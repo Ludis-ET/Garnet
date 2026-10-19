@@ -1,0 +1,8 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Platform-neutral: no Node or DOM globals. This package must run in Hermes and Node.
+    "types": []
+  },
+  "include": ["src"]
+}

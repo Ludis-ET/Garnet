@@ -1,0 +1,22 @@
+{
+  "name": "@garnet/domain",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Pure, platform-neutral Garnet business rules: shared day, Shared Spark, signals. Runs on server and client.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "temporal-polyfill": "catalog:"
+  },
+  "devDependencies": {
+    "fast-check": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

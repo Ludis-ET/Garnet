@@ -1,0 +1,16 @@
+{
+  "name": "@garnet/spike-offline-sync",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Feasibility spike F-04: retry-safe offline sync with idempotency, tombstones and fault injection.",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "fast-check": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "name": "garnet",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Garnet — a private app for exactly two partners. Phase 1: scope, design, architecture and feasibility.",
+  "type": "module",
+  "packageManager": "pnpm@10.24.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "mutation": "node scripts/mutation-check.mjs",
+    "spike:media": "pnpm --filter @garnet/spike-media-retry spike",
+    "test": "pnpm --recursive --parallel run test",
+    "typecheck": "pnpm --recursive run typecheck"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.19.1",
+    "eslint": "^10.12.0",
+    "prettier": "^3.9.0",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.71.0",
+    "vitest": "^5.0.3"
+  }
+}

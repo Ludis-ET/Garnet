@@ -1,0 +1,21 @@
+# F-07 local S3-compatible storage. Local testing only: never deploy this.
+# SeaweedFS 4.46 (released 2026-09-08), pinned by digest. MinIO images are no longer
+# published on Docker Hub or quay.io (checked 2026-10-19), so SeaweedFS was chosen: it
+# enforces SigV4 authentication (anonymous requests get 403), unlike signature-less mocks.
+services:
+  s3:
+    image: chrislusf/seaweedfs:4.46@sha256:08d516132314207d10c8e37cbffc1f32b147d870169688734cc61c6231625b62
+    container_name: garnet-f07-s3
+    command:
+      - server
+      - -dir=/data
+      - -s3
+      - -s3.port=8333
+      - -s3.config=/etc/garnet/s3.json
+      - -master.volumeSizeLimitMB=64
+      - -volume.max=4
+    ports:
+      - "127.0.0.1:18333:8333"
+    volumes:
+      # Written per run with random local-only keys by scripts/local-credentials.mjs (git-ignored).
+      - ./.cache/s3-config/s3.json:/etc/garnet/s3.json:ro

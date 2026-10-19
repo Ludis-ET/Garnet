@@ -1,0 +1,19 @@
+{
+  "name": "@garnet/spike-media-retry",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Feasibility spike F-07: server-side media upload, retry, commit validation and purge against local S3-compatible storage (SeaweedFS in Docker).",
+  "type": "module",
+  "scripts": {
+    "spike": "node scripts/run-spike.mjs",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@aws-sdk/client-s3": "3.1149.0",
+    "@aws-sdk/s3-request-presigner": "3.1149.0",
+    "@electric-sql/pglite": "catalog:",
+    "@types/node": "^24.19.1",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

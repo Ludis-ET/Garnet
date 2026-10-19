@@ -1,0 +1,31 @@
+# Dependencies and build output
+node_modules/
+dist/
+coverage/
+.cache/
+*.tsbuildinfo
+
+# Environment and secrets — never commit real credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.p8
+*.p12
+*.keystore
+*.jks
+google-services.json
+GoogleService-Info.plist
+
+# Character art and rights-restricted assets live outside this repo until the
+# rights review is complete (see docs/characters/rights.md).
+assets/characters/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+*.log
+
+# Office lock files
+~$*
