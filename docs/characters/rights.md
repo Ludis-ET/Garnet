@@ -1,5 +1,7 @@
 # Character rights path
 
+> **Owner direction P-45 (2026-10-21):** the prototype's Ruby, Sapphire and Garnet now come only from images the owner generates (prompt: [docs/design/gemini-character-prompt.md](../design/gemini-character-prompt.md)) and keeps in the git-ignored `apps/mobile/assets/characters/`. The earlier code-drawn figures were removed. **No licence exists yet, U-10 stays unresolved and public distribution stays blocked.**
+
 > Not legal advice, and **not a legal review or approval**. No lawyer has reviewed this. A qualified IP lawyer should review it before any distribution decision.
 
 ## The situation

@@ -4,7 +4,7 @@
 
 A private app for exactly two partners living apart. Ruby ❤️ + Sapphire 💙 → Garnet 💜.
 
-**Status: Phase 1 — closed (2026-10-19).** All eight §16 exit criteria are met. The known limitations carried forward (device behaviour, API authorization, Open When body enforcement, provider behaviour, character rights) are on the [Phase 1 status board](docs/README.md#phase-1-status-board). No decision has been Accepted. Phase 2 has not started and needs the owner's approval: [backlog](docs/phase-2/backlog.md).
+**Status: Phase 2 — design and mock prototype (started 2026-10-19).** Page prompts: [docs/design](docs/design/README.md); app: [apps/mobile](apps/mobile/README.md). Phase 1 — closed (2026-10-19). All eight §16 exit criteria are met. The known limitations carried forward (device behaviour, API authorization, Open When body enforcement, provider behaviour, character rights) are on the [Phase 1 status board](docs/README.md#phase-1-status-board). No decision has been Accepted. Phase 2 has not started and needs the owner's approval: [backlog](docs/phase-2/backlog.md).
 
 ## Quick start
 
@@ -22,6 +22,8 @@ pnpm mutation         # reproducible mutation checks (add --with-docker to inclu
 | Path                                        | Contents                                                                                                         |
 | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | [docs/](docs/README.md)                     | Scope record, decision log, product, UX, feature specs, architecture, ADRs, feasibility results, Phase 2 backlog |
+| [apps/mobile](apps/mobile/)                 | The Expo app: Phase 2 UI prototype on mock data (no backend)                                                     |
+| [docs/design](docs/design/README.md)        | Phase 2 specifications and the per-page design prompts                                                           |
 | [packages/domain](packages/domain/)         | Shared business rules: shared day across GMT/BST ↔ Addis Ababa, Shared Spark engine, signals                     |
 | [spikes/offline-sync](spikes/offline-sync/) | Sync protocol tested in an in-memory simulation with fault injection (F-04)                                      |
 | [spikes/media-retry](spikes/media-retry/)   | Server-side media upload and retry against local SeaweedFS in Docker (F-07)                                      |

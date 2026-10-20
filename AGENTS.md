@@ -6,7 +6,7 @@ This file is the single source of agent instructions for this repository. Tool-s
 
 Garnet is a private mobile app for **exactly two partners** in a long-distance relationship, one in Ethiopia (`Africa/Addis_Ababa`) and one in the UK (`Europe/London`). Promise: _"I can't be there with you right now, but I can still be part of your day."_
 
-**Current status: Phase 1 — closed (2026-10-19).** Phase 1 covered planning, design and feasibility; its known limitations are listed on the [status board](docs/README.md#phase-1-status-board). **Phase 2 (building the app) has not started and must not start without the owner's explicit approval.** No decision has been Accepted. There is no production app yet. `apps/` does not exist; do not create it unless the task is explicitly a Phase 2 backlog item ([docs/phase-2/backlog.md](docs/phase-2/backlog.md)).
+**Current status: Phase 2 — complete mobile design and mock prototype (started 2026-10-19, owner direction P-39).** Every screen and state is built in `apps/mobile` on **local mock data only**: no backend, API, real auth, push, email, cloud media or sync. Pages are implemented one at a time **only after the owner's design for that page exists** (gate B-04). Phase 1 is closed; its known limitations are on the [status board](docs/README.md#phase-1-status-board). No decision has been Accepted. Mobile rules: [apps/mobile/AGENTS.md](apps/mobile/AGENTS.md).
 
 ## 2. Commands — run before claiming anything works
 
@@ -29,6 +29,8 @@ Never report a task as done if `pnpm check` fails. Report failures with their ou
 | `docs/`                                     | Source of truth for scope, decisions, specs and architecture. Start at [docs/README.md](docs/README.md).                                         |
 | `docs/phase-1-scope-and-decision-record.md` | The scope record (Markdown copy of the `.docx`). `§n` references point here.                                                                     |
 | `docs/decisions/decision-log.md`            | **Every** decision (D-), Phase 1 proposal (P-) and unresolved question (U-).                                                                     |
+| `apps/mobile/`                              | The Expo app (Phase 2 prototype). Has its own [AGENTS.md](apps/mobile/AGENTS.md).                                                                |
+| `docs/design/`                              | Phase 2 specs (Markdown transcriptions of the owner's two `.docx` files) and the page design prompts with page IDs.                              |
 | `packages/domain/`                          | `@garnet/domain`: pure, platform-neutral business rules (shared day, Shared Spark, signals). Has its own [AGENTS.md](packages/domain/AGENTS.md). |
 | `spikes/offline-sync/`                      | F-04 evidence: sync protocol simulation with fault injection and property tests.                                                                 |
 | `spikes/data-model/`                        | F-05 evidence: draft PostgreSQL schema + RLS, tested on PGlite.                                                                                  |
@@ -118,7 +120,7 @@ These come from §2, §5, §7 and §11. Violating one is a bug even if a task as
 
 - Follow [docs/ux/voice-and-copy.md](docs/ux/voice-and-copy.md). Banned in Spark, widget and notification copy: _broken, lost, failed (about people), missed (accusatory), ignored, seen, read, last chance, don't let … down_.
 - **Characters (P-30, P-31, U-10, U-26):** the intended experience uses the **actual _Steven Universe_ characters Ruby, Sapphire and Garnet** (owner direction). Do not replace them with original characters, and do not treat private-only distribution as the product. Rights and distribution authorization are **unresolved**; never claim otherwise, and keep public distribution blocked.
-  **Safeguards stay in force:** do **not** generate, download, trace or commit character art, icons, audio or text. Do not use official artwork. Character assets stay out of the repo (`assets/characters/` is git-ignored). Asset sourcing is open (U-26). Performance tests may use proxy assets only if the results are labelled as proxy (P-31).
+  **Safeguards stay in force:** do **not** download or trace character art, icons, audio or text, and do not use official artwork or quote the show. **Character images are owner-supplied (P-44, P-45):** the app shows Ruby, Sapphire and Garnet only from images the owner generates and places in the git-ignored `apps/mobile/assets/characters/` (prompt: `docs/design/gemini-character-prompt.md`). Agents may process those files (cut out backgrounds, crop, rename) but do not draw, generate, download or trace character art themselves. Character assets stay out of the repo (`assets/characters/` is git-ignored). Asset sourcing is open (U-26). Performance tests may use proxy assets only if the results are labelled as proxy (P-31).
 - **Working icon:** undecided (U-25). Do not treat any concept, I-1 included, as chosen.
 
 ## 9. Working style

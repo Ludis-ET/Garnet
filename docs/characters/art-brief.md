@@ -1,5 +1,7 @@
 # Character art brief
 
+> **Owner direction P-45 (2026-10-21):** the prototype's Ruby, Sapphire and Garnet now come only from images the owner generates (prompt: [docs/design/gemini-character-prompt.md](../design/gemini-character-prompt.md)) and keeps in the git-ignored `apps/mobile/assets/characters/`. The earlier code-drawn figures were removed. **No licence exists yet, U-10 stays unresolved and public distribution stays blocked.**
+
 For §9 and §13C. **Product direction: the actual characters Ruby, Sapphire and Garnet** (P-30, owner direction, not Accepted). **Rights and distribution authorization remain unresolved** ([rights.md](./rights.md), U-10). Public distribution stays blocked. Asset sourcing and handling are open (U-26), and the P-31 safeguards apply: no official artwork in the repo, and agents do not generate, trace or commit character art.
 
 ## Characters and their roles in the app

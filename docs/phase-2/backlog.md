@@ -1,5 +1,7 @@
 # Phase 2 backlog (dependency-ordered)
 
+> **Re-sequenced 2026-10-19 (owner direction P-39).** Phase 2 is now the complete mobile **design and mock prototype** ([docs/design/](../design/README.md)). The backend, auth, sync, storage and notification items below move to **Phase 4–5** of the new roadmap; their order and gates still apply there. For Phase 2, the relevant items are B-04 (UI gate: a page's design exists before it is coded), B-10 (mobile scaffold: **started** — Expo SDK 57 app in `apps/mobile`, device run pending U-01), and the design-review exit (Phase 3 freeze).
+
 Each item lists what it **depends on** (work or decisions) and what "done" means. Items are ordered so nothing starts on a guess (§1). ⛔ = blocked by an unresolved decision.
 
 **UI gate (P-34, owner direction):** no Phase 2 UI implementation starts until **B-04** is done. This applies to the UI parts of B-20, B-21 and B-22 (J1/J2), and to every later item with UI (B-32, B-33, B-51, B-62, B-71, B-80, B-90, B-100, B-101).

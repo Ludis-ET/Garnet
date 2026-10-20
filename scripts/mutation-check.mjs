@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Reproducible mutation checks for the Phase 1 evidence suites.
+// Reproducible mutation checks for the Phase 1 evidence suites and the Phase 2 mobile guards.
 //
 // For each mutant: copy the suite into a scratch directory (never touching the real sources),
 // apply ONE deliberate break, run the suite's real tests, and require them to FAIL ("killed").
@@ -10,6 +10,7 @@
 //   pnpm mutation --with-docker   # also media-retry (starts local S3 storage in Docker)
 //   pnpm mutation --runs 5        # repeat randomized (property-based) suites N times per mutant
 //   pnpm mutation --only offline-sync   # run one suite
+//   pnpm mutation --only mobile         # the Phase 2 mobile prototype (Jest)
 import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -311,6 +312,56 @@ const suites = [
       },
     ],
   },
+  {
+    name: "mobile",
+    pkg: "apps/mobile",
+    runner: "jest",
+    copy: ["src", "jest.setup.js"],
+    runs: 2,
+    mutants: [
+      {
+        id: "OW-1",
+        file: "src/domain/openWhen.ts",
+        find: "        eligible: isRecipient && isEligible(letter, now),\n      };",
+        replace:
+          "        eligible: isRecipient && isEligible(letter, now),\n        ...{ body: letter.body },\n      };",
+        expect: "killed",
+        note: "sealed Open When view never carries the body (U-34 conservative)",
+      },
+      {
+        id: "FIG-1",
+        file: "src/features/figures/scenes.ts",
+        find: `line: "Take your time. I'm listening.",`,
+        replace: `line: "You missed my message. I'm listening.",`,
+        expect: "killed",
+        note: "figure copy stays free of banned/guilt words",
+      },
+      {
+        id: "FIG-2",
+        file: "src/features/figures/poses.ts",
+        find: "  if (reduceMotion) return { lift: 0, sway: 0, breathe: 1 };\n",
+        replace: "",
+        expect: "killed",
+        note: "reduced motion holds every pose",
+      },
+      {
+        id: "FIG-3",
+        file: "src/features/figures/studioState.ts",
+        find: '      if (state.cast !== "duo") return state;\n',
+        replace: "",
+        expect: "killed",
+        note: "fusion only from Ruby & Sapphire",
+      },
+      {
+        id: "FIG-4",
+        file: "src/features/figures/types.ts",
+        find: '  "sneaky",\n] as const;',
+        replace: '  "sneaky",\n  "sad",\n] as const;',
+        expect: "killed",
+        note: "no sad, angry or abandoned moods",
+      },
+    ],
+  },
 ];
 
 function run(command, commandArgs, cwd, env = process.env) {
@@ -335,8 +386,24 @@ function prepare(suite, label) {
   return { pkgDir, dir };
 }
 
-/** Runs the copied suite; returns { failed, passedCount } from Vitest's summary line. */
+/** Runs the copied suite; returns { failed, passedCount } from the runner's summary line. */
 function runSuite(suite, dir, pkgDir) {
+  if (suite.runner === "jest") {
+    // The package's Jest config (package.json) is reused with the scratch copy as rootDir.
+    const { status, output } = run(
+      "pnpm",
+      // The real config ignores /.cache/ (where these copies live); only node_modules here.
+      ["exec", "jest", "--ci", "--rootDir", dir, "--testPathIgnorePatterns", "/node_modules/"],
+      pkgDir,
+    );
+    const summary = /Tests:\s+(?:(\d+) failed, )?(\d+) passed/.exec(output);
+    return {
+      failed: status !== 0,
+      failedCount: Number(summary?.[1] ?? 0),
+      passedCount: Number(summary?.[2] ?? 0),
+      output,
+    };
+  }
   const env = suite.docker ? { ...process.env, ...dockerEnv } : process.env;
   const { status, output } = run(
     "pnpm",

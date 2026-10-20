@@ -1,14 +1,22 @@
 // @ts-check
 import js from "@eslint/js";
+import reactHooks from "eslint-plugin-react-hooks";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: ["**/node_modules/**", "**/dist/**", "**/coverage/**", "**/.cache/**"],
+    ignores: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/coverage/**",
+      "**/.cache/**",
+      "**/.expo/**",
+      "**/expo-env.d.ts",
+    ],
   },
   js.configs.recommended,
   {
-    files: ["**/*.ts"],
+    files: ["**/*.ts", "**/*.tsx"],
     extends: [tseslint.configs.strictTypeChecked, tseslint.configs.stylisticTypeChecked],
     languageOptions: {
       parserOptions: {
@@ -25,7 +33,18 @@ export default tseslint.config(
     },
   },
   {
-    files: ["**/*.test.ts"],
+    // React rules for the mobile app (hooks correctness and the React Compiler-ready rule set).
+    files: ["apps/mobile/**/*.tsx", "apps/mobile/**/*.ts"],
+    extends: [reactHooks.configs.flat["recommended-latest"]],
+  },
+  {
+    // react-native-svg's types merge a deprecated `x`/`y` transform shorthand into every
+    // element, so `<Rect x y>` (the rectangle's real position attributes) is falsely flagged.
+    files: ["apps/mobile/src/features/figures/art/**/*.tsx"],
+    rules: { "@typescript-eslint/no-deprecated": "off" },
+  },
+  {
+    files: ["**/*.test.ts", "**/*.test.tsx"],
     rules: {
       "@typescript-eslint/no-non-null-assertion": "off",
     },
@@ -38,5 +57,10 @@ export default tseslint.config(
   {
     files: ["**/*.js"],
     extends: [tseslint.configs.disableTypeChecked],
+  },
+  {
+    // Jest setup runs as CommonJS with Jest globals.
+    files: ["apps/mobile/jest.setup.js"],
+    languageOptions: { globals: { jest: "readonly", require: "readonly" } },
   },
 );

@@ -1,0 +1,235 @@
+/**
+ * One ready-made figure scene per app area, keyed to the page IDs in docs/design/prompts.
+ * These are proposals for the owner's page designs (B-04), not approved page content.
+ * Lines are original draft copy (voice-and-copy.md); no day-apart counters, scores or guilt.
+ */
+import type { Cast, FigureId, Mood, Occasion } from "./types";
+
+export interface SceneDef {
+  id: string;
+  label: string;
+  /** Page IDs from docs/design/prompts this scene is meant for. */
+  pages: readonly string[];
+  cast: Cast;
+  moods: Partial<Record<FigureId, Mood>>;
+  occasion: Occasion;
+  speaker: FigureId;
+  line: string;
+}
+
+export const scenes: readonly SceneDef[] = [
+  {
+    id: "home",
+    label: "Home",
+    pages: ["HOME-01"],
+    cast: "trio",
+    moods: { sapphire: "calm", garnet: "hello", ruby: "happy" },
+    occasion: "everyday",
+    speaker: "garnet",
+    line: "Welcome back. Both of your days are here.",
+  },
+  {
+    id: "welcome",
+    label: "Welcome",
+    pages: ["AUTH-01"],
+    cast: "trio",
+    moods: { sapphire: "hello", garnet: "happy", ruby: "hello" },
+    occasion: "together",
+    speaker: "garnet",
+    line: "Two lives. One space.",
+  },
+  {
+    id: "pairing",
+    label: "Pairing",
+    pages: ["PAIR-01", "PAIR-05"],
+    cast: "duo",
+    moods: { sapphire: "loving", ruby: "joyful" },
+    occasion: "together",
+    speaker: "ruby",
+    line: "Two gems, one space. Ready to fuse?",
+  },
+  {
+    id: "morning",
+    label: "Morning",
+    pages: ["HOME-02", "WIDGET-02"],
+    cast: "trio",
+    moods: { sapphire: "sleepy", garnet: "calm", ruby: "joyful" },
+    occasion: "morning",
+    speaker: "ruby",
+    line: "Morning, gem! Coffee first, chaos second.",
+  },
+  {
+    id: "days",
+    label: "Days",
+    pages: ["DAYS-01", "DAYS-03"],
+    cast: "ruby",
+    moods: { ruby: "thinking" },
+    occasion: "cozy",
+    speaker: "ruby",
+    line: "A tiny moment counts. Even a snack. Especially a snack.",
+  },
+  {
+    id: "us",
+    label: "Us",
+    pages: ["US-01"],
+    cast: "duo",
+    moods: { sapphire: "dreamy", ruby: "loving" },
+    occasion: "together",
+    speaker: "sapphire",
+    line: "Somewhere, two gems are thinking about each other.",
+  },
+  {
+    id: "needYou",
+    label: "I need you",
+    pages: ["US-04", "US-05"],
+    cast: "garnet",
+    moods: { garnet: "hug" },
+    occasion: "cozy",
+    speaker: "garnet",
+    line: "Sending a hug across the miles.",
+  },
+  {
+    id: "chat",
+    label: "Chat",
+    pages: ["CHAT-00", "CHAT-01"],
+    cast: "sapphire",
+    moods: { sapphire: "listening" },
+    occasion: "everyday",
+    speaker: "sapphire",
+    line: "Take your time. I'm listening.",
+  },
+  {
+    id: "openWhen",
+    label: "Open When",
+    pages: ["OPEN-01", "OPEN-05"],
+    cast: "sapphire",
+    moods: { sapphire: "dreamy" },
+    occasion: "openWhen",
+    speaker: "sapphire",
+    line: "A letter is waiting for just the right moment.",
+  },
+  {
+    id: "memories",
+    label: "Memories",
+    pages: ["MEM-01"],
+    cast: "ruby",
+    moods: { ruby: "proud" },
+    occasion: "memory",
+    speaker: "ruby",
+    line: "Look how far you two have come.",
+  },
+  {
+    id: "events",
+    label: "Events",
+    pages: ["EVT-01"],
+    cast: "trio",
+    moods: { sapphire: "happy", garnet: "celebrating", ruby: "celebrating" },
+    occasion: "celebration",
+    speaker: "ruby",
+    line: "Big day coming. I've already picked my outfit.",
+  },
+  {
+    id: "birthday",
+    label: "Birthday",
+    pages: ["EVT-03"],
+    cast: "trio",
+    moods: { sapphire: "joyful", garnet: "celebrating", ruby: "celebrating" },
+    occasion: "birthday",
+    speaker: "garnet",
+    line: "Happy birthday! The cake is mostly intact.",
+  },
+  {
+    id: "anniversary",
+    label: "Anniversary",
+    pages: ["EVT-04"],
+    cast: "duo",
+    moods: { sapphire: "loving", ruby: "shy" },
+    occasion: "anniversary",
+    speaker: "sapphire",
+    line: "Another year of each other's days.",
+  },
+  {
+    id: "surprise",
+    label: "Surprises",
+    pages: ["SUR-01", "SUR-05"],
+    cast: "ruby",
+    moods: { ruby: "surprised" },
+    occasion: "surprise",
+    speaker: "ruby",
+    line: "Wait, is that for me?",
+  },
+  {
+    id: "reunion",
+    label: "Reunion",
+    pages: ["FUT-01", "FUT-02"],
+    cast: "duo",
+    moods: { sapphire: "joyful", ruby: "celebrating" },
+    occasion: "reunion",
+    speaker: "ruby",
+    line: "Bags packed with excitement. And snacks.",
+  },
+  {
+    id: "soundtrack",
+    label: "Soundtrack",
+    pages: ["SONG-01"],
+    cast: "sapphire",
+    moods: { sapphire: "dreamy" },
+    occasion: "music",
+    speaker: "sapphire",
+    line: "This one sounds like the two of you.",
+  },
+  {
+    id: "spark",
+    label: "Spark",
+    pages: ["HOME-03"],
+    cast: "garnet",
+    moods: { garnet: "joyful" },
+    occasion: "spark",
+    speaker: "garnet",
+    line: "Your Spark grew today ✨",
+  },
+  {
+    id: "search",
+    label: "Search",
+    pages: ["SEARCH-01"],
+    cast: "ruby",
+    moods: { ruby: "thinking" },
+    occasion: "everyday",
+    speaker: "ruby",
+    line: "Let's find it together.",
+  },
+  {
+    id: "settings",
+    label: "Settings",
+    pages: ["SET-01"],
+    cast: "garnet",
+    moods: { garnet: "calm" },
+    occasion: "everyday",
+    speaker: "garnet",
+    line: "Everything here is yours to tune.",
+  },
+  {
+    id: "winter",
+    label: "Winter",
+    pages: ["EVT-01"],
+    cast: "trio",
+    moods: { sapphire: "happy", garnet: "calm", ruby: "joyful" },
+    occasion: "winter",
+    speaker: "sapphire",
+    line: "Cosy season. Scarves are mandatory.",
+  },
+  {
+    id: "goodnight",
+    label: "Goodnight",
+    pages: ["WIDGET-05", "NOTIF-01"],
+    cast: "trio",
+    moods: { sapphire: "sleepy", garnet: "sleepy", ruby: "sleepy" },
+    occasion: "goodnight",
+    speaker: "garnet",
+    line: "Sleep well. Today's moments are safe here.",
+  },
+];
+
+export function sceneById(id: string): SceneDef | undefined {
+  return scenes.find((s) => s.id === id);
+}

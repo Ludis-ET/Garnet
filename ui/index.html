@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" data-motion="normal">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Garnet — Interactive Mobile Design System & Screen Simulator</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><polygon points='50,5 95,35 80,95 20,95 5,35' fill='%239A7BFF'/></svg>">
+</head>
+<body>
+
+  <!-- Top Studio Header -->
+  <header class="studio-header">
+    <div class="studio-brand">
+      <div class="brand-gem"></div>
+      <span class="brand-title">Garnet</span>
+      <span class="brand-subtitle">Design Studio</span>
+    </div>
+
+    <!-- Quick Search & Filtering -->
+    <div class="search-box">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="prompt-search" placeholder="Search prompts (e.g. HOME-01, letter, reveal)…" />
+    </div>
+
+    <!-- Studio Toolbar Controls -->
+    <div class="studio-toolbar">
+      <!-- Device Presets -->
+      <div class="studio-btn-group">
+        <button class="studio-btn preset-btn active" id="btn-preset-iphone" onclick="GarnetApp.setPreset('iphone')" title="iPhone 16 Pro (393 × 852 pt)">
+          📱 iPhone
+        </button>
+        <button class="studio-btn preset-btn" id="btn-preset-compact" onclick="GarnetApp.setPreset('compact')" title="Compact Phone (375 × 667 pt)">
+          📲 Compact
+        </button>
+        <button class="studio-btn preset-btn" id="btn-preset-android" onclick="GarnetApp.setPreset('android')" title="Android (412 × 915 dp)">
+          🤖 Android
+        </button>
+        <button class="studio-btn preset-btn" id="btn-preset-unframed" onclick="GarnetApp.setPreset('unframed')" title="Full Viewport">
+          ⤢ Unframed
+        </button>
+      </div>
+
+      <!-- Viewing Side -->
+      <div class="studio-btn-group">
+        <button class="studio-btn active" id="btn-side-ruby" onclick="GarnetApp.setSide('ruby')" title="Viewing as Selam (Ruby / Addis)">
+          ❤️ Ruby
+        </button>
+        <button class="studio-btn" id="btn-side-sapphire" onclick="GarnetApp.setSide('sapphire')" title="Viewing as Noah (Sapphire / London)">
+          💙 Sapphire
+        </button>
+      </div>
+
+      <!-- Theme Mode -->
+      <div class="studio-btn-group">
+        <button class="studio-btn active" id="btn-theme-dark" onclick="GarnetApp.setTheme('dark')" title="Dark Mode (Canvas #0D0B12)">
+          🌙
+        </button>
+        <button class="studio-btn" id="btn-theme-light" onclick="GarnetApp.setTheme('light')" title="Light Mode (Canvas #F7F5FA)">
+          ☀️
+        </button>
+      </div>
+
+      <!-- Motion -->
+      <div class="studio-btn-group">
+        <button class="studio-btn active" id="btn-motion-normal" onclick="GarnetApp.setMotion('normal')" title="Smooth Animations">
+          ⚡
+        </button>
+        <button class="studio-btn" id="btn-motion-reduced" onclick="GarnetApp.setMotion('reduced')" title="Reduced Motion">
+          ⏸️
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Studio Workspace -->
+  <div class="studio-body">
+    <!-- Left Sidebar: Categorized Prompts Directory -->
+    <aside class="studio-sidebar">
+      <div class="sidebar-header">
+        <span class="sidebar-title">Design Prompts</span>
+        <span class="sidebar-count">17 Suites</span>
+      </div>
+      <div class="sidebar-scroll" id="sidebar-scroll">
+        <!-- Rendered via GarnetApp.buildSidebar() -->
+      </div>
+    </aside>
+
+    <!-- Center Stage: Mobile Phone Simulator -->
+    <main class="stage-area" id="stage-area">
+      <div class="device-wrapper">
+        <div class="device-frame" id="device-frame">
+          <!-- Dynamic Island -->
+          <div class="dynamic-island">
+            <div class="island-camera"></div>
+            <div class="island-sensor"></div>
+          </div>
+
+          <!-- Status Bar with Dual Time Clocks -->
+          <div class="status-bar">
+            <span class="status-time" id="status-time">09:12</span>
+            <div class="status-dual-zones" id="status-dual">
+              <span>Addis 09:12</span> · <span>LDN 07:12</span>
+            </div>
+            <div class="status-icons">
+              <span>5G</span>
+              <span>🔋</span>
+            </div>
+          </div>
+
+          <!-- Phone Viewport Screen Content -->
+          <div class="phone-viewport" id="phone-viewport">
+            <!-- Screen dynamically injected here -->
+          </div>
+
+          <!-- Home Indicator Bar -->
+          <div class="home-indicator"></div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Right Inspector: Prompt Spec, Route, States & Guardrails -->
+    <aside class="studio-inspector">
+      <div class="inspector-tag" id="insp-id">HOME-01</div>
+      <h2 class="inspector-title" id="insp-title">Home (default)</h2>
+      <div class="inspector-route" id="insp-route">/(tabs)/home</div>
+
+      <div class="inspector-section">
+        <div class="inspector-label">Interactive States</div>
+        <div class="state-chips-container" id="insp-states">
+          <!-- State chips dynamically injected -->
+        </div>
+      </div>
+
+      <div class="inspector-section">
+        <div class="inspector-label">Verbatim Design Prompt</div>
+        <div class="prompt-text-box" id="insp-prompt">
+          <!-- Prompt instruction -->
+        </div>
+      </div>
+
+      <div class="inspector-section">
+        <div class="inspector-label">Product Guardrails</div>
+        <div id="insp-guardrails">
+          <!-- Guardrails -->
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Scripts -->
+  <script src="data.js"></script>
+  <script src="screens.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

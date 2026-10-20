@@ -18,8 +18,10 @@ google-services.json
 GoogleService-Info.plist
 
 # Character art and rights-restricted assets live outside this repo until the
-# rights review is complete (see docs/characters/rights.md).
-assets/characters/
+# rights review is complete (see docs/characters/rights.md). Only the folder's README is
+# tracked, so the folder exists for the app to read owner-supplied images locally.
+**/assets/characters/*
+!**/assets/characters/README.md
 
 # OS / editor
 .DS_Store

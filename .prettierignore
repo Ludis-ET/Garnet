@@ -4,3 +4,7 @@ coverage
 .cache
 dist
 *.docx
+
+# Expo-generated files
+**/.expo/
+**/expo-env.d.ts
