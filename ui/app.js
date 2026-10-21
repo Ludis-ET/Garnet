@@ -26,7 +26,7 @@ const GarnetApp = {
     if (!container) return;
 
     let html = "";
-    GARNET_DATA.categories.forEach(cat => {
+    GARNET_DATA.categories.forEach((cat) => {
       html += `
         <div class="category-group" id="cat-${cat.id}">
           <div class="category-header" onclick="GarnetApp.toggleCategory('${cat.id}')">
@@ -34,12 +34,16 @@ const GarnetApp = {
             <span class="category-chevron">▼</span>
           </div>
           <div class="prompt-list">
-            ${cat.prompts.map(p => `
+            ${cat.prompts
+              .map(
+                (p) => `
               <div class="prompt-item" id="item-${p.id}" onclick="GarnetApp.navigatePrompt('${p.id}')">
                 <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 200px;">${p.title}</span>
                 <span class="prompt-id">${p.id}</span>
               </div>
-            `).join('')}
+            `,
+              )
+              .join("")}
           </div>
         </div>
       `;
@@ -58,11 +62,15 @@ const GarnetApp = {
   // Search filter across all prompts
   filterPrompts(query) {
     const q = query.toLowerCase().trim();
-    GARNET_DATA.categories.forEach(cat => {
+    GARNET_DATA.categories.forEach((cat) => {
       let anyMatch = false;
-      cat.prompts.forEach(p => {
+      cat.prompts.forEach((p) => {
         const itemEl = document.getElementById(`item-${p.id}`);
-        const match = !q || p.id.toLowerCase().includes(q) || p.title.toLowerCase().includes(q) || p.prompt.toLowerCase().includes(q);
+        const match =
+          !q ||
+          p.id.toLowerCase().includes(q) ||
+          p.title.toLowerCase().includes(q) ||
+          p.prompt.toLowerCase().includes(q);
         if (itemEl) {
           itemEl.style.display = match ? "flex" : "none";
         }
@@ -100,7 +108,7 @@ const GarnetApp = {
     this.currentState = state || (promptData.states && promptData.states[0]) || "default";
 
     // Update active highlight in sidebar
-    document.querySelectorAll(".prompt-item").forEach(el => el.classList.remove("active"));
+    document.querySelectorAll(".prompt-item").forEach((el) => el.classList.remove("active"));
     const activeEl = document.getElementById(`item-${promptId}`);
     if (activeEl) {
       activeEl.classList.add("active");
@@ -168,11 +176,16 @@ const GarnetApp = {
     // Guardrails
     const guardrailBox = document.getElementById("insp-guardrails");
     if (promptData.guardrails && promptData.guardrails.length > 0) {
-      guardrailBox.innerHTML = promptData.guardrails.map(g => `
+      guardrailBox.innerHTML = promptData.guardrails
+        .map(
+          (g) => `
         <div class="guardrail-pill">🔒 ${g}</div>
-      `).join('');
+      `,
+        )
+        .join("");
     } else {
-      guardrailBox.innerHTML = '<div class="caption-text">Standard Garnet product guardrails apply.</div>';
+      guardrailBox.innerHTML =
+        '<div class="caption-text">Standard Garnet product guardrails apply.</div>';
     }
 
     this.updateStateChips(promptData);
@@ -183,11 +196,15 @@ const GarnetApp = {
     const container = document.getElementById("insp-states");
     if (!container || !data || !data.states) return;
 
-    container.innerHTML = data.states.map(s => `
-      <span class="state-chip ${this.currentState === s ? 'active' : ''}" onclick="GarnetApp.setState('${s}')">
+    container.innerHTML = data.states
+      .map(
+        (s) => `
+      <span class="state-chip ${this.currentState === s ? "active" : ""}" onclick="GarnetApp.setState('${s}')">
         ${s}
       </span>
-    `).join('');
+    `,
+      )
+      .join("");
   },
 
   // In-App Toast notice
@@ -219,14 +236,23 @@ const GarnetApp = {
     const updateTime = () => {
       const now = new Date();
       // Formatter for Addis Ababa
-      const addisTime = now.toLocaleTimeString("en-GB", { timeZone: "Africa/Addis_Ababa", hour: "2-digit", minute: "2-digit" });
-      const londonTime = now.toLocaleTimeString("en-GB", { timeZone: "Europe/London", hour: "2-digit", minute: "2-digit" });
+      const addisTime = now.toLocaleTimeString("en-GB", {
+        timeZone: "Africa/Addis_Ababa",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      const londonTime = now.toLocaleTimeString("en-GB", {
+        timeZone: "Europe/London",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
 
       const timeEl = document.getElementById("status-time");
       if (timeEl) timeEl.innerText = addisTime;
 
       const dualEl = document.getElementById("status-dual");
-      if (dualEl) dualEl.innerHTML = `<span>Addis ${addisTime}</span> · <span>LDN ${londonTime}</span>`;
+      if (dualEl)
+        dualEl.innerHTML = `<span>Addis ${addisTime}</span> · <span>LDN ${londonTime}</span>`;
     };
 
     updateTime();
@@ -252,7 +278,7 @@ const GarnetApp = {
     if (preset === "unframed") document.getElementById("stage-area").classList.add("unframed-mode");
     else document.getElementById("stage-area").classList.remove("unframed-mode");
 
-    document.querySelectorAll(".preset-btn").forEach(btn => btn.classList.remove("active"));
+    document.querySelectorAll(".preset-btn").forEach((btn) => btn.classList.remove("active"));
     const activeBtn = document.getElementById(`btn-preset-${preset}`);
     if (activeBtn) activeBtn.classList.add("active");
   },
@@ -266,7 +292,10 @@ const GarnetApp = {
 
   setSide(side) {
     this.viewerSide = side;
-    document.documentElement.style.setProperty("--viewer-accent", side === "ruby" ? "var(--ruby)" : "var(--sapphire)");
+    document.documentElement.style.setProperty(
+      "--viewer-accent",
+      side === "ruby" ? "var(--ruby)" : "var(--sapphire)",
+    );
     document.getElementById("btn-side-ruby").classList.toggle("active", side === "ruby");
     document.getElementById("btn-side-sapphire").classList.toggle("active", side === "sapphire");
     this.renderCurrentScreen();
@@ -279,7 +308,7 @@ const GarnetApp = {
         this.filterPrompts(e.target.value);
       });
     }
-  }
+  },
 };
 
 // Auto-boot when DOM ready

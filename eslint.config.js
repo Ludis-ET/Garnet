@@ -63,4 +63,21 @@ export default tseslint.config(
     files: ["apps/mobile/jest.setup.js"],
     languageOptions: { globals: { jest: "readonly", require: "readonly" } },
   },
+  {
+    // Interactive UI preview files (browser globals and inter-script variables)
+    files: ["ui/**/*.js"],
+    languageOptions: {
+      globals: {
+        document: "readonly",
+        window: "readonly",
+        setTimeout: "readonly",
+        setInterval: "readonly",
+        GARNET_DATA: "writable",
+        GARNET_SCREENS: "writable",
+      },
+    },
+    rules: {
+      "no-unused-vars": "off",
+    },
+  },
 );

@@ -95,7 +95,12 @@ const GARNET_SCREENS = {
   },
 
   // Gem Capsule Generator
-  renderCapsule(type = "ruby", status = "Sealed", prompt = "Open when you miss me", sender = "Noah") {
+  renderCapsule(
+    type = "ruby",
+    status = "Sealed",
+    prompt = "Open when you miss me",
+    sender = "Noah",
+  ) {
     return `
       <div class="gem-capsule-card" onclick="GarnetApp.handleOpenLetter('${prompt}')">
         <div class="capsule-icon-wrap">
@@ -106,7 +111,7 @@ const GARNET_SCREENS = {
         </div>
         <div class="section-title" style="font-size: 17px; margin-bottom: 4px;">"${prompt}"</div>
         <div class="caption-text" style="margin-bottom: 8px;">From ${sender}</div>
-        <span class="badge ${status === 'Ready to open' ? 'badge-simulated' : 'badge-provisional'}">${status}</span>
+        <span class="badge ${status === "Ready to open" ? "badge-simulated" : "badge-provisional"}">${status}</span>
       </div>
     `;
   },
@@ -118,18 +123,22 @@ const GARNET_SCREENS = {
       { id: "days", label: "Days", icon: "◫", prompt: "DAYS-01" },
       { id: "us", label: "Us", icon: "♡", prompt: "US-01" },
       { id: "moments", label: "Moments", icon: "✧", prompt: "OPEN-01" },
-      { id: "world", label: "Our World", icon: "◎", prompt: "WORLD-01" }
+      { id: "world", label: "Our World", icon: "◎", prompt: "WORLD-01" },
     ];
 
     return `
       <nav class="bottom-tab-bar">
-        ${tabs.map(t => `
-          <div class="tab-item ${activeTab === t.id ? 'active' : ''}" onclick="GarnetApp.navigatePrompt('${t.prompt}')">
+        ${tabs
+          .map(
+            (t) => `
+          <div class="tab-item ${activeTab === t.id ? "active" : ""}" onclick="GarnetApp.navigatePrompt('${t.prompt}')">
             <span class="tab-icon">${t.icon}</span>
             <span>${t.label}</span>
-            ${t.id === "us" ? '<span class="tab-badge-dot"></span>' : ''}
+            ${t.id === "us" ? '<span class="tab-badge-dot"></span>' : ""}
           </div>
-        `).join('')}
+        `,
+          )
+          .join("")}
       </nav>
     `;
   },
@@ -139,19 +148,27 @@ const GARNET_SCREENS = {
     return `
       <header style="padding: 12px 18px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; z-index: 10;">
         <div style="display: flex; align-items: center; gap: 10px;">
-          ${showBack ? `
+          ${
+            showBack
+              ? `
             <button onclick="GarnetApp.navigateBack()" style="background: none; border: none; color: var(--text-primary); font-size: 20px; cursor: pointer; padding: 4px;">‹</button>
-          ` : ''}
+          `
+              : ""
+          }
           <div>
             <h1 class="section-title" style="font-size: 20px; font-weight: 600;">${title}</h1>
-            ${subtitle ? `<div class="caption-text">${subtitle}</div>` : ''}
+            ${subtitle ? `<div class="caption-text">${subtitle}</div>` : ""}
           </div>
         </div>
-        ${showAvatar ? `
+        ${
+          showAvatar
+            ? `
           <div onclick="GarnetApp.openOverlay('HOME-05')" style="width: 34px; height: 34px; border-radius: 50%; border: 2px solid var(--ruby); background: linear-gradient(135deg, #FF6B8B, #D7264A); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: #FFF; cursor: pointer;">
             S
           </div>
-        ` : ''}
+        `
+            : ""
+        }
       </header>
     `;
   },
@@ -520,32 +537,32 @@ const GARNET_SCREENS = {
 
         <div class="input-group">
           <label class="input-label">Display name</label>
-          <input class="input-field" type="text" placeholder="e.g. Selam" value="${state !== 'empty' ? 'Selam' : ''}" ${isSubmitting ? 'disabled' : ''}/>
-          ${isError ? '<div class="input-error">⚠️ Please enter a display name</div>' : ''}
+          <input class="input-field" type="text" placeholder="e.g. Selam" value="${state !== "empty" ? "Selam" : ""}" ${isSubmitting ? "disabled" : ""}/>
+          ${isError ? '<div class="input-error">⚠️ Please enter a display name</div>' : ""}
         </div>
 
         <div class="input-group">
           <label class="input-label">Email</label>
-          <input class="input-field" type="email" placeholder="you@example.com" value="${state !== 'empty' ? 'selam@example.test' : ''}" ${isSubmitting ? 'disabled' : ''}/>
-          ${isError ? '<div class="input-error">⚠️ Enter a valid email address</div>' : ''}
-          ${state === 'duplicate-email' ? '<div class="input-error">ℹ️ An account may already exist for this email. Try signing in.</div>' : ''}
+          <input class="input-field" type="email" placeholder="you@example.com" value="${state !== "empty" ? "selam@example.test" : ""}" ${isSubmitting ? "disabled" : ""}/>
+          ${isError ? '<div class="input-error">⚠️ Enter a valid email address</div>' : ""}
+          ${state === "duplicate-email" ? '<div class="input-error">ℹ️ An account may already exist for this email. Try signing in.</div>' : ""}
         </div>
 
         <div class="input-group">
           <label class="input-label">Password</label>
-          <input class="input-field" type="password" value="${state !== 'empty' ? '••••••••••••' : ''}" ${isSubmitting ? 'disabled' : ''}/>
+          <input class="input-field" type="password" value="${state !== "empty" ? "••••••••••••" : ""}" ${isSubmitting ? "disabled" : ""}/>
           <div class="input-helper">At least 12 characters.</div>
         </div>
 
         <div class="input-group">
           <label class="input-label">Confirm password</label>
-          <input class="input-field" type="password" value="${state !== 'empty' ? '••••••••••••' : ''}" ${isSubmitting ? 'disabled' : ''}/>
-          ${isError ? '<div class="input-error">⚠️ Passwords do not match</div>' : ''}
+          <input class="input-field" type="password" value="${state !== "empty" ? "••••••••••••" : ""}" ${isSubmitting ? "disabled" : ""}/>
+          ${isError ? '<div class="input-error">⚠️ Passwords do not match</div>' : ""}
         </div>
 
         <div style="margin-top: auto; padding-top: 16px;">
-          <button class="btn-pill btn-primary-garnet" onclick="GarnetApp.navigatePrompt('AUTH-04')" ${isSubmitting ? 'disabled' : ''}>
-            ${isSubmitting ? 'Creating account…' : 'Create account'}
+          <button class="btn-pill btn-primary-garnet" onclick="GarnetApp.navigatePrompt('AUTH-04')" ${isSubmitting ? "disabled" : ""}>
+            ${isSubmitting ? "Creating account…" : "Create account"}
           </button>
           <div style="text-align: center; margin-top: 12px;">
             <a href="#" onclick="GarnetApp.navigatePrompt('AUTH-03')" class="caption-text" style="color: var(--text-secondary); text-decoration: none;">Already have an account? Sign in</a>
@@ -565,21 +582,29 @@ const GARNET_SCREENS = {
         <h1 class="display-title" style="font-size: 32px; margin-bottom: 8px;">Welcome back</h1>
         <p class="body-text" style="margin-bottom: 24px;">Return to your shared space</p>
 
-        ${isError ? `
+        ${
+          isError
+            ? `
           <div class="guardrail-pill" style="margin-bottom: 16px; background: rgba(248, 113, 113, 0.15);">
             Those details don't match. Try again.
           </div>
-        ` : ''}
+        `
+            : ""
+        }
 
-        ${isTooMany ? `
+        ${
+          isTooMany
+            ? `
           <div class="guardrail-pill" style="margin-bottom: 16px;">
             Please wait a moment before trying again.
           </div>
-        ` : ''}
+        `
+            : ""
+        }
 
         <div class="input-group" style="text-align: left;">
           <label class="input-label">Email</label>
-          <input class="input-field" type="email" placeholder="you@example.com" value="${state !== 'default' ? 'selam@example.test' : ''}" />
+          <input class="input-field" type="email" placeholder="you@example.com" value="${state !== "default" ? "selam@example.test" : ""}" />
         </div>
 
         <div class="input-group" style="text-align: left;">
@@ -587,7 +612,7 @@ const GARNET_SCREENS = {
             <label class="input-label">Password</label>
             <a href="#" onclick="GarnetApp.navigatePrompt('AUTH-05')" class="caption-text" style="color: var(--garnet); text-decoration: none;">Forgot password?</a>
           </div>
-          <input class="input-field" type="password" value="${state !== 'default' ? '••••••••••••' : ''}" />
+          <input class="input-field" type="password" value="${state !== "default" ? "••••••••••••" : ""}" />
         </div>
 
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px;">
@@ -777,14 +802,18 @@ const GARNET_SCREENS = {
         <div class="input-group">
           <label class="input-label">Invitation code</label>
           <div style="position: relative;">
-            <input class="input-field" style="font-family: monospace; font-size: 20px; letter-spacing: 2px;" type="text" placeholder="GRNT-XXXX" value="${state === 'typing' ? 'GRNT-4KQ7' : ''}" />
+            <input class="input-field" style="font-family: monospace; font-size: 20px; letter-spacing: 2px;" type="text" placeholder="GRNT-XXXX" value="${state === "typing" ? "GRNT-4KQ7" : ""}" />
             <button onclick="GarnetApp.showToast('Pasted from clipboard')" style="position: absolute; right: 8px; top: 8px; height: 32px; padding: 0 10px; background: rgba(255,255,255,0.08); border: none; border-radius: 8px; color: var(--text-secondary); font-size: 11px; cursor: pointer;">Paste</button>
           </div>
-          ${isInvalid ? `
+          ${
+            isInvalid
+              ? `
             <div class="guardrail-pill" style="margin-top: 12px;">
               This invite isn't valid anymore — ask your person for a new one.
             </div>
-          ` : ''}
+          `
+              : ""
+          }
         </div>
 
         <div style="margin-top: auto;">
@@ -914,7 +943,7 @@ const GARNET_SCREENS = {
 
           <div class="input-group">
             <label class="input-label">Nickname (optional)</label>
-            <input class="input-field" type="text" placeholder="e.g. My Love" value="${state === 'with-nickname' ? 'My Star' : ''}" />
+            <input class="input-field" type="text" placeholder="e.g. My Love" value="${state === "with-nickname" ? "My Star" : ""}" />
             <div class="input-helper">Only your person sees this.</div>
           </div>
 
@@ -985,23 +1014,23 @@ const GARNET_SCREENS = {
 
           <div style="display: flex; gap: 14px;">
             <!-- Ruby Side Card -->
-            <div class="card-quiet" style="flex: 1; padding: 18px 12px; text-align: center; border-radius: 18px; cursor: pointer; border: 2px solid ${isRuby ? 'var(--ruby)' : 'var(--hairline)'}; background: ${isRuby ? 'rgba(232, 83, 111, 0.12)' : 'var(--surface-primary)'}; box-shadow: ${isRuby ? 'var(--glow-ruby)' : 'none'};" onclick="GarnetApp.setState('ruby-selected')">
+            <div class="card-quiet" style="flex: 1; padding: 18px 12px; text-align: center; border-radius: 18px; cursor: pointer; border: 2px solid ${isRuby ? "var(--ruby)" : "var(--hairline)"}; background: ${isRuby ? "rgba(232, 83, 111, 0.12)" : "var(--surface-primary)"}; box-shadow: ${isRuby ? "var(--glow-ruby)" : "none"};" onclick="GarnetApp.setState('ruby-selected')">
               <div class="figure-render ruby-figure" style="margin: 0 auto 10px auto; width: 64px; height: 80px;">
                 <span class="figure-silhouette">❤️</span>
               </div>
               <div class="headline-text" style="font-size: 17px; margin-bottom: 4px;">Ruby</div>
               <div class="caption-text" style="font-size: 11px; color: var(--text-secondary); line-height: 1.4;">Warm, expressive, alive.</div>
-              ${isRuby ? '<div style="margin-top: 10px; font-size: 11px; color: var(--ruby); font-weight: 600;">✓ Selected</div>' : ''}
+              ${isRuby ? '<div style="margin-top: 10px; font-size: 11px; color: var(--ruby); font-weight: 600;">✓ Selected</div>' : ""}
             </div>
 
             <!-- Sapphire Side Card -->
-            <div class="card-quiet" style="flex: 1; padding: 18px 12px; text-align: center; border-radius: 18px; cursor: pointer; border: 2px solid ${!isRuby ? 'var(--sapphire)' : 'var(--hairline)'}; background: ${!isRuby ? 'rgba(91, 140, 255, 0.12)' : 'var(--surface-primary)'}; box-shadow: ${!isRuby ? 'var(--glow-sapphire)' : 'none'};" onclick="GarnetApp.setState('sapphire-selected')">
+            <div class="card-quiet" style="flex: 1; padding: 18px 12px; text-align: center; border-radius: 18px; cursor: pointer; border: 2px solid ${!isRuby ? "var(--sapphire)" : "var(--hairline)"}; background: ${!isRuby ? "rgba(91, 140, 255, 0.12)" : "var(--surface-primary)"}; box-shadow: ${!isRuby ? "var(--glow-sapphire)" : "none"};" onclick="GarnetApp.setState('sapphire-selected')">
               <div class="figure-render sapphire-figure" style="margin: 0 auto 10px auto; width: 64px; height: 80px;">
                 <span class="figure-silhouette">💙</span>
               </div>
               <div class="headline-text" style="font-size: 17px; margin-bottom: 4px;">Sapphire</div>
               <div class="caption-text" style="font-size: 11px; color: var(--text-secondary); line-height: 1.4;">Calm, dreamy, spacious.</div>
-              ${!isRuby ? '<div style="margin-top: 10px; font-size: 11px; color: var(--sapphire); font-weight: 600;">✓ Selected</div>' : ''}
+              ${!isRuby ? '<div style="margin-top: 10px; font-size: 11px; color: var(--sapphire); font-weight: 600;">✓ Selected</div>' : ""}
             </div>
           </div>
         </div>
@@ -1231,18 +1260,26 @@ const GARNET_SCREENS = {
 
     return `
       <div style="flex: 1; display: flex; flex-direction: column; overflow-y: auto;">
-        ${isOffline ? `
+        ${
+          isOffline
+            ? `
           <div class="banner-alert" style="background: rgba(251, 191, 36, 0.15); border-color: rgba(251, 191, 36, 0.3); color: #FDE68A;">
             <span>📡 You're offline. Changes will sync later.</span>
           </div>
-        ` : ''}
+        `
+            : ""
+        }
 
-        ${state === 'permission-banner' ? `
+        ${
+          state === "permission-banner"
+            ? `
           <div class="banner-alert">
             <span>Turn on gentle notifications?</span>
             <button onclick="GarnetApp.showToast('Permissions enabled')" style="background: none; border: none; color: var(--garnet); font-weight: 600; cursor: pointer;">Enable</button>
           </div>
-        ` : ''}
+        `
+            : ""
+        }
 
         <!-- Home Header -->
         <header style="padding: 14px 20px 4px 20px; display: flex; align-items: center; justify-content: space-between;">
@@ -1259,13 +1296,17 @@ const GARNET_SCREENS = {
 
         <!-- Crystal Hero Area -->
         <div class="crystal-hero-container">
-          ${isArtworkUnavailable ? `
+          ${
+            isArtworkUnavailable
+              ? `
             <div style="height: 120px; display: flex; align-items: center; justify-content: center; color: var(--garnet);">
               [Crystal Motif Stand-in]
             </div>
-          ` : `
+          `
+              : `
             ${this.renderCrystalSVG("home", 130)}
-          `}
+          `
+          }
 
           <!-- Quick Emotional Actions -->
           <div style="display: flex; gap: 8px; width: 100%; margin-top: 14px;">
@@ -1387,13 +1428,38 @@ const GARNET_SCREENS = {
   // HOME-04 · Emotional Action Sheet
   screenHome04() {
     const signals = [
-      { id: "US-02", icon: "💭", title: "Thought of You", desc: "A gentle touch across the distance" },
-      { id: "US-03", icon: "🥺", title: "Missing You", desc: "Let Noah know they are on your mind" },
+      {
+        id: "US-02",
+        icon: "💭",
+        title: "Thought of You",
+        desc: "A gentle touch across the distance",
+      },
+      {
+        id: "US-03",
+        icon: "🥺",
+        title: "Missing You",
+        desc: "Let Noah know they are on your mind",
+      },
       { id: "US-04", icon: "🫂", title: "I Need You", desc: "Ask for warmth or grounding" },
-      { id: "US-06", icon: "💬", title: "I Need to Talk", desc: "Ask to talk or ask Noah to just listen" },
-      { id: "US-07", icon: "⏱️", title: "Please Check On Me", desc: "A gentle reminder later today" },
-      { id: "US-08", icon: "🛡️", title: "I Can't Talk Yet", desc: "Not ready to talk yet, but still close" },
-      { id: "US-09", icon: "❤️", title: "I'm Okay Now", desc: "Reassure Noah you are alright" }
+      {
+        id: "US-06",
+        icon: "💬",
+        title: "I Need to Talk",
+        desc: "Ask to talk or ask Noah to just listen",
+      },
+      {
+        id: "US-07",
+        icon: "⏱️",
+        title: "Please Check On Me",
+        desc: "A gentle reminder later today",
+      },
+      {
+        id: "US-08",
+        icon: "🛡️",
+        title: "I Can't Talk Yet",
+        desc: "Not ready to talk yet, but still close",
+      },
+      { id: "US-09", icon: "❤️", title: "I'm Okay Now", desc: "Reassure Noah you are alright" },
     ];
 
     return `
@@ -1404,7 +1470,9 @@ const GARNET_SCREENS = {
           <p class="caption-text" style="margin-bottom: 16px;">Signals are gentle communication, not pressure.</p>
 
           <div style="display: flex; flex-direction: column; gap: 8px;">
-            ${signals.map(s => `
+            ${signals
+              .map(
+                (s) => `
               <div class="card-quiet" style="display: flex; align-items: center; gap: 12px; cursor: pointer; padding: 12px 14px;" onclick="GarnetApp.closeOverlay(); GarnetApp.openOverlay('${s.id}');">
                 <span style="font-size: 24px;">${s.icon}</span>
                 <div>
@@ -1412,7 +1480,9 @@ const GARNET_SCREENS = {
                   <div class="caption-text">${s.desc}</div>
                 </div>
               </div>
-            `).join('')}
+            `,
+              )
+              .join("")}
           </div>
         </div>
       </div>
@@ -1600,7 +1670,9 @@ const GARNET_SCREENS = {
           </div>
         </div>
 
-        ${!isRevealed ? `
+        ${
+          !isRevealed
+            ? `
           <!-- Unrevealed State -->
           <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px; text-align: center;">
             <div style="width: 60px; height: 60px; border-radius: 50%; background: rgba(91, 140, 255, 0.15); display: flex; align-items: center; justify-content: center; font-size: 24px; margin-bottom: 16px;">
@@ -1612,7 +1684,8 @@ const GARNET_SCREENS = {
             </p>
             <button class="btn-pill btn-secondary" onclick="GarnetApp.setState('revealed')">Preview revealed day</button>
           </div>
-        ` : `
+        `
+            : `
           <!-- Revealed State -->
           <div style="padding: 10px 20px 24px 20px; position: relative;">
             <div style="position: absolute; left: 68px; top: 20px; bottom: 40px; width: 2px; background: var(--sapphire-subtle);"></div>
@@ -1626,7 +1699,8 @@ const GARNET_SCREENS = {
               </div>
             </div>
           </div>
-        `}
+        `
+        }
 
         ${this.renderTabBar("days")}
       </div>
@@ -1682,7 +1756,7 @@ const GARNET_SCREENS = {
       { id: "US-07", icon: "⏱️", title: "Check On Me", color: "var(--text-secondary)" },
       { id: "US-08", icon: "🛡️", title: "Can't Talk Yet", color: "var(--text-secondary)" },
       { id: "US-09", icon: "❤️", title: "I'm Okay Now", color: "var(--ruby)" },
-      { id: "CHAT-01", icon: "✉️", title: "Messages", color: "var(--garnet)" }
+      { id: "CHAT-01", icon: "✉️", title: "Messages", color: "var(--garnet)" },
     ];
 
     return `
@@ -1710,7 +1784,9 @@ const GARNET_SCREENS = {
           </div>
         </div>
 
-        ${isSupportPinned ? `
+        ${
+          isSupportPinned
+            ? `
           <div style="padding: 0 20px 14px 20px;">
             <div class="card-quiet" style="background: rgba(154, 123, 255, 0.15); border-color: var(--garnet);">
               <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -1721,17 +1797,23 @@ const GARNET_SCREENS = {
               <button class="btn-pill btn-primary-garnet" style="min-height: 36px; font-size: 12px;" onclick="GarnetApp.showToast('Comfort sent to Noah ❤️')">Send comfort</button>
             </div>
           </div>
-        ` : ''}
+        `
+            : ""
+        }
 
         <!-- 2-Column Grid of Signal Tiles -->
         <div style="padding: 0 20px 24px 20px;">
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;">
-            ${signals.map(s => `
+            ${signals
+              .map(
+                (s) => `
               <div class="card-quiet" style="padding: 16px 12px; text-align: center; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; background: rgba(20,17,27,0.7); backdrop-filter: blur(10px);" onclick="GarnetApp.openOverlay('${s.id}')">
                 <span style="font-size: 26px;">${s.icon}</span>
                 <span style="font-size: 13px; font-weight: 600; color: ${s.color};">${s.title}</span>
               </div>
-            `).join('')}
+            `,
+              )
+              .join("")}
           </div>
 
           <!-- Signal History -->
@@ -1812,7 +1894,7 @@ const GARNET_SCREENS = {
       "I need to talk",
       "I need comfort",
       "Something upset me",
-      "I just need you"
+      "I just need you",
     ];
 
     return `
@@ -1823,12 +1905,16 @@ const GARNET_SCREENS = {
           <p class="caption-text" style="margin-bottom: 16px;">Noah will receive a calm, caring notification.</p>
 
           <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
-            ${needs.map(n => `
+            ${needs
+              .map(
+                (n) => `
               <div class="card-quiet" style="padding: 12px 14px; cursor: pointer; display: flex; align-items: center; justify-content: space-between;" onclick="GarnetApp.showToast('Support signal sent to Noah'); GarnetApp.closeOverlay();">
                 <span style="font-size: 14px;">${n}</span>
                 <span>›</span>
               </div>
-            `).join('')}
+            `,
+              )
+              .join("")}
           </div>
 
           <div class="caption-text" style="color: var(--text-tertiary); text-align: center;">
@@ -2066,7 +2152,7 @@ const GARNET_SCREENS = {
       "you need to laugh",
       "you need motivation",
       "on your first day at work",
-      "you need to hear my voice"
+      "you need to hear my voice",
     ];
 
     return `
@@ -2080,9 +2166,13 @@ const GARNET_SCREENS = {
 
           <div class="caption-text" style="margin-bottom: 12px; color: var(--text-tertiary);">Suggestions</div>
           <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-            ${suggestions.map(s => `
+            ${suggestions
+              .map(
+                (s) => `
               <span class="state-chip" onclick="GarnetApp.showToast('Selected: ${s}')">${s}</span>
-            `).join('')}
+            `,
+              )
+              .join("")}
           </div>
         </div>
 
@@ -2478,18 +2568,30 @@ const GARNET_SCREENS = {
 
   // SUR-02 · Choose Content
   screenSur02() {
-    const types = ["Message", "Photo", "Voice note", "Video", "Letter", "Song link", "Future-date idea"];
+    const types = [
+      "Message",
+      "Photo",
+      "Voice note",
+      "Video",
+      "Letter",
+      "Song link",
+      "Future-date idea",
+    ];
     return `
       <div style="flex: 1; display: flex; flex-direction: column; justify-content: space-between; padding: 24px;">
         <div>
           ${this.renderHeader("Create a surprise", "Choose what to hide", true, false)}
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px;">
-            ${types.map(t => `
+            ${types
+              .map(
+                (t) => `
               <div class="card-quiet" style="padding: 16px; text-align: center; cursor: pointer;" onclick="GarnetApp.showToast('Selected: ${t}'); GarnetApp.navigatePrompt('SUR-05');">
                 <span class="headline-text" style="font-size: 14px;">${t}</span>
               </div>
-            `).join('')}
+            `,
+              )
+              .join("")}
           </div>
         </div>
 
@@ -2694,7 +2796,7 @@ const GARNET_SCREENS = {
     return `
       <div style="flex: 1; display: flex; flex-direction: column; overflow-y: auto; padding: 20px;">
         <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px;">
-          <input class="input-field" type="text" placeholder="Search moments, letters, messages…" value="${state === 'active-results' ? 'coffee' : ''}" style="height: 42px; border-radius: 21px;" />
+          <input class="input-field" type="text" placeholder="Search moments, letters, messages…" value="${state === "active-results" ? "coffee" : ""}" style="height: 42px; border-radius: 21px;" />
           <button onclick="GarnetApp.navigateBack()" style="background: none; border: none; color: var(--garnet); cursor: pointer;">Cancel</button>
         </div>
 
@@ -2845,7 +2947,7 @@ const GARNET_SCREENS = {
       { id: "DAYS-08", name: "Voice Recorder Sheet" },
       { id: "DAYS-09", name: "Mood / Activity Picker" },
       { id: "AUTH-08", name: "Sign Out Confirmation" },
-      { id: "SET-17", name: "Reset Demo Data Dialog" }
+      { id: "SET-17", name: "Reset Demo Data Dialog" },
     ];
 
     return `
@@ -2853,12 +2955,16 @@ const GARNET_SCREENS = {
         ${this.renderHeader("System Overlays", "Catalogue of bottom sheets & dialogs", true, false)}
 
         <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 14px;">
-          ${overlays.map(o => `
+          ${overlays
+            .map(
+              (o) => `
             <div class="card-quiet" style="display: flex; justify-content: space-between; align-items: center; cursor: pointer;" onclick="GarnetApp.openOverlay('${o.id}')">
               <span>${o.name}</span>
               <span style="color: var(--garnet);">Open ›</span>
             </div>
-          `).join('')}
+          `,
+            )
+            .join("")}
         </div>
       </div>
     `;
@@ -2999,5 +3105,5 @@ const GARNET_SCREENS = {
         </div>
       </div>
     `;
-  }
+  },
 };

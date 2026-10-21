@@ -3,6 +3,7 @@
 An interactive mobile HTML/CSS/JS design system and screen simulator developed directly from the 17 design prompt suites and the Master Mobile Design Specification in `docs/design/`.
 
 ## Features
+
 - **Every Single Prompt Implemented**: Complete fidelity coverage of all 17 prompt areas (`AUTH-01` through `AUTH-08`, `PAIR-01` through `PAIR-07`, `SETUP-01` through `SETUP-08`, `PRE-01` through `PRE-10`, `HOME-01` through `HOME-05`, `DAYS-01` through `DAYS-11`, `US-01` through `US-10`, `CHAT-00` through `CHAT-09`, `OPEN-01` through `OPEN-08`, `MEM-01` through `MEM-10`, `EVT-01` through `EVT-09`, `SUR-01` through `SUR-07`, `WORLD-01` through `WORLD-03` / `FUT-01` through `FUT-03` / `PLACE-01` / `SONG-01`, `SEARCH-01` through `SEARCH-02`, `SET-01` through `SET-17`, `SYS-01` through `SYS-06`, and `NOTIF-01` through `WIDGET-07`), plus `COMP-01` (Global Component Sheet).
 - **Interactive iPhone 16 Pro Frame**: Dynamic island, safe areas, status bar with dual Addis Ababa & London clocks, bottom home bar, and responsive device presets (iPhone 16 Pro 393×852, Compact 375×667, Android 412×915).
 - **Interactive Tab & Overlay Navigation**: Working bottom tabs (Home, Days, Us, Moments, Our World), bottom sheets (Quick Log, Emotional signals, Media picker, Voice recorder, Mood picker), modal dialogs, and toast/banner feedbacks.
