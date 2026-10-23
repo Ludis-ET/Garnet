@@ -1,0 +1,169 @@
+/**
+ * AUTH-04 · Verify email (Daylight Glass, P-48). Simulated: no email is sent; "Open email preview
+ * (demo)" stands in for tapping the link. Only a masked address is shown. States: waiting,
+ * resent with cooldown, verified (sparkles), expired link, already verified.
+ */
+import * as Haptics from "expo-haptics";
+import { Redirect, useRouter } from "expo-router";
+import { useState } from "react";
+import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
+import Animated, { FadeInDown } from "react-native-reanimated";
+import { GarnetMark } from "@/components/brand/GarnetMark";
+import { AppText } from "@/components/ui/AppText";
+import { Button } from "@/components/ui/Button";
+import { Glass } from "@/components/ui/Glass";
+import { Notice } from "@/components/ui/Notice";
+import { SimulatedBadge } from "@/components/ui/SimulatedBadge";
+import { useToast } from "@/components/ui/Toast";
+import { useTheme } from "@/theme/ThemeProvider";
+import { formatSeconds, serviceErrorMessage, useCountdown } from "../authUi";
+import { GlassScreen } from "@/components/ui/GlassScreen";
+import { GlassEnvelope } from "../components/GlassEnvelope";
+import { StatusHero } from "@/components/ui/StatusHero";
+import {
+  useAuthStatus,
+  useCancelVerification,
+  useFinishVerification,
+  useOpenVerificationLink,
+  useResendVerification,
+} from "../useAuth";
+
+export function VerifyEmailScreen() {
+  const router = useRouter();
+  const toast = useToast();
+  const { colors, radii, spacing, reduceMotion } = useTheme();
+  const status = useAuthStatus();
+  const open = useOpenVerificationLink();
+  const resend = useResendVerification();
+  const finish = useFinishVerification();
+  const cancel = useCancelVerification();
+  const [expired, setExpired] = useState(false);
+  const [cooldown, setCooldown] = useState({ seconds: 0, key: 0 });
+  const wait = useCountdown(cooldown.seconds, cooldown.key);
+
+  if (status.data === undefined) {
+    return (
+      <GlassScreen>
+        <View style={styles.fill}>
+          <ActivityIndicator color={colors.accent} accessibilityLabel="Loading" />
+        </View>
+      </GlassScreen>
+    );
+  }
+  if (status.data.kind !== "verifying") return <Redirect href="/" />;
+
+  const { maskedEmail, verified } = status.data;
+  const onError = (error: unknown) => {
+    toast.show(serviceErrorMessage(error), "error");
+  };
+
+  if (verified) {
+    return (
+      <GlassScreen
+        footer={
+          <Button
+            label="Continue"
+            loading={finish.isPending}
+            onPress={() => {
+              finish.mutate(undefined, {
+                onSuccess: () => {
+                  router.replace("/");
+                },
+                onError,
+              });
+            }}
+          />
+        }
+      >
+        <StatusHero
+          art={<GarnetMark size={108} />}
+          celebrate
+          title="Email verified"
+          body="You're all set. Welcome to your space."
+        />
+      </GlassScreen>
+    );
+  }
+
+  return (
+    <GlassScreen
+      footer={
+        <>
+          <Button
+            label="Open email preview (demo)"
+            loading={open.isPending}
+            onPress={() => {
+              open.mutate(undefined, {
+                onSuccess: (result) => {
+                  setExpired(!result.ok);
+                  if (result.ok && Platform.OS !== "web")
+                    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                },
+                onError,
+              });
+            }}
+          />
+          <Button
+            label={wait > 0 ? `Resend in ${formatSeconds(wait)}` : "Resend email"}
+            variant="secondary"
+            loading={resend.isPending}
+            disabled={wait > 0}
+            onPress={() => {
+              resend.mutate(undefined, {
+                onSuccess: ({ cooldownSeconds }) => {
+                  setExpired(false);
+                  setCooldown((c) => ({ seconds: cooldownSeconds, key: c.key + 1 }));
+                  toast.show("Sent again.", "success");
+                },
+                onError,
+              });
+            }}
+          />
+          <Button
+            label="Change email"
+            variant="text"
+            onPress={() => {
+              cancel.mutate(undefined, {
+                onSuccess: () => {
+                  router.replace("/create-account");
+                },
+                onError,
+              });
+            }}
+          />
+        </>
+      }
+    >
+      <View style={[styles.fill, { gap: spacing.xl }]}>
+        <GlassEnvelope />
+        <Animated.View
+          {...(reduceMotion ? {} : { entering: FadeInDown.delay(120).springify().damping(18) })}
+          style={[styles.center, { gap: spacing.md }]}
+        >
+          <AppText variant="largeTitle" style={styles.centerText}>
+            Check your inbox
+          </AppText>
+          <Glass
+            radius={radii.pill}
+            shadow={false}
+            contentStyle={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm }}
+          >
+            <AppText variant="body" weight="600">
+              {maskedEmail}
+            </AppText>
+          </Glass>
+        </Animated.View>
+        <SimulatedBadge />
+        {expired ? (
+          <Notice tone="error" icon="clock" text="This link has expired. We can send a new one." />
+        ) : null}
+      </View>
+    </GlassScreen>
+  );
+}
+
+const styles = StyleSheet.create({
+  fill: { flex: 1, alignItems: "center", justifyContent: "center" },
+  center: { alignItems: "center" },
+  centerText: { textAlign: "center" },
+});

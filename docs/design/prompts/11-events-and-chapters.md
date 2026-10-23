@@ -72,7 +72,7 @@ looking forward to. Each is optional ("Skip" always visible). No statistics.
 ### EVT-08 · Relationship chapters list and detail
 
 ```text
-Garnet chapters list: vertical story list "Before Long Distance — Preparing", "Chapter 01 — London
+Garnet chapters list: vertical story list "Chapter 01 — London
 begins", "Chapter 02 — Finding our rhythm", "Chapter 03 — Still us", each with a cover photo and
 date range; rename action. Detail: chapter cover, title (editable), dates, memories, letters.
 ```

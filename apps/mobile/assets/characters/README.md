@@ -32,3 +32,7 @@ Formats: `.png`, `.webp`, `.jpg`, `.gif` (animated GIF and animated WebP play au
 ## Frame
 
 Full body, front-facing, transparent background (after processing), feet on the bottom edge, centred, portrait 2:3 (for example 1024 × 1536). One character per file.
+
+## Brand mark and app icons (P-55)
+
+Run `python scripts/make-garnet-brand.py` (from `apps/mobile`, needs Pillow) after adding or replacing `garnet-proud.png`. It writes `garnet-face.png` (the in-app Garnet mark) here and the app icon, Android adaptive icon layers and favicon into `brand/`. Everything stays git-ignored; `app.config.js` uses the icons only when they exist.

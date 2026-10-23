@@ -29,6 +29,8 @@ export interface CharacterSlotProps {
   pose?: Pose;
   /** Rendered height in points; width follows the art's aspect ratio (placeholder is square). */
   size?: number;
+  /** Width ÷ height of the box (default square). Owner images are 2:3 (FRAME_ASPECT). */
+  aspectRatio?: number;
   /** Decorative by default. Pass a label only when the figure carries meaning. */
   accessibilityLabel?: string;
 }
@@ -42,6 +44,7 @@ export function CharacterSlot({
   character,
   pose = "idle",
   size = 160,
+  aspectRatio = 1,
   accessibilityLabel,
 }: CharacterSlotProps) {
   const theme = useTheme();
@@ -58,7 +61,8 @@ export function CharacterSlot({
       <Image
         source={source}
         contentFit="contain"
-        style={{ height: size, aspectRatio: 1 }}
+        contentPosition="bottom"
+        style={{ height: size, aspectRatio }}
         transition={theme.reduceMotion ? 0 : 180}
         {...a11y}
       />
@@ -72,7 +76,7 @@ export function CharacterSlot({
         ? theme.gradients.sapphire
         : theme.gradients.together;
   return (
-    <View style={{ width: size, height: size }} {...a11y}>
+    <View style={[styles.placeholder, { width: size * aspectRatio, height: size }]} {...a11y}>
       <LinearGradient
         colors={colors}
         start={{ x: 0.1, y: 0 }}
@@ -80,12 +84,10 @@ export function CharacterSlot({
         style={[
           styles.crystal,
           {
-            borderRadius: size * 0.28,
+            borderRadius: size * aspectRatio * 0.2,
             transform: [{ rotate: "45deg" }],
-            width: size * 0.62,
-            height: size * 0.62,
-            top: size * 0.19,
-            left: size * 0.19,
+            width: size * aspectRatio * 0.5,
+            height: size * aspectRatio * 0.5,
           },
         ]}
       />
@@ -99,6 +101,7 @@ export function CharacterSlot({
 }
 
 const styles = StyleSheet.create({
-  crystal: { position: "absolute", opacity: 0.92 },
+  placeholder: { alignItems: "center", justifyContent: "center" },
+  crystal: { opacity: 0.6 },
   devLabel: { position: "absolute", bottom: 0, alignSelf: "center" },
 });

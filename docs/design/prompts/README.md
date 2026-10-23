@@ -6,12 +6,12 @@ Use them in your design tool of choice (Figma AI / Figma Make, Uizard, Galileo, 
 
 ## How to use a prompt
 
-1. Paste the **[Master style](#master-style-paste-first)** once per session (or at the top of each prompt if your tool forgets context).
+1. Paste the master style once per session (or at the top of each prompt if your tool forgets context): **[v2 Daylight Glass](#master-style-v2--daylight-glass-p-48)** for pages already redesigned under P-48 to P-56 (01, 02, 03, 05, 06 and 07 so far), otherwise **[v1](#master-style-paste-first)**.
 2. Paste the page prompt. Each one names its frame, layout, content, states and the rules it must not break.
 3. Design **every state listed** for that page. A page is not done until its empty, loading, error and edge states exist.
 4. Export or link the frames and tell me the page ID (for example `HOME-01`). I'll implement it against the design, with tests.
 
-**Frames.** Primary: **iPhone 16 Pro, 393 × 852 pt**, dark mode. Then: light mode, and a compact phone (**375 × 667**) for any screen with forms or long content. Android check: **412 × 915 dp** (Material back behaviour, no iOS-only gestures).
+**Frames.** Primary: **iPhone 16 Pro, 393 × 852 pt**, light (Daylight Glass) for v2 pages and dark for v1 pages. Then the other scheme, and a compact phone (**375 × 667**) for any screen with forms or long content. Android check: **412 × 915 dp** (Material back behaviour, no iOS-only gestures).
 
 ## Character figures (read before designing)
 
@@ -22,9 +22,60 @@ The intended experience uses the **actual _Steven Universe_ characters Ruby, Sap
 - In the design tool, place **your own rights-cleared figure render** into the slot, or a neutral silhouette stand-in. **Don't ask a tool to recreate official artwork**, and don't paste screenshots from the show into designs that will be shared.
 - Every screen must still work and look complete **without** the figure (the app ships a crystal placeholder; P-31 safeguards). Design the "artwork unavailable" variant wherever a figure appears.
 - The **Garnet crystal**, gem capsules, shards and light are **original** 3D motifs and can be generated freely.
-- Figures appear only where the spec places them (spec §3): Welcome, setup, identity/theme, Home hero, Start Long Distance, anniversary, together/fusion moments, selected empty states, major emotional transitions, loading moments and the brand screen. **Never** on dense working screens (chat, forms, settings lists).
+- Figures appear only where the spec places them (spec §3): Welcome, setup, identity/theme, Home hero, anniversary, together/fusion moments, selected empty states, major emotional transitions, loading moments and the brand screen. **Never** on dense working screens (chat, forms, settings lists).
 
 ---
+
+## Master style v2 — Daylight Glass (P-48)
+
+> **Update (P-55):** the logo is the **Garnet mark** (Garnet's face from the owner's image in a glass disc with a ruby → violet → sapphire ring), not the crystal. Personal pages, sheets and forms show the viewer's own gem and a warm (Ruby) or cool (Sapphire) canvas; shared pages show Garnet and the mixed canvas.
+
+Owner direction **P-48** (2026-10-22): white, iOS-quiet, glassy, award-level polish with Duolingo-smooth, springy interaction. It applies to the pages redesigned so far ([01 — Welcome and account](./01-welcome-and-account.md) [02 — Pairing](./02-pairing.md), [03 — Identity and setup](./03-identity-and-setup.md), [05 — Home](./05-home.md), [06 — Days and logging](./06-days-and-logging.md) and [07 — Us](./07-us-emotional.md), P-49, P-51, P-53, P-56); the other pages keep v1 until they are redesigned. Product rules, copy voice, privacy and accessibility from v1 all still apply.
+
+```text
+GARNET — MASTER STYLE v2 "DAYLIGHT GLASS"
+Product: a private iOS/Android app for exactly two partners in a long-distance relationship.
+Promise: "I can't be there with you right now, but I can still be part of your day."
+Metaphor: Ruby (warm rose, one partner) + Sapphire (calm sky blue, the other) → Garnet (violet,
+together). Signature image: two panes of tinted glass overlapping into lilac.
+
+Feel: light, airy, intimate, modern, award-winning. Apple-level restraint (iOS 18+ quiet
+typography, inset grouped lists, large titles) + Duolingo-level tactility (one question per
+screen, chunky-but-elegant buttons, springy feedback, small celebrations). NOT a dashboard,
+social network, productivity app, habit tracker, generic couples template or anything childish.
+No statistics, scores, streaks or "days apart" counters.
+
+Canvas: porcelain white #FAF9FC with a very soft aurora: rose #FFD3DE (top-left), sky #D3E0FF
+(top-right), lilac #E4DBFF (low centre), each a radial fade, drifting a few points over ~24 s.
+Glass panes: backdrop blur 30 + white veil 72 % (text-bearing) or 60 % (decorative), 1-pt top
+highlight rgba(255,255,255,0.9), 1-pt hairline rgba(24,18,48,0.07), long soft violet shadow
+(y 12, blur 32, 8 %). Radii: 22 fields, 28 cards/dock/sheets, 36 hero panes, pills for buttons.
+Text: #15131C primary, #575266 secondary, #6B6579 tertiary (all ≥ 4.5:1 on glass over any orb).
+Accents: Garnet violet #7B55F0 (primary), Ruby #9E1636 text / #E5486A decoration,
+Sapphire #1A3FA8 text / #4F7BFF decoration, success #1E7A57, danger #B4233C.
+Primary button: violet pill #7B55F0→#6741E0 on a 4-pt lip #4B2BC2, white label; pressed sinks
+onto the lip. Gradient "Together" rose→violet→sky only for progress and ceremonies.
+Dark variant "Night Glass": canvas #0E0C14, orbs #5A1730 / #2C1F6E / #0F2A6B at 55 %, glass
+rgba(22,19,32,0.66) with a rgba(255,255,255,0.10) highlight; same layouts.
+
+Typography: clean sans for UI and titles (Inter / SF Pro style): large title 34/41 semibold
+with −0.6 tracking, title 28/34, headline 17/22 semibold, body 17/24, callout 16/21,
+footnote 13/18, caption 12/16. One serif-italic accent phrase per screen at most (Fraunces
+italic), e.g. "One space." Left-aligned titles on working screens; centred only on hero and
+status screens.
+
+Space: 4-pt grid, 20-pt gutters, 28–36 pt between groups, touch targets ≥ 48 pt.
+Iconography: thin 1.75-pt rounded line icons; icons in soft tinted glass circles for status.
+
+Motion: springs everywhere (press: snappy; layout/progress: smooth; success: bouncy). Steps
+slide; toasts drop from the top like iOS's Dynamic Island; sheets spring up; errors shake once;
+success pops a few rose/violet/sky sparkles. Haptics on device. Every motion has a still
+version for reduced motion; Reduce Transparency makes glass solid.
+
+Characters: [RUBY FIGURE], [SAPPHIRE FIGURE], [GARNET FIGURE] slots as in v1 (owner images,
+P-45; never official artwork), placed inside or in front of glass panes; never on dense forms.
+Copy, privacy and accessibility rules: as in v1.
+```
 
 ## Master style (paste first)
 
@@ -136,25 +187,24 @@ Annotate sizes, radii, spacing and states. Touch targets ≥ 48 pt.
 
 ## Index
 
-| File                                                                           | Pages                                                                                    |
-| ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
-| [01 — Welcome and account](./01-welcome-and-account.md)                        | Welcome, create account, sign in, verify, recovery, session                              |
-| [02 — Pairing](./02-pairing.md)                                                | Create our space, invite, join, review, accept, invalid states, connected                |
-| [03 — Identity and setup](./03-identity-and-setup.md)                          | Name, avatar, side, nickname, timezone, theme preview, notifications, summary            |
-| [04 — Before long distance](./04-before-long-distance.md)                      | Pre-long-distance home, checklist, dates, letters, memories, reveal, Start Long Distance |
-| [05 — Home](./05-home.md)                                                      | Home and its states, quick log, emotional sheet, profile menu, banners                   |
-| [06 — Days and logging](./06-days-and-logging.md)                              | Days list, timeline, entries, media, voice, pickers, reveal, filters                     |
-| [07 — Us: emotional connection](./07-us-emotional.md)                          | Thought, Missing You, I Need You, Talk, Check On Me, Can't Talk Yet, Okay Now, history   |
-| [08 — Chat](./08-chat.md)                                                      | Conversation, composer, replies, reactions, edit, delete, pins, search, states           |
-| [09 — Open When](./09-open-when.md)                                            | Library, create, sealed, eligible, opening, opened, unavailable                          |
-| [10 — Memories](./10-memories.md)                                              | Timeline, collections, create, detail, viewer, voice, save from chat, delete             |
-| [11 — Events and chapters](./11-events-and-chapters.md)                        | Calendar, event, birthday, anniversary, monthly chapter, chapters, reminders             |
-| [12 — Surprises](./12-surprises.md)                                            | Library, create, locked, reveal, cancelled, errors                                       |
-| [13 — Future and Our World](./13-future-and-our-world.md)                      | When We Meet Again, places, soundtrack, shared world, together state                     |
-| [14 — Search](./14-search.md)                                                  | Universal search and its privacy states                                                  |
-| [15 — Settings and account](./15-settings-and-account.md)                      | Every settings page, export, delete, unpair, about/licensing, demo reset                 |
-| [16 — System overlays and states](./16-system-overlays-and-states.md)          | Every dialog, sheet, menu, toast, banner, empty/loading/error state                      |
-| [17 — Notifications, emails and widgets](./17-notifications-emails-widgets.md) | Notification centre and previews, every email, every widget                              |
+| File                                                                           | Pages                                                                                  |
+| ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| [01 — Welcome and account](./01-welcome-and-account.md)                        | Welcome, create account, sign in, verify, recovery, session                            |
+| [02 — Pairing](./02-pairing.md)                                                | Create our space, invite, join, review, accept, invalid states, connected              |
+| [03 — Identity and setup](./03-identity-and-setup.md)                          | Name, avatar, side, nickname, timezone, theme preview, notifications, summary          |
+| [05 — Home](./05-home.md)                                                      | Home and its states, quick log, emotional sheet, profile menu, banners                 |
+| [06 — Days and logging](./06-days-and-logging.md)                              | Days list, timeline, entries, media, voice, pickers, reveal, filters                   |
+| [07 — Us: emotional connection](./07-us-emotional.md)                          | Thought, Missing You, I Need You, Talk, Check On Me, Can't Talk Yet, Okay Now, history |
+| [08 — Chat](./08-chat.md)                                                      | Conversation, composer, replies, reactions, edit, delete, pins, search, states         |
+| [09 — Open When](./09-open-when.md)                                            | Library, create, sealed, eligible, opening, opened, unavailable                        |
+| [10 — Memories](./10-memories.md)                                              | Timeline, collections, create, detail, viewer, voice, save from chat, delete           |
+| [11 — Events and chapters](./11-events-and-chapters.md)                        | Calendar, event, birthday, anniversary, monthly chapter, chapters, reminders           |
+| [12 — Surprises](./12-surprises.md)                                            | Library, create, locked, reveal, cancelled, errors                                     |
+| [13 — Future and Our World](./13-future-and-our-world.md)                      | When We Meet Again, places, soundtrack, shared world, together state                   |
+| [14 — Search](./14-search.md)                                                  | Universal search and its privacy states                                                |
+| [15 — Settings and account](./15-settings-and-account.md)                      | Every settings page, export, delete, unpair, about/licensing, demo reset               |
+| [16 — System overlays and states](./16-system-overlays-and-states.md)          | Every dialog, sheet, menu, toast, banner, empty/loading/error state                    |
+| [17 — Notifications, emails and widgets](./17-notifications-emails-widgets.md) | Notification centre and previews, every email, every widget                            |
 
 Each page has an ID (`AREA-NN`) used in commits, tests and review notes.
 

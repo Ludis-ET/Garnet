@@ -2,7 +2,6 @@ import { moods } from "../moods";
 import { occasions } from "../occasions";
 import { moodMotion } from "../poses";
 import { scenes } from "../scenes";
-import { FUSE_LINE, UNFUSE_LINE } from "../studioState";
 import { CASTS, castMembers, MOODS, OCCASIONS, isOneOf } from "../types";
 
 /** voice-and-copy.md banned words, plus day-apart counters (spec A4/A5). */
@@ -63,12 +62,7 @@ describe("figure data", () => {
   });
 
   it("keeps every line free of banned and guilt words (voice-and-copy.md)", () => {
-    const lines = [
-      ...MOODS.map((m) => moods[m].line),
-      ...scenes.map((s) => s.line),
-      FUSE_LINE,
-      UNFUSE_LINE,
-    ];
+    const lines = [...MOODS.map((m) => moods[m].line), ...scenes.map((s) => s.line)];
     for (const line of lines)
       expect({ line, banned: bannedIn(line) }).toEqual({ line, banned: [] });
   });

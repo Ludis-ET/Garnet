@@ -1,5 +1,5 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
-import { useColorScheme } from "react-native";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { AccessibilityInfo, Platform, useColorScheme } from "react-native";
 import { useReducedMotion } from "react-native-reanimated";
 import {
   colorsFor,
@@ -29,6 +29,8 @@ export interface Theme {
   elevation: typeof elevation;
   /** True when the OS asks for reduced motion. Every animation must respect it. */
   reduceMotion: boolean;
+  /** True when the OS asks for less transparency (iOS): glass panes become solid (P-48). */
+  reduceTransparency: boolean;
 }
 
 interface ThemeControls {
@@ -40,7 +42,12 @@ interface ThemeControls {
 
 const ThemeContext = createContext<ThemeControls | null>(null);
 
-function buildTheme(scheme: ColorScheme, side: Side, reduceMotion: boolean): Theme {
+function buildTheme(
+  scheme: ColorScheme,
+  side: Side,
+  reduceMotion: boolean,
+  reduceTransparency: boolean,
+): Theme {
   return {
     scheme,
     side,
@@ -52,13 +59,35 @@ function buildTheme(scheme: ColorScheme, side: Side, reduceMotion: boolean): The
     gradients,
     elevation,
     reduceMotion,
+    reduceTransparency,
   };
+}
+
+/** iOS "Reduce Transparency". The setting (and its API) only exists on iOS; elsewhere false. */
+function useReduceTransparency(): boolean {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    if (Platform.OS !== "ios") return;
+    let live = true;
+    AccessibilityInfo.isReduceTransparencyEnabled()
+      .then((value) => {
+        if (live) setOn(value);
+      })
+      .catch(() => undefined);
+    const sub = AccessibilityInfo.addEventListener("reduceTransparencyChanged", setOn);
+    return () => {
+      live = false;
+      sub.remove();
+    };
+  }, []);
+  return on;
 }
 
 export function ThemeProvider({
   children,
   initialSide = "garnet",
-  initialSchemePreference = "system",
+  // Daylight Glass opens in light (owner direction P-48); dark stays selectable.
+  initialSchemePreference = "light",
 }: {
   children: ReactNode;
   initialSide?: Side;
@@ -66,22 +95,23 @@ export function ThemeProvider({
 }) {
   const system = useColorScheme();
   const reduceMotion = useReducedMotion();
+  const reduceTransparency = useReduceTransparency();
   const [schemePreference, setSchemePreference] =
     useState<SchemePreference>(initialSchemePreference);
   const [side, setSide] = useState<Side>(initialSide);
 
-  // Dark-first: when the system gives no answer, use dark.
+  // When following the system and it gives no answer, use light (P-48).
   const scheme: ColorScheme =
-    schemePreference === "system" ? (system === "light" ? "light" : "dark") : schemePreference;
+    schemePreference === "system" ? (system === "dark" ? "dark" : "light") : schemePreference;
 
   const value = useMemo<ThemeControls>(
     () => ({
-      theme: buildTheme(scheme, side, reduceMotion),
+      theme: buildTheme(scheme, side, reduceMotion, reduceTransparency),
       schemePreference,
       setSchemePreference,
       setSide,
     }),
-    [scheme, side, reduceMotion, schemePreference],
+    [scheme, side, reduceMotion, reduceTransparency, schemePreference],
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
@@ -102,11 +132,25 @@ export function useThemeSettings(): Omit<ThemeControls, "theme"> {
   return { schemePreference, setSchemePreference, setSide };
 }
 
+/**
+ * Everything inside renders in one side's accent, e.g. shared pages (Home, anniversary, Our
+ * World) in Garnet violet while personal pages follow the viewer's own side (master style).
+ */
+export function SideScope({ side, children }: { side: Side; children: ReactNode }) {
+  const controls = useThemeControls();
+  const { scheme, reduceMotion, reduceTransparency } = controls.theme;
+  const value = useMemo<ThemeControls>(
+    () => ({ ...controls, theme: buildTheme(scheme, side, reduceMotion, reduceTransparency) }),
+    [controls, scheme, side, reduceMotion, reduceTransparency],
+  );
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+}
+
 /** Shared pages (Home hero, anniversary, Our World) render in the Garnet accent. */
 export function useSideTheme(side: Side): Theme {
   const theme = useTheme();
   return useMemo(
-    () => buildTheme(theme.scheme, side, theme.reduceMotion),
-    [theme.scheme, side, theme.reduceMotion],
+    () => buildTheme(theme.scheme, side, theme.reduceMotion, theme.reduceTransparency),
+    [theme.scheme, side, theme.reduceMotion, theme.reduceTransparency],
   );
 }

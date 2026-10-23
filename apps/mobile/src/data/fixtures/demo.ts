@@ -1,4 +1,9 @@
 import type { DemoUser, OpenWhenLetter, Relationship } from "@/domain/models";
+import { createDemoAuth, type DemoAuthState } from "./demoAuth";
+import { createDemoDays, type DemoDaysState } from "./demoDays";
+import { createDemoHome, type DemoHomeState } from "./demoHome";
+import { createDemoPairing, type DemoPairingState } from "./demoPairing";
+import { createDemoProfiles, type DemoProfilesState } from "./demoProfile";
 
 /**
  * Deterministic demo data (spec §5: stable IDs, fictional identities, no real private data).
@@ -12,6 +17,11 @@ export interface DemoState {
   users: Record<string, DemoUser>;
   relationship: Relationship;
   letters: OpenWhenLetter[];
+  auth: DemoAuthState;
+  pairing: DemoPairingState;
+  profiles: DemoProfilesState;
+  home: DemoHomeState;
+  days: DemoDaysState;
 }
 
 export function createDemoState(): DemoState {
@@ -83,5 +93,10 @@ export function createDemoState(): DemoState {
         openedAt: null,
       },
     ],
+    auth: createDemoAuth(DEMO_ME_ID),
+    pairing: createDemoPairing(),
+    profiles: createDemoProfiles(),
+    home: createDemoHome(),
+    days: createDemoDays(DEMO_ME_ID, DEMO_PARTNER_ID),
   };
 }

@@ -10,7 +10,7 @@ flowchart TD
   Auth -- yes --> Paired{Paired?}
   Verify --> Paired
   Paired -- no --> Pair[Invite your person / Enter invite]
-  Pair --> Setup[Start Long Distance setup]
+  Pair --> Setup[Identity and setup]
   Paired -- yes --> Home
 
   subgraph Tabs[Main tabs]
@@ -54,4 +54,4 @@ flowchart TD
 
 ## Wireframe list (to produce)
 
-Onboarding · Pairing · Start Long Distance · Home · Day Log · Add a Moment · Entry detail · Signals (send / respond) · Recap · Spark · Widget (each state in [features/widget.md](../features/widget.md)) · Open When · Memories · Settings · Export & delete. Each screen must cover the states in [states.md](./states.md).
+Onboarding · Pairing · Setup · Home · Day Log · Add a Moment · Entry detail · Signals (send / respond) · Recap · Spark · Widget (each state in [features/widget.md](../features/widget.md)) · Open When · Memories · Settings · Export & delete. Each screen must cover the states in [states.md](./states.md).

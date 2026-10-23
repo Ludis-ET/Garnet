@@ -11,6 +11,7 @@
 //   pnpm mutation --runs 5        # repeat randomized (property-based) suites N times per mutant
 //   pnpm mutation --only offline-sync   # run one suite
 //   pnpm mutation --only mobile         # the Phase 2 mobile prototype (Jest)
+//   pnpm mutation --only mobile --ids DAYS-1,US-1   # just these mutants (after the baseline)
 import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -23,6 +24,8 @@ const runsArg = args.indexOf("--runs");
 const randomizedRuns = runsArg === -1 ? 3 : Number(args[runsArg + 1]);
 const onlyArg = args.indexOf("--only");
 const only = onlyArg === -1 ? null : args[onlyArg + 1];
+const idsArg = args.indexOf("--ids");
+const ids = idsArg === -1 ? null : new Set(args[idsArg + 1]?.split(","));
 const shell = process.platform === "win32";
 
 /**
@@ -345,20 +348,197 @@ const suites = [
         note: "reduced motion holds every pose",
       },
       {
-        id: "FIG-3",
-        file: "src/features/figures/studioState.ts",
-        find: '      if (state.cast !== "duo") return state;\n',
-        replace: "",
-        expect: "killed",
-        note: "fusion only from Ruby & Sapphire",
-      },
-      {
         id: "FIG-4",
         file: "src/features/figures/types.ts",
         find: '  "sneaky",\n] as const;',
         replace: '  "sneaky",\n  "sad",\n] as const;',
         expect: "killed",
         note: "no sad, angry or abandoned moods",
+      },
+      {
+        id: "AUTH-1",
+        file: "src/domain/auth.ts",
+        find: "  return `${first}***${e.slice(at)}`;",
+        replace: "  return e;",
+        expect: "killed",
+        note: "verify screen shows only a masked email",
+      },
+      {
+        id: "AUTH-2",
+        file: "src/data/mock/mockAuth.ts",
+        find: '          resetLinks: { ...a.resetLinks, [token]: "used" },',
+        replace: "          resetLinks: a.resetLinks,",
+        expect: "killed",
+        note: "reset links work once",
+      },
+      {
+        id: "AUTH-3",
+        file: "src/data/mock/mockAuth.ts",
+        find: '          // A reset signs out every device (ADR-0006).\n          status: { kind: "signedOut" },',
+        replace: "          // A reset signs out every device (ADR-0006).",
+        expect: "killed",
+        note: "a password reset signs the session out",
+      },
+      {
+        id: "AUTH-4",
+        file: "src/data/mock/mockAuth.ts",
+        find: "          const lock = failed >= DEMO_MAX_ATTEMPTS;",
+        replace: "          const lock = false;",
+        expect: "killed",
+        note: "repeated wrong sign-ins back off",
+      },
+      {
+        id: "AUTH-5",
+        file: "src/data/mock/mockAuth.ts",
+        find: '          return { ok: false as const, reason: "may-already-exist" as const };',
+        replace:
+          '          return { ok: false as const, reason: "may-already-exist" as const, email: normal };',
+        expect: "killed",
+        note: "duplicate-account answer carries nothing about the existing account",
+      },
+      {
+        id: "AUTH-6",
+        file: "src/domain/auth.ts",
+        find: "  for (const field of CREATE_ACCOUNT_STEPS[step]) {",
+        replace: "  for (const field of CREATE_ACCOUNT_STEPS[0]) {",
+        expect: "killed",
+        note: "each create-account step checks its own fields (P-48)",
+      },
+      {
+        id: "PAIR-1",
+        file: "src/data/mock/mockPairing.ts",
+        find: '    return invite?.state === "valid" ? invite : null;',
+        replace: "    return invite ?? null;",
+        expect: "killed",
+        note: "expired and used invitations are refused, with the one message (P-18)",
+      },
+      {
+        id: "PAIR-2",
+        file: "src/data/mock/mockPairing.ts",
+        find: '        setIncoming(code, { state: "used" });',
+        replace: "",
+        expect: "killed",
+        note: "an invitation works once (P-18)",
+      },
+      {
+        id: "PAIR-3",
+        file: "src/domain/pairing.ts",
+        find: "  return createdAt.add({ hours: policy.ttlHours });",
+        replace: "  return createdAt.add({ hours: policy.ttlHours + 1 });",
+        expect: "killed",
+        note: "invitations last exactly the policy's hours (P-18)",
+      },
+      {
+        id: "PAIR-4",
+        file: "src/domain/pairing.ts",
+        find: "    .filter((c) => INVITE_ALPHABET.includes(c))",
+        replace: '    .filter((c) => c !== " ")',
+        expect: "killed",
+        note: "codes are normalised to the look-alike-free alphabet (P-50)",
+      },
+      {
+        id: "SIDE-1",
+        file: "src/domain/identity.ts",
+        find: "  return partnerSide !== side;",
+        replace: "  return true;",
+        expect: "killed",
+        note: "the two partners can never hold the same side (P-51)",
+      },
+      {
+        id: "SIDE-2",
+        file: "src/data/mock/mockSetup.ts",
+        find: "        if (!isSideAvailable(side, taken)) {",
+        replace: "        if (taken === null && side === null) {",
+        expect: "killed",
+        note: "the server refuses a side the partner holds (P-51)",
+      },
+      {
+        id: "HOME-1",
+        file: "src/data/mock/mockHome.ts",
+        find: "          .filter((m) => m.authorId === userId)",
+        replace: "          .filter((m) => m.authorId.length > 0)",
+        expect: "killed",
+        note: "Home never shows the partner's day before the reveal (U-02)",
+      },
+      {
+        id: "HOME-2",
+        file: "src/data/mock/mockHome.ts",
+        find: "          shared: share,",
+        replace: "          shared: true,",
+        expect: "killed",
+        note: "a moment stays private unless the person shares it (day-log rule 2)",
+      },
+      {
+        id: "HOME-3",
+        file: "src/data/mock/mockHome.ts",
+        find: '          return v.kind === "sealed" && v.viewerIsRecipient && v.eligible;',
+        replace: '          return v.kind === "sealed";',
+        expect: "killed",
+        note: "only a letter the viewer may open now counts as waiting",
+      },
+      {
+        id: "HOME-4",
+        file: "src/features/home/components/SignalButton.tsx",
+        find: "        onLongPress={send}",
+        replace: "        onLongPress={send}\n        onPress={send}",
+        expect: "killed",
+        note: "signals never send on a tap (HOME-04)",
+      },
+      {
+        id: "SCROLL-1",
+        file: "src/components/ui/GlassScreen.tsx",
+        find: '  column: { flexGrow: 1, width: "100%", maxWidth: 440, alignSelf: "center" },',
+        replace: '  column: { flex: 1, width: "100%", maxWidth: 440, alignSelf: "center" },',
+        expect: "killed",
+        note: "long pages scroll (scroll content grows, never shrinks)",
+      },
+      {
+        id: "SCROLL-2",
+        file: "src/app/(tabs)/_layout.tsx",
+        find: "      <TabSlot style={styles.fill} />",
+        replace: "      <TabSlot />",
+        expect: "killed",
+        note: "tab pages are one screen tall, so they scroll",
+      },
+      {
+        id: "DAYS-1",
+        file: "src/domain/days.ts",
+        find: '    case "afterReveal":\n      return revealed;',
+        replace: '    case "afterReveal":\n      return true;',
+        expect: "killed",
+        note: "'after our days meet' stays the author's until the reveal (§4)",
+      },
+      {
+        id: "DAYS-2",
+        file: "src/domain/days.ts",
+        find: '  if (from === "shared") return false;',
+        replace: "",
+        expect: "killed",
+        note: "a shared moment stays shared (P-20)",
+      },
+      {
+        id: "DAYS-3",
+        file: "src/data/mock/mockDays.ts",
+        find: '.filter((x) => x.mine || partnerCanSee(x.e.visibility, stateOf(s, x.day) === "ready"))',
+        replace: ".filter((x) => x.mine || x.e.visibility !== undefined)",
+        expect: "killed",
+        note: "the partner's private drafts never leave the repository (§4)",
+      },
+      {
+        id: "DAYS-4",
+        file: "src/domain/days.ts",
+        find: "(input.meReady && input.partnerReady) ||",
+        replace: "(input.meReady || input.partnerReady) ||",
+        expect: "killed",
+        note: "the recap waits for both (U-06 option both-ready)",
+      },
+      {
+        id: "US-1",
+        file: "src/data/mock/mockUs.ts",
+        find: "              i.responses.length === 0 &&",
+        replace: "              true &&",
+        expect: "killed",
+        note: "an answered support signal is no longer pinned (US-05)",
       },
     ],
   },
@@ -387,13 +567,29 @@ function prepare(suite, label) {
 }
 
 /** Runs the copied suite; returns { failed, passedCount } from the runner's summary line. */
-function runSuite(suite, dir, pkgDir) {
+/**
+ * Runs a suite on a scratch copy. For Jest, `related` (a mutated file) limits the run to the
+ * tests that import it, directly or indirectly (--findRelatedTests): a mutant can only be
+ * killed by those, and the full mobile suite takes minutes per run. The baseline runs it all.
+ */
+function runSuite(suite, dir, pkgDir, related) {
   if (suite.runner === "jest") {
     // The package's Jest config (package.json) is reused with the scratch copy as rootDir.
     const { status, output } = run(
       "pnpm",
       // The real config ignores /.cache/ (where these copies live); only node_modules here.
-      ["exec", "jest", "--ci", "--rootDir", dir, "--testPathIgnorePatterns", "/node_modules/"],
+      [
+        "exec",
+        "jest",
+        "--ci",
+        // A failing render can leave a timer open; don't let one mutant hang the whole run.
+        "--forceExit",
+        "--rootDir",
+        dir,
+        "--testPathIgnorePatterns",
+        "/node_modules/",
+        ...(related === undefined ? [] : ["--findRelatedTests", related]),
+      ],
       pkgDir,
     );
     const summary = /Tests:\s+(?:(\d+) failed, )?(\d+) passed/.exec(output);
@@ -456,6 +652,7 @@ for (const suite of suites) {
       continue;
     }
     for (const mutant of suite.mutants) {
+      if (ids !== null && !ids.has(mutant.id)) continue;
       const { pkgDir, dir } = prepare(suite, mutant.id);
       const target = join(dir, mutant.file);
       const source = readFileSync(target, "utf8").replaceAll("\r\n", "\n");
@@ -472,7 +669,9 @@ for (const suite of suites) {
       }
       writeFileSync(target, source.replace(mutant.find, mutant.replace));
       let killedRuns = 0;
-      for (let i = 0; i < suite.runs; i++) if (runSuite(suite, dir, pkgDir).failed) killedRuns++;
+      for (let i = 0; i < suite.runs; i++)
+        if (runSuite(suite, dir, pkgDir, suite.runner === "jest" ? target : undefined).failed)
+          killedRuns++;
       const killed = killedRuns > 0;
       const ok = mutant.expect === "killed" ? killedRuns === suite.runs : !killed;
       if (!ok) problems++;

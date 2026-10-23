@@ -53,6 +53,7 @@ import {
   type Occasion,
   type ParticleSpec,
 } from "./types";
+import { useSvgId } from "@/components/brand/svgId";
 
 export interface FusionCue {
   kind: "fuse" | "unfuse";
@@ -120,16 +121,17 @@ function useAppActive(): boolean {
 function FigurePlaceholder({ id, width, height }: { id: FigureId; width: number; height: number }) {
   const [light, deep] = GEM[id];
   const s = Math.min(width * 0.7, height * 0.42);
+  const gemId = useSvgId(`gem-${id}`);
   return (
     <View style={[styles.placeholder, { width, height }]}>
       <Svg width={s} height={s} viewBox="0 0 100 100">
         <Defs>
-          <LinearGradient id={`gem-${id}`} x1="0" y1="0" x2="1" y2="1">
+          <LinearGradient id={gemId} x1="0" y1="0" x2="1" y2="1">
             <Stop offset="0" stopColor={light} />
             <Stop offset="1" stopColor={deep} />
           </LinearGradient>
         </Defs>
-        <Path d="M50,4 L88,34 L72,92 H28 L12,34Z" fill={`url(#gem-${id})`} />
+        <Path d="M50,4 L88,34 L72,92 H28 L12,34Z" fill={`url(#${gemId})`} />
         <Path
           d="M12,34 H88 M50,4 L34,34 L50,92 L66,34Z M28,92 L34,34 M72,92 L66,34"
           stroke="#FFFFFF"
@@ -224,6 +226,8 @@ function FigureSlot(props: SlotProps) {
   const motion = moodMotion[mood];
   const phase = PHASE[id];
   const groundY = H * GROUND;
+  const auraId = useSvgId(`aura-${id}`);
+  const shadowId = useSvgId(`shadow-${id}`);
 
   const figureStyle = useAnimatedStyle(() => {
     const body = sampleBody(motion, time.get(), reduceMotion, phase);
@@ -264,20 +268,20 @@ function FigureSlot(props: SlotProps) {
       <Animated.View pointerEvents="none" style={[styles.abs, auraStyle]}>
         <Svg width={auraSize} height={auraSize}>
           <Defs>
-            <RadialGradient id={`aura-${id}`} cx="50%" cy="50%" r="50%">
+            <RadialGradient id={auraId} cx="50%" cy="50%" r="50%">
               <Stop offset="0" stopColor={def.baseGlow} stopOpacity={0.42} />
               <Stop offset="0.55" stopColor={def.baseGlow} stopOpacity={0.12} />
               <Stop offset="1" stopColor={def.baseGlow} stopOpacity={0} />
             </RadialGradient>
           </Defs>
-          <Circle cx={auraSize / 2} cy={auraSize / 2} r={auraSize / 2} fill={`url(#aura-${id})`} />
+          <Circle cx={auraSize / 2} cy={auraSize / 2} r={auraSize / 2} fill={`url(#${auraId})`} />
         </Svg>
       </Animated.View>
       {/* Soft contact shadow and a rim of light on the ground */}
       <Animated.View pointerEvents="none" style={[styles.abs, shadowStyle]}>
         <Svg width={shadowW} height={28}>
           <Defs>
-            <RadialGradient id={`shadow-${id}`} cx="50%" cy="50%" r="50%">
+            <RadialGradient id={shadowId} cx="50%" cy="50%" r="50%">
               <Stop offset="0" stopColor="#000000" stopOpacity={0.55} />
               <Stop offset="1" stopColor="#000000" stopOpacity={0} />
             </RadialGradient>
@@ -290,13 +294,7 @@ function FigureSlot(props: SlotProps) {
             fill={def.baseGlow}
             opacity={0.18}
           />
-          <Ellipse
-            cx={shadowW / 2}
-            cy={14}
-            rx={shadowW * 0.36}
-            ry={8}
-            fill={`url(#shadow-${id})`}
-          />
+          <Ellipse cx={shadowW / 2} cy={14} rx={shadowW * 0.36} ry={8} fill={`url(#${shadowId})`} />
         </Svg>
       </Animated.View>
       <Animated.View pointerEvents="none" style={[styles.abs, styles.bottomOrigin, figureStyle]}>

@@ -19,7 +19,7 @@ quiet serif quotes, each with date. Search and filter icons. Floating "Add memor
 
 ```text
 Garnet Collections grid, dark: 2-column cover cards with large cover photo, title in serif
-("Before Long Distance", "First days apart", "Birthdays", "Trips", "Random moments"), item
+("First days apart", "Birthdays", "Trips", "Random moments"), item
 count in small caption. "New collection" card with dashed outline.
 ```
 

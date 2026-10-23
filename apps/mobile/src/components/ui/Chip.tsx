@@ -45,7 +45,7 @@ export function Chip({ label, leading, selected, onPress, accessibilityHint }: C
       <AppText
         variant="callout"
         color={selected ? "textPrimary" : "textSecondary"}
-        style={selected ? styles.bold : null}
+        weight={selected ? "600" : "500"}
       >
         {label}
       </AppText>
@@ -55,5 +55,4 @@ export function Chip({ label, leading, selected, onPress, accessibilityHint }: C
 
 const styles = StyleSheet.create({
   chip: { height: 40, flexDirection: "row", alignItems: "center" },
-  bold: { fontWeight: "700" },
 });

@@ -26,9 +26,10 @@ Never create or edit `ios/` or `android/`: they are generated (Continuous Native
 src/
   app/            Expo Router routes ONLY (every file is a screen; _layout.tsx defines navigators)
   features/<area> Screens' building blocks, hooks and feature components (one folder per prompt area)
-  features/figures Figures: data (moods, motion, occasions, scenes), art/ (image lookup, particles), FigureStage, FigureStudio
+  features/figures Figures: data (moods, motion, occasions, scenes), art/ (image lookup, particles), FigureStage
+  features/{auth,pairing,setup,home,days,us,tabs} Designed pages (P-47 to P-56); tabs = the floating glass tab bar
   components/
-    ui/           Shared primitives: Screen, AppText, Button, TextField, Sheet, Dialog, Toast, …
+    ui/           Shared primitives (Daylight Glass, P-48): AppText, Glass, GlassScreen, Button, TextField, FieldGroup, ActionSheet, Sheet (draggable glass sheet + SheetAction), GlassChip, Toast, Notice, ProgressBar, Checklist, …
     character/    CharacterSlot + characterAssets registry (the only way to show Ruby/Sapphire/Garnet)
   domain/         Pure types and rules (e.g. openWhen.ts visibility). No React, no I/O
   data/
@@ -58,7 +59,8 @@ src/
 7. **Accessibility:** every control has a role and label; touch targets ≥ 48 pt (`touchTarget`); never colour alone; font scaling stays enabled; focus order is logical.
 8. **Motion:** Reanimated on the UI thread; durations from `motion` tokens; every animation has a reduced-motion path (`theme.reduceMotion`); never block an action for decoration. Figures: body motion comes from the pure `sampleBody` (a worklet, run on the UI thread), which holds still under reduced motion; talking-frame toggles and animated images stop under reduced motion; pause animation in the background.
 9. **Performance:** virtualized lists (`FlatList`/`SectionList`) for timelines and chat, with no nested virtualized lists; `expo-image` for images with sizes and fallbacks; memoize list rows; lazy-load heavy art; no heavy dependency without a stated reason.
-10. **Platform:** safe areas on every screen, keyboard-safe forms, Android hardware back closes the top overlay, iOS swipe-back preserved, both light and dark schemes.
+10. **Scrolling:** every screen scrolls through `GlassScreen` (or a list). Inside scroll content use `flexGrow: 1`, never `flex: 1` or a fixed height: on web `flex: 1` squeezes the page into one screen and it can't scroll (owner report 2026-10-23; guarded by `components/ui/__tests__/GlassScreen.test.tsx`). Tab containers are `flex: 1, minHeight: 0` (`app/__tests__/tabsLayout.test.tsx`). Tall sheets scroll inside `Sheet`; pages with the floating "＋" end with an `ADD_BUTTON_SPACE` spacer so it never covers the last item.
+11. **Platform:** safe areas on every screen, keyboard-safe forms, Android hardware back closes the top overlay, iOS swipe-back preserved, both light and dark schemes.
 
 ## Tests (jest-expo + Testing Library)
 

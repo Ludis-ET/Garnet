@@ -19,16 +19,16 @@ Phase 2 is the **complete mobile design and mock prototype**: every screen and s
 
 ## Route map (planned)
 
-| Group              | Routes                                                                                  | Prompts                                                                                                                      |
-| ------------------ | --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `(auth)`           | welcome, create-account, sign-in, verify-email, forgot-password, reset-password         | [01](./prompts/01-welcome-and-account.md)                                                                                    |
-| `(onboarding)`     | pair, pair/invite, pair/join, pair/review, pair/connected, setup/*, start-long-distance | [02](./prompts/02-pairing.md), [03](./prompts/03-identity-and-setup.md), [04](./prompts/04-before-long-distance.md)          |
-| `(tabs)/home`      | home                                                                                    | [05](./prompts/05-home.md)                                                                                                   |
-| `(tabs)/days`      | days, days/[date], days/entry/[id]                                                      | [06](./prompts/06-days-and-logging.md)                                                                                       |
-| `(tabs)/us`        | us, us/messages, us/chat, us/signals                                                    | [07](./prompts/07-us-emotional.md), [08](./prompts/08-chat.md)                                                               |
-| `(tabs)/moments`   | moments/events, moments/open-when, moments/surprises                                    | [09](./prompts/09-open-when.md), [11](./prompts/11-events-and-chapters.md), [12](./prompts/12-surprises.md)                  |
-| `(tabs)/our-world` | our-world, memories, chapters, plans, places, soundtrack, world                         | [10](./prompts/10-memories.md), [13](./prompts/13-future-and-our-world.md)                                                   |
-| root               | search, settings/_, notifications, preview-lab/_                                        | [14](./prompts/14-search.md), [15](./prompts/15-settings-and-account.md), [17](./prompts/17-notifications-emails-widgets.md) |
+| Group              | Routes                                                                          | Prompts                                                                                                                      |
+| ------------------ | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `(auth)`           | welcome, create-account, sign-in, verify-email, forgot-password, reset-password | [01](./prompts/01-welcome-and-account.md)                                                                                    |
+| `(onboarding)`     | pair, pair/invite, pair/join, pair/review, pair/connected, pair/already, setup  | [02](./prompts/02-pairing.md), [03](./prompts/03-identity-and-setup.md)                                                      |
+| `(tabs)/home`      | home                                                                            | [05](./prompts/05-home.md)                                                                                                   |
+| `(tabs)/days`      | days, days/[date], days/entry/[id], days/new                                    | [06](./prompts/06-days-and-logging.md)                                                                                       |
+| `(tabs)/us`        | us, us/history, us/messages, us/chat                                            | [07](./prompts/07-us-emotional.md), [08](./prompts/08-chat.md)                                                               |
+| `(tabs)/moments`   | moments/events, moments/open-when, moments/surprises                            | [09](./prompts/09-open-when.md), [11](./prompts/11-events-and-chapters.md), [12](./prompts/12-surprises.md)                  |
+| `(tabs)/our-world` | our-world, memories, chapters, plans, places, soundtrack, world                 | [10](./prompts/10-memories.md), [13](./prompts/13-future-and-our-world.md)                                                   |
+| root               | search, settings/_, notifications, preview-lab/_                                | [14](./prompts/14-search.md), [15](./prompts/15-settings-and-account.md), [17](./prompts/17-notifications-emails-widgets.md) |
 
 Chat lives under **Us**: the spec's five tabs are Home, Days, Us, Moments and Our World, and its A1 inventory includes chat. This placement is a design proposal; confirm it when designing US-01.
 

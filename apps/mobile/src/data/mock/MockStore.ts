@@ -42,6 +42,12 @@ export class MockStore {
     this.emit();
   }
 
+  /** Changes simulation settings (prototype panel, SYS-06) and notifies subscribers. */
+  configure(settings: Partial<SimulationSettings>): void {
+    this.settings = { ...this.settings, ...settings };
+    this.emit();
+  }
+
   /** "Reset Demo Data" (spec A3): restores the seeded baseline exactly. */
   reset(): void {
     this.state = createDemoState();

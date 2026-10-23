@@ -1,59 +1,56 @@
 # 05 — Home
 
-Spec: §10, A1 "Home", A2 "Home", A3 "Quick Log sheet", "Emotional action sheet". Order: greeting/profile → shared hero → compact emotional actions → quick log → recent moments → one upcoming event (if any) → one safe waiting item → tab bar. Useful within seconds. **No relationship score, streak or guilt language.** Spark/grace behaviour is open (U-03, U-04, U-24): show no streak number.
+Spec: §10, A1 "Home", A2 "Home", A3 "Quick Log sheet", "Emotional action sheet".
 
-### HOME-01 · Home (default)
+**Design language: [Daylight Glass](./README.md#master-style-v2--daylight-glass-p-48), liquid pass, minimal** (owner directions **P-48**, **P-51**, **P-53**). One idea per section and almost no text: the visuals carry the meaning. Home is a **shared** page, so its accent is Garnet violet; Ruby and Sapphire appear as the two lights.
+
+**Rules:** no relationship score, streak, "days apart" counter or guilt language. Spark and grace behaviour stay open (U-03, U-04, U-24), so no streak number appears. New moments start as **private drafts**, and sharing is always an explicit tap (§4, day-log rule 2). Senders see "Sent", never "delivered" or "seen" (§5). The partner's day is not shown before the reveal (U-02 and U-06 open), so Home shows only your own day.
+
+## The idea in one line
+
+> **The two of you, right now.**
+
+## HOME-01 · Home
 
 Route `/(tabs)/home`
 
 ```text
-Garnet Home, iPhone 393×852, dark, premium and calm. Header: "Good morning, Selam" in display
-serif, small line "It's 09:12 for you · 07:12 for Noah", avatar button (opens profile menu).
-Hero (about 40% of the height): the original Garnet crystal floating, ruby glow entering from the
-left, sapphire glow from the right, meeting as violet in the core; [GARNET FIGURE] (pose: holding
-the crystal) optional behind it, softly lit. Below the hero, a row of 3 compact emotional action
-buttons with icon + label: "💭 Thought of You", "🥺 Missing You", "🫂 I Need You" (pills, glass
-surface). Then a wide primary "＋ Log something" button. Section "Today" with the last 3 moments
-as minimal rows (time, icon, short text, thumbnail). One quiet card "Coming up: Noah's birthday ·
-in 4 days". One safe waiting item: "Something is waiting for you 💜" (no content). Tab bar:
-Home (selected), Days, Us, Moments, Our World.
+Garnet Home, iPhone 393×852, Daylight Glass liquid, minimal and award-level. Porcelain canvas,
+soft aurora. Top row: "Good morning, Sel" (22 pt semibold) on the left; a 44-pt glass avatar
+button on the right. Under it a tiny glass capsule: ruby dot "09:12" · sapphire dot "07:12
+Noah". Hero (about 40 % of the height): a large liquid-glass orb with the Garnet crystal
+floating inside; a ruby light circles in from the left and a sapphire light from the right,
+meeting in the violet core. Below: three round glass buttons (64 pt) with an emoji and one
+word under each — "Thinking", "Missing", "Need you" — and a small "More" chip. A wide violet
+lip button "Log a moment". "Today": up to three slim glass rows (time · emoji · words, a tiny
+lock for private ones). A horizontal row of small glass cards: "Noah's birthday · 4 days" and
+"Something's waiting 💜". A floating liquid-glass tab bar: Home, Days, Us, Moments, World.
 ```
 
-**States:** default · first use (no moments: "Your days will gather here, one small moment at a time." + Log something) · empty recent moments · with upcoming event · with waiting item (letter or surprise) · both shown · offline banner on top ("You're offline. Some changes may wait to sync.") · notification-permission banner ("Turn on gentle notifications?" with Not now) · loading skeleton · artwork unavailable · light mode · reduced motion (crystal static).
+**Motion.** On arrival the sections rise in 50 ms apart with springs. The lights orbit slowly (12 s), and the crystal breathes. The tab bar's glass thumb slides between tabs with a spring and stretches as it moves.
+**States:** default · first day (no moments: "Your day starts here.") · with event · with waiting item · offline (notice pill) · reduced motion (lights still, crystal still) · artwork unavailable · dark (Night Glass).
 
-### HOME-02 · Hero reacts to activity
+## HOME-02 · The hero reacts
+
+- **You log or send something:** a ruby spark (sapphire if that's your side) flies from the button into the crystal, and the crystal pops once.
+- **Noah's thought arrives:** a spark of Noah's colour drifts in, and a glass capsule floats above the orb for 3 s: "Noah thought of you 💙".
+
+Each reaction lasts under 1 s and never blocks anything. Under reduced motion the glow simply changes.
+
+## HOME-03 · Log a moment
 
 ```text
-Three storyboard frames of the Garnet Home hero reacting: (1) after Selam logs a moment, a small
-ruby light drifts into the crystal; (2) when Noah's thought arrives, a sapphire light drifts in;
-(3) when both interact with the same memory, the core softly turns violet for 1 s. Subtle,
-under 1 s each, never blocking. Include the reduced-motion version (static glow change).
+Glass sheet with a grabber (drag down to close). One large field "A small moment…", a row of
+six emoji chips (☕ 💼 🍝 🚇 📸 ❤️). Two buttons: violet lip "Share with Noah" and text "Keep
+private". Nothing else.
 ```
 
-### HOME-03 · Quick log sheet
+**Rules:** a moment is a private draft until "Share" is tapped. Closing with text keeps the draft ("Kept as a draft."). There are no other dialogs.
 
-```text
-Garnet "Log something" bottom sheet over a dimmed Home, dark. Grabber, title "What's happening?"
-Large single-line text field with placeholder "A small moment…". Row of type chips: Text, Photo,
-Video, Voice, Feeling, Activity, Food, Work, Place, More. Optional mood picker row of 6 soft emoji
-chips. Footer: "Visible to Noah after your days meet" with a change link (visibility), text button
-"More options", primary "Save". Autosave hint: "Draft saved on this device."
-```
+## HOME-04 · Hold to send
 
-**States:** empty · typing · photo attached (thumbnail with remove) · saving · saved toast "Saved to your day." · cancel with text → keep draft, no dialog · discard confirmation only if media selected.
+The three signal buttons send on a **press and hold** (0.6 s). A ring fills around the button with light haptic ticks; letting go early shows "Hold to send" under it. Once sent, the button bursts with sparkles and reads "Sent". "More" opens a glass sheet with the other signals (Need to talk, Just listen, Check on me, Can't talk yet, I'm okay now), each also hold-to-send. Nothing sends on a tap.
 
-### HOME-04 · Emotional action sheet
+## HOME-05 · Profile menu
 
-```text
-Garnet emotional actions sheet (from the "Us" quick actions), dark. Title "Send something to
-Noah". Large rows with icon, title and one-line meaning: Thought of You, Missing You, I Need You,
-I Need to Talk, Please Check On Me, I Can't Talk Yet, I'm Okay Now. Each row opens its compose
-sheet. Nothing sends on a single accidental tap.
-```
-
-### HOME-05 · Profile menu
-
-```text
-Garnet profile menu popover from the Home avatar, dark. Rows: profile (avatar + name + side),
-"Settings", "Notification preview lab", "Reset demo data" (prototype badge), "Sign out".
-```
+A glass popover from the avatar: your card (avatar, name, side), "Settings", "Sign out". Nothing else.

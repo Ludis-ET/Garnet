@@ -64,20 +64,11 @@ export default tseslint.config(
     languageOptions: { globals: { jest: "readonly", require: "readonly" } },
   },
   {
-    // Interactive UI preview files (browser globals and inter-script variables)
-    files: ["ui/**/*.js"],
+    // Expo reads app.config.js and metro.config.js as Node CommonJS.
+    files: ["apps/mobile/app.config.js", "apps/mobile/metro.config.js"],
     languageOptions: {
-      globals: {
-        document: "readonly",
-        window: "readonly",
-        setTimeout: "readonly",
-        setInterval: "readonly",
-        GARNET_DATA: "writable",
-        GARNET_SCREENS: "writable",
-      },
-    },
-    rules: {
-      "no-unused-vars": "off",
+      sourceType: "commonjs",
+      globals: { require: "readonly", module: "writable", __dirname: "readonly" },
     },
   },
 );

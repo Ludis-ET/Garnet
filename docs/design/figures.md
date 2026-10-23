@@ -17,10 +17,10 @@ Owner direction **P-45** (2026-10-21). The app shows Ruby, Sapphire and Garnet *
 
 **21 page scenes** (`scenes.ts`) map app areas to a cast, moods, occasion and line, keyed to page IDs.
 
-## Using the studio
+## Where figures appear
 
-- The studio is the home page: pick a page scene, or mix cast, mood and occasion. Tap the stage to make the figures hop.
-- Deep links: `/?scene=birthday`, `/?cast=ruby&mood=sleepy&occasion=goodnight&bubble=off`.
+- The Figure Studio home page was removed (owner direction P-49). Figures now appear only in designed pages, through `CharacterSlot` (Welcome windows AUTH-01, the connected moment PAIR-05) or `FigureStage`.
+- The "fusion only from Ruby and Sapphire" rule and the fusion lines left with the studio; they return with the first designed fusion moment.
 - Windows: double-click `apps/run-mobile.bat` and pick the browser preview.
 
 ## Adding images

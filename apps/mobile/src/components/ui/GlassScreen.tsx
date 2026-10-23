@@ -1,0 +1,103 @@
+import { StatusBar } from "expo-status-bar";
+import type { ReactNode } from "react";
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Aurora } from "@/components/brand/Aurora";
+import { SideWash } from "@/components/brand/SideWash";
+import { Header } from "@/components/ui/Header";
+import { OfflineBanner } from "@/components/ui/Notice";
+import { useTheme } from "@/theme/ThemeProvider";
+
+/** Room for the floating tab bar (its 64-pt height plus breathing space). */
+export const TAB_BAR_SPACE = 96;
+
+export interface GlassScreenProps {
+  children: ReactNode;
+  /** The action dock, pinned under the content; rises above the keyboard. */
+  footer?: ReactNode;
+  onBack?: () => void;
+  /** Extra content in the header row next to Back (the create-account progress bar). */
+  header?: ReactNode;
+  /** A control at the right end of the header row (the account button during onboarding). */
+  headerRight?: ReactNode;
+  /** A soft wash of a side's colour over the aurora (SETUP-03 "side flood", P-51). */
+  wash?: "ruby" | "sapphire" | null;
+  /** Leaves room for the floating tab bar (tab screens). */
+  tabBar?: boolean;
+}
+
+/**
+ * Shared screen layout in Daylight Glass (P-48), used by account and onboarding screens: the
+ * opaque aurora canvas (so
+ * nothing from a previous screen shows through), safe areas, keyboard-safe scrolling, a centred
+ * column no wider than 440 pt, an optional header with a glass Back button, the offline notice,
+ * and the action dock. Forms keep taps inside the keyboard ("handled").
+ */
+export function GlassScreen({
+  children,
+  footer,
+  onBack,
+  header,
+  headerRight,
+  wash = null,
+  tabBar = false,
+}: GlassScreenProps) {
+  const { spacing, scheme } = useTheme();
+  return (
+    <View style={styles.fill}>
+      <Aurora />
+      <SideWash side="ruby" on={wash === "ruby"} />
+      <SideWash side="sapphire" on={wash === "sapphire"} />
+      <StatusBar style={scheme === "dark" ? "light" : "dark"} />
+      <SafeAreaView style={styles.fill} edges={["top", "bottom"]}>
+        <KeyboardAvoidingView
+          style={styles.fill}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+        >
+          <ScrollView
+            testID="glass-screen-scroll"
+            contentContainerStyle={[
+              styles.scroll,
+              {
+                paddingHorizontal: spacing.gutter,
+                paddingBottom: tabBar ? TAB_BAR_SPACE : spacing.md,
+              },
+            ]}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
+            showsVerticalScrollIndicator={false}
+          >
+            <View
+              testID="glass-screen-column"
+              style={[styles.column, { gap: spacing.xl, paddingTop: spacing.sm }]}
+            >
+              {onBack !== undefined || header !== undefined || headerRight !== undefined ? (
+                <Header
+                  {...(onBack === undefined ? {} : { onBack })}
+                  {...(headerRight === undefined ? {} : { right: headerRight })}
+                >
+                  {header}
+                </Header>
+              ) : null}
+              <OfflineBanner />
+              <View testID="glass-screen-body" style={[styles.body, { gap: spacing.xl }]}>
+                {children}
+              </View>
+              {footer === undefined ? null : <View style={{ gap: spacing.md }}>{footer}</View>}
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  fill: { flex: 1 },
+  // Scrolling rule: inside a ScrollView, grow but never shrink. `flex: 1` means "start at zero
+  // and shrink to fit", so on web the content squeezes into one screen and can't scroll.
+  // `flexGrow: 1` fills short screens and grows past the fold on long ones (tested).
+  scroll: { flexGrow: 1 },
+  column: { flexGrow: 1, width: "100%", maxWidth: 440, alignSelf: "center" },
+  body: { flexGrow: 1 },
+});

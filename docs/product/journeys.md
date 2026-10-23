@@ -31,6 +31,8 @@ Open: invitation delivery and lifecycle (U-33); re-pairing after ending (U-32).
 
 ## J2 — Start Long Distance (first-run setup)
 
+> **Owner direction P-53 (2026-10-22):** the "before long distance" mode (its own home, preparation checklist and the Start Long Distance ceremony) is removed. J2 is now the first-run setup only (time zones, notification permissions), designed as [03 — Identity and setup](../design/prompts/03-identity-and-setup.md).
+
 1. Each partner confirms their home time zone (from the device, editable).
 2. The shared-day explainer shows the day boundary **in each person's own time** ("Your shared day starts at 07:00 for you, 04:00 for them"). Depends on U-02.
 3. Notification preferences: gentle and support levels, quiet hours (on by default, U-21), lock-screen preview (generic by default).
