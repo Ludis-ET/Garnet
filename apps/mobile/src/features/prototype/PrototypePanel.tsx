@@ -290,6 +290,64 @@ export function PrototypePanel() {
                   selected={state.profiles.partner.ready}
                   onPress={setupDemo.partnerReady}
                 />
+                <Chip
+                  label="Fast-track to Home (signed in & set up)"
+                  selected={false}
+                  onPress={() => {
+                    store.update((s) => {
+                      const meId = "demo-user-ruby";
+                      return {
+                        ...s,
+                        auth: {
+                          ...s.auth,
+                          status: { kind: "signedIn", userId: meId, keepSignedIn: true },
+                        },
+                        pairing: {
+                          ...s.pairing,
+                          byUser: {
+                            ...s.pairing.byUser,
+                            [meId]: {
+                              partnerName: "Noah",
+                              invite: null,
+                              reviewing: null,
+                            },
+                          },
+                        },
+                        profiles: {
+                          ...s.profiles,
+                          byUser: {
+                            ...s.profiles.byUser,
+                            [meId]: {
+                              displayName: "Selam",
+                              nickname: "Selly",
+                              side: "ruby",
+                              avatar: { kind: "photo", photo: "sunrise" },
+                              timeZone: "Africa/Addis_Ababa",
+                              appearance: "system",
+                              accent: "rich",
+                              notifications: {
+                                status: "on",
+                                thoughts: true,
+                                support: true,
+                                days: true,
+                              },
+                              done: ["name", "side", "photo", "time", "look", "alerts"],
+                              complete: true,
+                            },
+                          },
+                          partner: {
+                            name: "Noah",
+                            side: "sapphire",
+                            timeZone: "Europe/London",
+                            ready: true,
+                          },
+                        },
+                      };
+                    });
+                    setOpen(false);
+                    router.replace("/home");
+                  }}
+                />
               </View>
 
               <AppText variant="headline">Home</AppText>

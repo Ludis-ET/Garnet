@@ -6,6 +6,9 @@ export default function UsLayout() {
     <Stack screenOptions={{ headerShown: false, animation: "ios_from_right" }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="history" />
+      <Stack.Screen name="messages" />
+      <Stack.Screen name="chat" />
+      <Stack.Screen name="chat-details" />
     </Stack>
   );
 }

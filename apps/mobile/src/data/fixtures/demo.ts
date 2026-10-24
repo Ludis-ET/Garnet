@@ -4,6 +4,7 @@ import { createDemoDays, type DemoDaysState } from "./demoDays";
 import { createDemoHome, type DemoHomeState } from "./demoHome";
 import { createDemoPairing, type DemoPairingState } from "./demoPairing";
 import { createDemoProfiles, type DemoProfilesState } from "./demoProfile";
+import { createDemoChat, type DemoChatState } from "./demoChat";
 
 /**
  * Deterministic demo data (spec §5: stable IDs, fictional identities, no real private data).
@@ -22,6 +23,7 @@ export interface DemoState {
   profiles: DemoProfilesState;
   home: DemoHomeState;
   days: DemoDaysState;
+  chat: DemoChatState;
 }
 
 export function createDemoState(): DemoState {
@@ -98,5 +100,6 @@ export function createDemoState(): DemoState {
     profiles: createDemoProfiles(),
     home: createDemoHome(),
     days: createDemoDays(DEMO_ME_ID, DEMO_PARTNER_ID),
+    chat: createDemoChat(DEMO_ME_ID, DEMO_PARTNER_ID),
   };
 }

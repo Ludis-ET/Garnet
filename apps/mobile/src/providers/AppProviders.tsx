@@ -3,7 +3,9 @@ import { useState, type ReactNode } from "react";
 import { StyleSheet } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { ToastProvider } from "@/components/ui/Toast";
 import { RepositoryProvider } from "@/data/RepositoryProvider";
+import { MediaPlayerProvider } from "@/features/media/MediaPlayerContext";
 import { ThemeProvider } from "@/theme/ThemeProvider";
 
 /** Root providers, in dependency order. Business logic never lives here. */
@@ -23,7 +25,11 @@ export function AppProviders({ children }: { children: ReactNode }) {
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
           <RepositoryProvider>
-            <ThemeProvider>{children}</ThemeProvider>
+            <ThemeProvider>
+              <ToastProvider>
+                <MediaPlayerProvider>{children}</MediaPlayerProvider>
+              </ToastProvider>
+            </ThemeProvider>
           </RepositoryProvider>
         </QueryClientProvider>
       </SafeAreaProvider>

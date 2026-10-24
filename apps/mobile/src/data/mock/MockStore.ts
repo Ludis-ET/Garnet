@@ -1,5 +1,54 @@
 import { createDemoState, type DemoState } from "@/data/fixtures/demo";
 
+const STORAGE_KEY = "garnet_demo_store_v1";
+
+function loadPersistedState(): DemoState | null {
+  try {
+    if (typeof window !== "undefined") {
+      const raw = window.localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as Partial<DemoState> | null;
+        if (parsed?.meId && parsed.users && parsed.auth && parsed.profiles) {
+          const fresh = createDemoState();
+          return {
+            ...fresh,
+            ...parsed,
+            auth: { ...fresh.auth, ...parsed.auth },
+            pairing: { ...fresh.pairing, ...parsed.pairing },
+            profiles: { ...fresh.profiles, ...parsed.profiles },
+            home: { ...fresh.home, ...parsed.home },
+            days: { ...fresh.days, ...parsed.days },
+            chat: { ...fresh.chat, ...parsed.chat },
+          };
+        }
+      }
+    }
+  } catch {
+    // Ignore storage parse or access errors
+  }
+  return null;
+}
+
+function savePersistedState(state: DemoState): void {
+  try {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+  } catch {
+    // Ignore quota or access errors
+  }
+}
+
+function clearPersistedState(): void {
+  try {
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(STORAGE_KEY);
+    }
+  } catch {
+    // Ignore storage access errors
+  }
+}
+
 /**
  * In-memory demo state with simulated service behaviour (spec §6 "Mock behavior contract").
  * Nothing here talks to a network. Simulation is explicit and controllable so screens can be
@@ -12,6 +61,8 @@ export interface SimulationSettings {
   failCalls: boolean;
   /** Developer toggle for offline UI states (no real sync exists). */
   offline: boolean;
+  /** When true, state changes are persisted to localStorage. Defaults to true outside test runner. */
+  persist: boolean;
 }
 
 export class MockServiceError extends Error {
@@ -29,8 +80,17 @@ export class MockStore {
   settings: SimulationSettings;
 
   constructor(settings: Partial<SimulationSettings> = {}) {
-    this.state = createDemoState();
-    this.settings = { latencyMs: 350, failCalls: false, offline: false, ...settings };
+    const isTest = typeof process !== "undefined" && process.env.NODE_ENV === "test";
+    const persist = settings.persist ?? !isTest;
+    this.settings = {
+      latencyMs: 350,
+      failCalls: false,
+      offline: false,
+      persist,
+      ...settings,
+    };
+    const loaded = persist ? loadPersistedState() : null;
+    this.state = loaded ?? createDemoState();
   }
 
   read(): Readonly<DemoState> {
@@ -39,6 +99,9 @@ export class MockStore {
 
   update(mutate: (draft: DemoState) => DemoState): void {
     this.state = mutate(this.state);
+    if (this.settings.persist) {
+      savePersistedState(this.state);
+    }
     this.emit();
   }
 
@@ -50,6 +113,9 @@ export class MockStore {
 
   /** "Reset Demo Data" (spec A3): restores the seeded baseline exactly. */
   reset(): void {
+    if (this.settings.persist) {
+      clearPersistedState();
+    }
     this.state = createDemoState();
     this.emit();
   }

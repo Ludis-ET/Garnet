@@ -11,6 +11,7 @@ import { createMockUs } from "./mockUs";
 import { PROVISIONAL_DAY_POLICY } from "@/domain/days";
 import { createMockSetup } from "./mockSetup";
 import { INVITE_POLICY_P18 } from "@/domain/pairing";
+import { createMockChat } from "./mockChat";
 
 function requireUser(store: MockStore, id: string): DemoUser {
   const user = store.read().users[id];
@@ -49,6 +50,7 @@ export function createMockRepositories(
     // passed explicitly and labelled as provisional on screen (DAYS-10).
     days: createMockDays(store, now, localIdOf, PROVISIONAL_DAY_POLICY),
     us: createMockUs(store, now, localIdOf),
+    chat: createMockChat(store, now, localIdOf),
     relationship: {
       getMe: () => store.simulate(() => requireUser(store, store.read().meId)),
       getPartner: () => store.simulate(() => requireUser(store, partnerId())),

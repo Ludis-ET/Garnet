@@ -121,8 +121,12 @@ function ToastView({ toast, onDismiss }: { toast: ToastMessage; onDismiss: () =>
   );
 }
 
+export function useOptionalToast(): ToastApi | null {
+  return useContext(ToastContext);
+}
+
 export function useToast(): ToastApi {
-  const api = useContext(ToastContext);
+  const api = useOptionalToast();
   if (api === null) throw new Error("useToast must be used inside <ToastProvider>");
   return api;
 }

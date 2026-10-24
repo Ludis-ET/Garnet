@@ -101,7 +101,7 @@ function UsContent() {
               );
             }}
             onMessage={() => {
-              toast.show("Messages are designed next.");
+              router.push("/us/chat");
             }}
           />
         )}
@@ -122,7 +122,7 @@ function UsContent() {
             emoji="💬"
             title="Messages"
             onPress={() => {
-              toast.show("Messages are designed next.");
+              router.push("/us/messages");
             }}
           />
         </Animated.View>

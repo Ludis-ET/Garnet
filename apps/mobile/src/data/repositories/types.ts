@@ -13,6 +13,7 @@ import type { DemoPartnerProfile, Profile } from "@/data/fixtures/demoProfile";
 import type { GemSide, SetupStep } from "@/domain/identity";
 import type { OpenWhenView, OpenResult } from "@/domain/openWhen";
 import type { DemoUser, Relationship } from "@/domain/models";
+import type { ChatMedia, ChatMessage, ChatSettings, ConversationSummary } from "@/domain/chat";
 
 /**
  * Repository contracts. Screens and hooks depend on these interfaces only. Phase 2 provides
@@ -266,6 +267,28 @@ export interface UsRepository {
   respond(id: string, response: SignalResponse): Promise<void>;
 }
 
+export interface SendMessageInput {
+  text?: string | undefined;
+  replyToId?: string | undefined;
+  media?: ChatMedia | undefined;
+}
+
+export interface ChatRepository {
+  getSummary(): Promise<ConversationSummary>;
+  getMessages(): Promise<ChatMessage[]>;
+  sendMessage(input: SendMessageInput): Promise<ChatMessage>;
+  editMessage(id: string, text: string): Promise<ChatMessage>;
+  deleteMessage(id: string, mode: "for-me" | "for-everyone"): Promise<void>;
+  toggleReaction(messageId: string, emoji: string): Promise<ChatMessage>;
+  togglePin(messageId: string): Promise<ChatMessage>;
+  retryMessage(id: string): Promise<ChatMessage>;
+  getSettings(): Promise<ChatSettings>;
+  updateSettings(patch: Partial<ChatSettings>): Promise<ChatSettings>;
+  search(query: string): Promise<ChatMessage[]>;
+  getPinned(): Promise<ChatMessage[]>;
+  getSharedMedia(): Promise<ChatMessage[]>;
+}
+
 export interface Repositories {
   relationship: RelationshipRepository;
   openWhen: OpenWhenRepository;
@@ -275,4 +298,5 @@ export interface Repositories {
   home: HomeRepository;
   days: DaysRepository;
   us: UsRepository;
+  chat: ChatRepository;
 }

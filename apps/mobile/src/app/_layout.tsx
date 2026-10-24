@@ -4,7 +4,6 @@ import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
-import { ToastProvider } from "@/components/ui/Toast";
 import { PrototypePanel } from "@/features/prototype/PrototypePanel";
 import { ProfileThemeSync } from "@/features/setup/ProfileThemeSync";
 import { AppProviders } from "@/providers/AppProviders";
@@ -37,11 +36,9 @@ export default function RootLayout() {
 
   return (
     <AppProviders>
-      <ToastProvider>
-        <ProfileThemeSync />
-        <Stack screenOptions={{ headerShown: false, animation: "fade" }} />
-        <PrototypePanel />
-      </ToastProvider>
+      <ProfileThemeSync />
+      <Stack screenOptions={{ headerShown: false, animation: "fade" }} />
+      <PrototypePanel />
     </AppProviders>
   );
 }
