@@ -1,5 +1,5 @@
 import { Modal, Pressable, StyleSheet, View } from "react-native";
-import Animated, { FadeIn, ZoomIn } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText } from "@/components/ui/AppText";
 import { Glass } from "@/components/ui/Glass";
@@ -8,6 +8,7 @@ import type { AvatarChoice } from "@/data/fixtures/demoProfile";
 import type { GemSide } from "@/domain/identity";
 import { ProfileAvatar } from "@/features/setup/components/ProfileAvatar";
 import { useTheme } from "@/theme/ThemeProvider";
+import { ENTER, POP } from "@/theme/transitions";
 
 /** HOME-05: a glass popover from the avatar — you, Settings, Sign out. Nothing else. */
 export function ProfileMenu({
@@ -53,10 +54,7 @@ export function ProfileMenu({
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      <Animated.View
-        entering={FadeIn.duration(160)}
-        style={[styles.fill, { backgroundColor: colors.scrim }]}
-      >
+      <Animated.View entering={ENTER} style={[styles.fill, { backgroundColor: colors.scrim }]}>
         <Pressable
           style={StyleSheet.absoluteFill}
           onPress={onClose}
@@ -64,7 +62,7 @@ export function ProfileMenu({
           accessibilityLabel="Close menu"
         />
         <Animated.View
-          {...(reduceMotion ? {} : { entering: ZoomIn.springify().damping(17).stiffness(260) })}
+          {...(reduceMotion ? {} : { entering: POP })}
           accessibilityRole="menu"
           accessibilityViewIsModal
           style={[styles.menu, { top: insets.top + 64, right: spacing.gutter }]}

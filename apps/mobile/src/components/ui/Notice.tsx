@@ -1,10 +1,11 @@
 import { StyleSheet, View } from "react-native";
-import Animated, { FadeInDown } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { AppText } from "@/components/ui/AppText";
 import { Glass } from "@/components/ui/Glass";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { useSimulation } from "@/data/RepositoryProvider";
 import { useTheme } from "@/theme/ThemeProvider";
+import { ENTER } from "@/theme/transitions";
 
 export type NoticeTone = "info" | "error" | "success";
 
@@ -28,7 +29,7 @@ export function Notice({
   const fallback: IconName = tone === "error" ? "alert" : tone === "success" ? "check" : "sparkle";
   return (
     <Animated.View
-      {...(reduceMotion ? {} : { entering: FadeInDown.springify().damping(16) })}
+      {...(reduceMotion ? {} : { entering: ENTER })}
       accessibilityRole={tone === "error" ? "alert" : "text"}
       accessibilityLiveRegion="polite"
     >
@@ -53,7 +54,7 @@ export function OfflineBanner() {
   const { offline } = useSimulation();
   if (!offline) return null;
   return (
-    <Notice text="You're offline (simulated). Some changes may wait to sync." icon="wifi-off" />
+    <Notice text="You're offline. What you write waits safely on this phone." icon="wifi-off" />
   );
 }
 

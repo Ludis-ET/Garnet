@@ -269,6 +269,21 @@ export function colorsFor(scheme: ColorScheme, side: Side): ColorTokens {
   return { ...(scheme === "dark" ? dark : light), ...accentFor[scheme][side] };
 }
 
+/**
+ * Frosted glass for platforms without a live backdrop blur (Android, P-74). The see-through
+ * veils above rely on blur to read as glass; without it they look transparent, so the panes
+ * become dense frost instead: still a pane over the aurora with its sheen and shadow, but
+ * nothing behind shows through.
+ */
+export const FROST: Record<ColorScheme, Pick<ColorTokens, "glassVeil" | "glassVeilSoft">> = {
+  light: { glassVeil: "rgba(255, 255, 255, 0.92)", glassVeilSoft: "rgba(255, 255, 255, 0.78)" },
+  dark: { glassVeil: "rgba(30, 26, 44, 0.94)", glassVeilSoft: "rgba(44, 38, 62, 0.86)" },
+};
+
+export function frosted(colors: ColorTokens, scheme: ColorScheme): ColorTokens {
+  return { ...colors, ...FROST[scheme] };
+}
+
 /** Signature gradients (spec §4). Use for heroes and ceremonies only, never for body text backgrounds. */
 export const gradients = {
   ruby: [palette.ruby900, palette.ruby500, palette.ruby200],
@@ -376,15 +391,17 @@ export type TypeVariant = Exclude<keyof typeof typography, "families">;
  * reduced-motion path (see useReducedMotion). Ceremony durations are for milestones only.
  */
 export const motion = {
-  duration: { instant: 100, quick: 180, standard: 260, gentle: 420, ceremony: 900 },
+  // Fast and subtle (P-74): UI moves finish in under a fifth of a second; ceremonies keep theirs.
+  duration: { instant: 80, quick: 140, standard: 180, gentle: 240, ceremony: 900 },
   spring: {
     ruby: { damping: 14, stiffness: 180 }, // a little livelier
     sapphire: { damping: 22, stiffness: 120 }, // calmer, floating
     garnet: { damping: 18, stiffness: 150 },
     /** Daylight Glass (P-48): presses, layout/progress, and success pops. */
     press: { damping: 18, stiffness: 420, mass: 0.6 },
-    smooth: { damping: 22, stiffness: 180 },
-    bouncy: { damping: 9, stiffness: 170 },
+    // Quick and settled, with almost no overshoot (P-74).
+    smooth: { damping: 30, stiffness: 340 },
+    bouncy: { damping: 18, stiffness: 320 },
   },
 } as const;
 

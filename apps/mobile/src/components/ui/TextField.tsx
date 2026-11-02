@@ -1,12 +1,19 @@
-import { useState, type Ref } from "react";
+import { LinearGradient } from "expo-linear-gradient";
+import { useEffect, useState, type Ref } from "react";
 import { Pressable, StyleSheet, TextInput, View, type TextInputProps } from "react-native";
-import Animated from "react-native-reanimated";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 import { AppText } from "@/components/ui/AppText";
 import { Glass } from "@/components/ui/Glass";
-import { Icon } from "@/components/ui/Icon";
+import { Icon, type IconName } from "@/components/ui/Icon";
 import { useShake } from "@/components/ui/motion";
 import { useTheme } from "@/theme/ThemeProvider";
 import { touchTarget } from "@/theme/tokens";
+import { ENTER, EXIT } from "@/theme/transitions";
 
 export interface TextFieldProps extends Omit<
   TextInputProps,
@@ -29,14 +36,20 @@ export interface TextFieldProps extends Omit<
   large?: boolean;
   /** A multi-line field this many lines tall (it still grows with its text). */
   rows?: number;
+  /** A small icon at the start of the field (search, pin, mail…). */
+  icon?: IconName;
+  /** Shows a clear button while there is text (not for passwords). Default on for one-line fields. */
+  clearable?: boolean;
   ref?: Ref<TextInput>;
 }
 
 /**
- * Labelled text field in Daylight Glass (P-48). The label is always visible (never
- * placeholder-only); focus shows a violet hairline and a soft halo; an error turns the hairline
- * ruby-red, sits under its own field with an icon (never colour alone), is announced, and shakes
- * the field once (not under reduced motion). Password fields can be revealed.
+ * Liquid glass text field (P-48, redesign P-62). No outlines: the browser's focus rectangle is
+ * gone (`noOutline`), and focus is a soft glow in the person's colour that rises under the pane
+ * while the label and the leading icon take the accent and the pane lifts slightly. An error
+ * glows ruby and sits under its own field with an icon (never colour alone), is announced, and
+ * shakes the field once. Extras: a leading icon, a clear button, a live character counter near
+ * the limit, and show/hide for passwords. Reduced motion: no lift.
  */
 export function TextField({
   label,
@@ -47,23 +60,56 @@ export function TextField({
   appearance = "field",
   large = false,
   rows,
+  icon,
+  clearable,
   ref,
   ...input
 }: TextFieldProps) {
-  const { colors, radii, spacing, typography } = useTheme();
+  const { colors, radii, spacing, typography, motion, reduceMotion } = useTheme();
   const [focused, setFocused] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const invalid = error !== undefined;
   const shake = useShake(error);
   const row = appearance === "row";
+  const value = typeof input.value === "string" ? input.value : "";
+  const canClear =
+    (clearable ?? (rows === undefined && !secure)) &&
+    value.length > 0 &&
+    !disabled &&
+    input.onChangeText !== undefined;
+  const max = input.maxLength;
+  const showCount = max !== undefined && focused && value.length >= Math.floor(max * 0.8);
+
+  const lift = useSharedValue(0);
+  useEffect(() => {
+    lift.set(
+      reduceMotion
+        ? withTiming(focused ? 1 : 0, { duration: 120 })
+        : withSpring(focused ? 1 : 0, motion.spring.smooth),
+    );
+  }, [focused, reduceMotion, lift, motion.spring.smooth]);
+  const paneStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: reduceMotion ? 0 : -lift.get() * 1.5 }],
+  }));
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: invalid ? 0.55 : lift.get() * 0.6,
+    transform: [{ scaleX: 0.9 + lift.get() * 0.1 }],
+  }));
+  const glow = invalid ? colors.danger : colors.accent;
+  const tint = invalid ? colors.danger : focused ? colors.accent : null;
 
   const field = (
     <View style={[styles.box, { opacity: disabled ? 0.6 : 1 }]}>
+      {icon === undefined ? null : (
+        <View style={[styles.lead, { paddingLeft: spacing.lg }]}>
+          <Icon name={icon} size={19} color={tint ?? colors.textTertiary} />
+        </View>
+      )}
       <View style={[styles.flex, row && { paddingTop: spacing.sm }]}>
         {row ? (
           <AppText
             variant="caption"
-            color={invalid ? "danger" : "textSecondary"}
+            color={invalid ? "danger" : focused ? "accent" : "textSecondary"}
             style={{ paddingHorizontal: spacing.lg }}
           >
             {label}
@@ -96,12 +142,14 @@ export function TextField({
           }}
           style={[
             styles.input,
+            noOutline,
             row ? styles.rowInput : null,
             {
               color: colors.textPrimary,
               fontFamily: typography.families.text[large ? "500" : "400"],
               fontSize: large ? 20 : typography.body.fontSize,
-              paddingHorizontal: spacing.lg,
+              paddingLeft: icon === undefined ? spacing.lg : spacing.sm,
+              paddingRight: spacing.lg,
             },
             rows === undefined
               ? null
@@ -110,6 +158,23 @@ export function TextField({
           {...(rows === undefined ? {} : { multiline: true })}
         />
       </View>
+      {canClear ? (
+        <Animated.View entering={ENTER} exiting={EXIT}>
+          <Pressable
+            onPress={() => {
+              input.onChangeText?.("");
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={`Clear ${label}`}
+            hitSlop={8}
+            style={styles.clear}
+          >
+            <View style={[styles.clearDot, { backgroundColor: colors.textTertiary }]}>
+              <Icon name="x" size={11} color={colors.background} />
+            </View>
+          </Pressable>
+        </Animated.View>
+      ) : null}
       {secure ? (
         <Pressable
           onPress={() => {
@@ -139,14 +204,22 @@ export function TextField({
         {error}
       </AppText>
     </View>
-  ) : helper === undefined ? null : (
-    <AppText
-      variant="footnote"
-      color="textTertiary"
-      style={{ paddingHorizontal: row ? spacing.lg : spacing.xs }}
-    >
-      {helper}
-    </AppText>
+  ) : helper === undefined && !showCount ? null : (
+    <View style={[styles.message, { paddingHorizontal: row ? spacing.lg : spacing.xs }]}>
+      <AppText variant="footnote" color="textTertiary" style={styles.flex}>
+        {helper ?? ""}
+      </AppText>
+      {showCount ? (
+        <AppText
+          variant="caption"
+          weight="600"
+          color={value.length >= max ? "danger" : "textTertiary"}
+          accessibilityLiveRegion="polite"
+        >
+          {max - value.length}
+        </AppText>
+      ) : null}
+    </View>
   );
 
   if (row) {
@@ -158,34 +231,27 @@ export function TextField({
     );
   }
 
-  const ring = invalid ? colors.danger : focused ? colors.accent : null;
   return (
     <View style={{ gap: spacing.sm }}>
-      <AppText variant="footnote" weight="500" color="textSecondary">
+      <AppText
+        variant="footnote"
+        weight={focused ? "600" : "500"}
+        color={invalid ? "danger" : focused ? "accent" : "textSecondary"}
+      >
         {label}
       </AppText>
-      <Animated.View style={shake}>
-        {/* Focus halo: a soft accent ring just outside the pane. */}
-        {ring === null ? null : (
-          <View
-            pointerEvents="none"
-            style={[
-              styles.halo,
-              { borderRadius: radii.lg + 4, borderColor: ring, opacity: invalid ? 0.35 : 0.25 },
-            ]}
+      <Animated.View style={[shake, paneStyle]}>
+        {/* The glow: a soft light in the accent rising under the pane — no outline. */}
+        <Animated.View pointerEvents="none" style={[styles.glow, glowStyle]}>
+          <LinearGradient
+            colors={[`${glow}00`, `${glow}66`, `${glow}00`]}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={[StyleSheet.absoluteFill, { borderRadius: radii.lg + 6 }]}
           />
-        )}
-        <Glass radius={radii.lg} shadow={false}>
+        </Animated.View>
+        <Glass radius={radii.lg} shadow={focused} tint={invalid ? "ruby" : "none"}>
           {field}
-          {ring === null ? null : (
-            <View
-              pointerEvents="none"
-              style={[
-                StyleSheet.absoluteFill,
-                { borderRadius: radii.lg, borderWidth: 1.5, borderColor: ring },
-              ]}
-            />
-          )}
         </Glass>
       </Animated.View>
       {message}
@@ -193,9 +259,13 @@ export function TextField({
   );
 }
 
+/** Removes the browser's focus rectangle (web); native inputs never draw one. */
+export const noOutline = { outlineStyle: "none", outlineWidth: 0 } as unknown as object;
+
 const styles = StyleSheet.create({
   box: { flexDirection: "row", alignItems: "center", minHeight: 56 },
   flex: { flex: 1 },
+  lead: { justifyContent: "center" },
   input: { minHeight: 56, paddingVertical: 14 },
   rowInput: { minHeight: 40, paddingTop: 2, paddingBottom: 10 },
   reveal: {
@@ -204,6 +274,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  clear: { width: 36, height: touchTarget, alignItems: "center", justifyContent: "center" },
+  clearDot: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   message: { flexDirection: "row", alignItems: "flex-start" },
-  halo: { position: "absolute", top: -4, left: -4, right: -4, bottom: -4, borderWidth: 4 },
+  glow: { position: "absolute", left: 8, right: 8, bottom: -10, height: 26 },
 });

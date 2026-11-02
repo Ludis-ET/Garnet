@@ -60,3 +60,10 @@ Garnet surprise edge states: cancelled ("This surprise was withdrawn."), unavail
 isn't available here."), simulated delivery error for the sender ("Couldn't schedule this yet.
 Try again."). Calm, no blame.
 ```
+
+## Built (P-68, Daylight Glass)
+
+- **Where:** Moments › Surprises, with For me and From me. Each surprise is a glass card with an original gift capsule (a ribbon of light and a gem knot), its safe title, who it's from and its status.
+- **Create:** what's inside (seven kinds), when it opens (shown on both clocks), an optional safe title, then a preview of exactly what Noah sees and "Lock surprise".
+- **Detail:** locked (no hints for the recipient), ready ("Open your surprise?", then a skippable unwrap), opened (Save as memory, Send a thought back), withdrawn, unavailable, and a calm scheduling error with Try again.
+- **Provisional:** cancelling and changing the title are labelled "Rules not final".

@@ -6,6 +6,7 @@ import { EMPTY_PAIRING } from "@/data/fixtures/demoPairing";
 import { newProfile } from "@/data/fixtures/demoProfile";
 import type { HomePerson } from "@/data/repositories/types";
 import { atLocalTime, todayIn } from "@/domain/home";
+import { otherSide } from "@/domain/identity";
 
 /**
  * Who is looking, for the Home, Days and Us mocks: the signed-in person and their partner (the
@@ -29,11 +30,15 @@ export function viewerOf(s: DemoState): {
       name: profile.nickname.trim() || profile.displayName,
       side: profile.side,
       zone: profile.timeZone ?? "UTC",
+      avatar: profile.avatar,
     },
     partner: {
       name: pairing.partnerName ?? s.profiles.partner.name,
-      side: s.profiles.partner.side,
+      // P-51: the two sides never match, so once this person has chosen, the partner is the
+      // other gem even before their own setup finishes (P-57).
+      side: s.profiles.partner.side ?? (profile.side === null ? null : otherSide(profile.side)),
       zone: s.profiles.partner.timeZone,
+      avatar: { kind: "initials", swatch: 1 },
     },
   };
 }

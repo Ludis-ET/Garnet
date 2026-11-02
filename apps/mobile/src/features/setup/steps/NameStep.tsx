@@ -1,12 +1,13 @@
 /** SETUP-02 · Your name (P-52 limits, proposed). The preview is in-app only (P-17). */
 import { StyleSheet, View } from "react-native";
-import Animated, { FadeIn } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { GarnetMark } from "@/components/brand/GarnetMark";
 import { AppText } from "@/components/ui/AppText";
 import { Glass } from "@/components/ui/Glass";
 import { TextField } from "@/components/ui/TextField";
 import { greetingPreview, NAME_POLICY_P52 } from "@/domain/identity";
 import { useTheme } from "@/theme/ThemeProvider";
+import { ENTER } from "@/theme/transitions";
 
 export function NameStep({
   partnerName,
@@ -66,10 +67,7 @@ export function NameStep({
             <AppText variant="caption" color="textTertiary">
               {partnerName}'s Garnet
             </AppText>
-            <Animated.View
-              key={preview}
-              {...(reduceMotion ? {} : { entering: FadeIn.duration(220) })}
-            >
+            <Animated.View key={preview} {...(reduceMotion ? {} : { entering: ENTER })}>
               <AppText variant="callout" weight="500">
                 {preview}
               </AppText>

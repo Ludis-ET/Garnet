@@ -4,11 +4,22 @@ import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
+import { Platform } from "react-native";
+import { useTestingTools } from "@/features/prototype/devTools";
+import { NotificationSync } from "@/notifications/NotificationSync";
 import { PrototypePanel } from "@/features/prototype/PrototypePanel";
 import { ProfileThemeSync } from "@/features/setup/ProfileThemeSync";
 import { AppProviders } from "@/providers/AppProviders";
+import { PAGE } from "@/theme/transitions";
 
 export { AppErrorBoundary as ErrorBoundary } from "@/providers/AppErrorBoundary";
+
+// Web: no browser focus rectangles on fields; focus is shown by the glass glow (P-62).
+if (Platform.OS === "web" && typeof document !== "undefined") {
+  const style = document.createElement("style");
+  style.textContent = "input, textarea { outline: none !important; }";
+  document.head.appendChild(style);
+}
 
 // Keep the splash screen up until the fonts are ready, so text never flashes in a fallback face.
 void SplashScreen.preventAutoHideAsync();
@@ -37,8 +48,14 @@ export default function RootLayout() {
   return (
     <AppProviders>
       <ProfileThemeSync />
-      <Stack screenOptions={{ headerShown: false, animation: "fade" }} />
-      <PrototypePanel />
+      <Stack screenOptions={{ headerShown: false, ...PAGE }} />
+      <NotificationSync />
+      <TestingPanel />
     </AppProviders>
   );
+}
+
+/** The ✦ prototype panel, only once testing tools are on (P-75). */
+function TestingPanel() {
+  return useTestingTools() ? <PrototypePanel /> : null;
 }

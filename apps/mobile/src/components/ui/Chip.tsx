@@ -12,7 +12,7 @@ export interface ChipProps {
   accessibilityHint?: string;
 }
 
-/** Single-choice chip. Selection is shown by fill, border and weight, never colour alone. */
+/** Single-choice chip. Selection is shown by fill and weight, never colour alone; no outline (P-67). */
 export function Chip({ label, leading, selected, onPress, accessibilityHint }: ChipProps) {
   const { colors, radii, spacing } = useTheme();
   const vertical = Math.max(0, (touchTarget - 40) / 2);
@@ -31,8 +31,6 @@ export function Chip({ label, leading, selected, onPress, accessibilityHint }: C
           paddingHorizontal: spacing.md,
           gap: spacing.xs,
           backgroundColor: selected ? colors.accentSoft : colors.surface,
-          borderColor: selected ? colors.accent : colors.border,
-          borderWidth: selected ? 2 : 1,
           opacity: pressed ? 0.75 : 1,
         },
       ]}

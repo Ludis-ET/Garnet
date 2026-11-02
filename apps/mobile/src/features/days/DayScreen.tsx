@@ -7,7 +7,7 @@
 import { router } from "expo-router";
 import { type ReactNode, useState } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
-import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { Temporal } from "temporal-polyfill";
 import { GarnetMark } from "@/components/brand/GarnetMark";
 import { SparkleBurst } from "@/components/brand/SparkleBurst";
@@ -32,6 +32,8 @@ import { ADD_BUTTON_SPACE, AddButton } from "./components/AddButton";
 import { BoundarySheet } from "./components/BoundarySheet";
 import { MergedTimeline, Timeline } from "./components/Timeline";
 import { useDay, useFinishDay, useRemoveEntry, useRetryUpload, useSetVisibility } from "./useDays";
+import { goBack } from "@/navigation/goBack";
+import { ENTER } from "@/theme/transitions";
 
 type View3 = "mine" | "partner" | "together";
 
@@ -47,7 +49,7 @@ export function editEntry(id: string) {
 function Waiting({ action }: { action?: ReactNode }) {
   const { radii, spacing } = useTheme();
   return (
-    <Animated.View entering={FadeIn.duration(260)}>
+    <Animated.View entering={ENTER}>
       <Glass
         radius={radii.xl}
         contentStyle={[styles.center, { padding: spacing.xl, gap: spacing.md }]}
@@ -66,7 +68,7 @@ function Waiting({ action }: { action?: ReactNode }) {
 function Ready({ onSee }: { onSee: () => void }) {
   const { radii, spacing } = useTheme();
   return (
-    <Animated.View entering={FadeInDown.springify().damping(16)}>
+    <Animated.View entering={ENTER}>
       <Glass
         radius={radii.xl}
         tint="garnet"
@@ -148,7 +150,7 @@ function DayBody({
       <GlassScreen
         tabBar
         onBack={() => {
-          router.back();
+          goBack("/days");
         }}
         header={
           <AppText variant="headline" style={styles.textCenter}>
@@ -192,7 +194,7 @@ function DayBody({
         ) : null}
 
         {view === "mine" ? (
-          <Animated.View key="mine" entering={FadeIn.duration(220)} style={{ gap: spacing.lg }}>
+          <Animated.View key="mine" entering={ENTER} style={{ gap: spacing.lg }}>
             {day.mine.length === 0 ? (
               <View style={[styles.center, { gap: spacing.md, paddingVertical: spacing.xl }]}>
                 <SideCharacter pose="idle" size={150} />
@@ -223,7 +225,7 @@ function DayBody({
         ) : null}
 
         {view === "partner" ? (
-          <Animated.View key="partner" entering={FadeIn.duration(220)} style={{ gap: spacing.lg }}>
+          <Animated.View key="partner" entering={ENTER} style={{ gap: spacing.lg }}>
             {day.partner.length === 0 ? (
               <View style={[styles.center, { gap: spacing.md, paddingVertical: spacing.xl }]}>
                 <GarnetMark size={96} progress={ready ? 3 : 1} dim={!ready} />
@@ -251,7 +253,7 @@ function DayBody({
         ) : null}
 
         {view === "together" ? (
-          <Animated.View key="together" entering={FadeIn.duration(220)} style={{ gap: spacing.lg }}>
+          <Animated.View key="together" entering={ENTER} style={{ gap: spacing.lg }}>
             {ready ? (
               <MergedTimeline
                 entries={merged}
@@ -407,7 +409,7 @@ export function DayScreen({ date }: { date: string }) {
         <GlassScreen
           tabBar
           onBack={() => {
-            router.back();
+            goBack("/days");
           }}
         >
           <View style={[styles.center, styles.grow]}>

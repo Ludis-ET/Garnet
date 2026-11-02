@@ -7,7 +7,6 @@ import { AppText } from "@/components/ui/AppText";
 import { usePop } from "@/components/ui/motion";
 import type { AvatarChoice } from "@/data/fixtures/demoProfile";
 import type { GemSide } from "@/domain/identity";
-import { useTheme } from "@/theme/ThemeProvider";
 import { avatarSwatches, demoPhotoArt, palette } from "@/theme/tokens";
 
 /** The ring colour: the person's side, or Garnet violet before they choose. */
@@ -35,7 +34,6 @@ export function ProfileAvatar({
   side: GemSide | null;
   size: number;
 }) {
-  const { colors } = useTheme();
   const key = avatar.kind === "photo" ? avatar.photo : `i${avatar.swatch}`;
   const pop = usePop(`${key}-${side ?? "none"}`, 0.1);
   const glow = useSvgId("photo-sun");
@@ -93,12 +91,7 @@ export function ProfileAvatar({
             </AppText>
           </LinearGradient>
         )}
-        <View
-          style={[
-            StyleSheet.absoluteFill,
-            { borderRadius: inner / 2, borderWidth: 1, borderColor: colors.glassRimStart },
-          ]}
-        />
+        <View style={[StyleSheet.absoluteFill, { borderRadius: inner / 2 }]} />
       </View>
     </Animated.View>
   );

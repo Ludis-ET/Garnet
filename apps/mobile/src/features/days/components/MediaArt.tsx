@@ -1,7 +1,7 @@
 import { LinearGradient } from "expo-linear-gradient";
 import type { ReactNode } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
-import Animated, { FadeIn } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { AppText } from "@/components/ui/AppText";
 import { Glass } from "@/components/ui/Glass";
 import { Icon } from "@/components/ui/Icon";
@@ -9,6 +9,7 @@ import type { DemoArt } from "@/data/fixtures/demoDays";
 import { formatDuration } from "@/domain/days";
 import { useTheme } from "@/theme/ThemeProvider";
 import { demoPhotoArt } from "@/theme/tokens";
+import { ENTER } from "@/theme/transitions";
 
 /**
  * A simulated photo or video (Phase 2 has no real media): an abstract gradient "picture" with a
@@ -74,14 +75,14 @@ export function MediaArt({
         </>
       ) : null}
       {upload === "uploading" ? (
-        <Animated.View entering={FadeIn} style={styles.center}>
+        <Animated.View entering={ENTER} style={styles.center}>
           <Glass radius={26} shadow={false} contentStyle={styles.play}>
             <ActivityIndicator color={colors.textPrimary} accessibilityLabel="Uploading" />
           </Glass>
         </Animated.View>
       ) : null}
       {upload === "failed" ? (
-        <Animated.View entering={FadeIn} style={[styles.center, { padding: spacing.md }]}>
+        <Animated.View entering={ENTER} style={[styles.center, { padding: spacing.md }]}>
           <Glass radius={999} contentStyle={[styles.retry, { gap: spacing.sm }]}>
             <AppText variant="footnote" weight="500">
               Couldn't upload yet

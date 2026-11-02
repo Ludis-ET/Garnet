@@ -1,4 +1,4 @@
-import * as Haptics from "expo-haptics";
+import { Haptics } from "@/components/ui/haptics";
 import { Platform, Pressable, StyleSheet } from "react-native";
 import Animated, { useAnimatedStyle, withSpring } from "react-native-reanimated";
 import { AppText } from "@/components/ui/AppText";
@@ -53,8 +53,6 @@ export function GlassChip({
             paddingHorizontal: spacing.md,
             gap: spacing.xs,
             backgroundColor: selected ? colors.accentSoft : colors.glassVeilSoft,
-            borderColor: selected ? colors.accent : colors.glassRimEnd,
-            borderWidth: selected ? 1.5 : 1,
             opacity: disabled ? 0.45 : pressed ? 0.8 : 1,
           },
         ]}

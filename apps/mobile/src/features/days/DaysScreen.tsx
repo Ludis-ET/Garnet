@@ -8,8 +8,6 @@ import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, {
-  FadeIn,
-  FadeInDown,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -40,6 +38,7 @@ import { FilterSheet } from "./components/FilterSheet";
 import { MediaArt } from "./components/MediaArt";
 import { MonthCalendar } from "./components/MonthCalendar";
 import { useDaysOverview, useSearch } from "./useDays";
+import { ENTER } from "@/theme/transitions";
 
 const STATUS: Record<RevealState, { icon: IconName; label: (today: boolean) => string }> = {
   ready: { icon: "sparkle", label: () => "Revealed" },
@@ -57,7 +56,6 @@ function DayRow({
   partnerName,
   meColor,
   partnerColor,
-  index,
 }: {
   day: DaySummary;
   meName: string;
@@ -76,9 +74,7 @@ function DayRow({
       {...(reduceMotion
         ? {}
         : {
-            entering: FadeInDown.delay(Math.min(index, 8) * 45)
-              .springify()
-              .damping(18),
+            entering: ENTER,
           })}
     >
       <Pressable
@@ -243,7 +239,7 @@ function DaysContent() {
         </View>
 
         {filter !== null ? (
-          <Animated.View entering={FadeIn} style={{ gap: spacing.lg }}>
+          <Animated.View entering={ENTER} style={{ gap: spacing.lg }}>
             <Glass
               radius={radii.pill}
               shadow={false}
@@ -275,14 +271,8 @@ function DaysContent() {
                 </AppText>
               </View>
             ) : (
-              results.data.map((group, gi) => (
-                <Animated.View
-                  key={group.date}
-                  entering={FadeInDown.delay(gi * 50)
-                    .springify()
-                    .damping(18)}
-                  style={{ gap: spacing.sm }}
-                >
+              results.data.map((group) => (
+                <Animated.View key={group.date} entering={ENTER} style={{ gap: spacing.sm }}>
                   <AppText variant="footnote" color="textSecondary" weight="600">
                     {dayLabel(Temporal.PlainDate.from(group.date))}
                   </AppText>
@@ -320,7 +310,7 @@ function DaysContent() {
                 </AppText>
               </View>
             ) : mode === "calendar" ? (
-              <Animated.View entering={FadeIn.duration(240)}>
+              <Animated.View entering={ENTER}>
                 <MonthCalendar
                   today={data.today}
                   days={data.days}

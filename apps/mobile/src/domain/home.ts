@@ -63,3 +63,51 @@ export function atLocalTime(
     .toZonedDateTime({ timeZone: zone, plainTime: Temporal.PlainTime.from(time) })
     .toInstant();
 }
+
+/** Waking hours used for "both awake" on Home (P-66): 08:00 to 22:00 in each person's zone. */
+export const AWAKE = { from: 8, to: 22 } as const;
+
+function awake(at: Temporal.Instant, zone: string): boolean {
+  const t = at.toZonedDateTimeISO(zone);
+  const h = t.hour + t.minute / 60;
+  return h >= AWAKE.from && h < AWAKE.to;
+}
+
+/**
+ * When the two of you are both awake (HOME "Right now", P-66): now and for how much longer, or
+ * how long until you both are. Steps in 15 minutes through real zone times, so 23- and 25-hour
+ * days and either clock change are handled by Temporal (ADR-0002).
+ */
+export function bothAwake(
+  now: Temporal.Instant,
+  myZone: string,
+  theirZone: string,
+): { now: true; minutesLeft: number } | { now: false; minutesUntil: number | null } {
+  const both = (at: Temporal.Instant) => awake(at, myZone) && awake(at, theirZone);
+  const step = 15;
+  if (both(now)) {
+    let m = 0;
+    while (m < 24 * 60 && both(now.add({ minutes: m + step }))) m += step;
+    return { now: true, minutesLeft: m + step };
+  }
+  for (let m = step; m <= 48 * 60; m += step) {
+    if (both(now.add({ minutes: m }))) return { now: false, minutesUntil: m };
+  }
+  return { now: false, minutesUntil: null };
+}
+
+/** "About 3 h", "About 45 min", "A little while" (rounded down, gentle). */
+export function aboutDuration(minutes: number): string {
+  if (minutes < 30) return "a little while";
+  if (minutes < 90) return `about ${String(Math.round(minutes / 15) * 15)} min`;
+  return `about ${String(Math.floor(minutes / 60))} h`;
+}
+
+/** A picture for the part of someone's day. */
+export function dayPhaseEmoji(now: Temporal.Instant, zone: string): string {
+  const h = now.toZonedDateTimeISO(zone).hour;
+  if (h >= 5 && h < 11) return "🌅";
+  if (h >= 11 && h < 17) return "☀️";
+  if (h >= 17 && h < 21) return "🌇";
+  return "🌙";
+}

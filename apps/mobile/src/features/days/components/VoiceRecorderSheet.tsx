@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, {
-  FadeIn,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -16,6 +15,8 @@ import type { DemoMedia } from "@/data/fixtures/demoDays";
 import { formatDuration } from "@/domain/days";
 import { useTheme } from "@/theme/ThemeProvider";
 import { VoicePlayer } from "./VoicePlayer";
+import { ENTER } from "@/theme/transitions";
+import { useTestingTools } from "@/features/prototype/devTools";
 
 const BARS = 28;
 const MAX_TICKS = 1200; // two minutes
@@ -38,6 +39,8 @@ export function VoiceRecorderSheet({
   onClose: () => void;
 }) {
   const { colors, spacing, reduceMotion } = useTheme();
+  // Testing tools only (P-75); the app itself looks finished.
+  const tools = useTestingTools();
   const [phase, setPhase] = useState<"idle" | "recording" | "done">("idle");
   const [tick, setTick] = useState(0);
   const [wave, setWave] = useState<number[]>([]);
@@ -102,10 +105,10 @@ export function VoiceRecorderSheet({
       }
     >
       <View style={styles.center}>
-        <SimulatedBadge text="Simulated recorder" />
+        {tools ? <SimulatedBadge text="Simulated recorder" /> : null}
       </View>
       {phase === "done" ? (
-        <Animated.View entering={FadeIn} style={{ paddingVertical: spacing.lg }}>
+        <Animated.View entering={ENTER} style={{ paddingVertical: spacing.lg }}>
           <VoicePlayer seconds={seconds} wave={wave} />
         </Animated.View>
       ) : (

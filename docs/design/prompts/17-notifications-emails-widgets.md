@@ -107,3 +107,28 @@ as the anchor, no scores, no separation counter.
 | WIDGET-07 | Lock-screen concept | Compact icon, label and safe summary                                                               | No sensitive content by default                                       |
 
 Real widgets and refresh limits are verified later on devices (F-01, deferred to B-11).
+
+## Built (P-63)
+
+- **NOTIF-01, the notification centre:** opened from the bell on Home. Grouped by day, glass rows, an unread dot for the viewer only, "Mark all read", and "You're all caught up" with your gem when it's empty. It is built from what happened (the partner's signals, messages and reactions, letters ready to open, events within a week), using catalogue copy only.
+- **NOTIF-02, the preview lab:** under Settings › Prototype. Every catalogue entry in Generic, Sender or Full, on an iOS lock screen, iOS banner, Android heads-up or Android shade.
+- **EMAIL-01, the email lab:** all eleven templates with Mobile/Desktop, HTML/Plain text and Images on/blocked, plus what each link state leads to.
+- **Copy rules:** generic previews read the same for every category, and no banned words appear (tested in `notifications.test.ts`).
+
+## Counts and details (P-66)
+
+- **Counts:** the bell on Home shows how many are new. Settings › Notification centre shows the same count.
+- **Details:** tapping a notification opens a glass details page:
+  - its picture, kind, title and words;
+  - when it arrived, on both clocks;
+  - "Why you got this", with its group's setting one tap away;
+  - Open, and "Keep unread".
+- **Reading:** opening it marks it read for you only. Messages read in the chat count as read here too.
+
+## Widget gallery (P-70)
+
+Settings › Prototype › Widget gallery shows WIDGET-02 to WIDGET-07 in small, medium and large sizes, on iOS and Android, in light and dark, stale, and with a missing picture. Every variant is privacy-neutral (§5): "Something waiting for you", "A memory to revisit", "Something special · in 5 days", never real titles or words. Quick actions ask "Send this?" first, and nothing is sent in the prototype.
+
+## Character widgets (P-72)
+
+The gallery now opens on **Character** widgets, planned in [widgets-plan.md](../widgets-plan.md): one large Garnet, Ruby or Sapphire as the whole widget, in a look that follows the time of day (morning, day, evening, night), a special day, or something new or waiting. They never look sad, and there are no streaks or counts. W1 Garnet today, W2 Two clocks, W3 Thinking of you (asks "Send 'I thought of you'?" first), W4 Something waiting, W5 Coming up, W6 Far apart, W7 lock screen, W8 StandBy, plus Material You on Android. **Simple** keeps the P-70 set.

@@ -5,7 +5,6 @@
  * stays shared (P-20). The time is "now" and can't be changed yet (U-11 open). Leaving with
  * unsaved words asks first and offers to keep them as a private draft (§5 forgiving UX).
  */
-import { router } from "expo-router";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -15,7 +14,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import Animated, { FadeIn, FadeInDown, LinearTransition } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { SideCharacter } from "@/components/character/SideCharacter";
 import { ActionSheet } from "@/components/ui/ActionSheet";
 import { AppText } from "@/components/ui/AppText";
@@ -47,6 +46,8 @@ import { VisibilityPicker } from "./components/VisibilityPicker";
 import { VoicePlayer } from "./components/VoicePlayer";
 import { VoiceRecorderSheet } from "./components/VoiceRecorderSheet";
 import { useDaysOverview, useEntry, useSaveEntry } from "./useDays";
+import { goBack } from "@/navigation/goBack";
+import { ENTER, LAYOUT } from "@/theme/transitions";
 
 const MAX_TEXT = 500;
 
@@ -193,13 +194,11 @@ function ComposeForm({
   };
   const dirty = JSON.stringify(d) !== JSON.stringify(initial);
   const empty = d.text.trim().length === 0 && d.media === null;
-  const enter = (i: number) =>
+  const enter = () =>
     reduceMotion
       ? {}
       : {
-          entering: FadeInDown.delay(i * 55)
-            .springify()
-            .damping(18),
+          entering: ENTER,
         };
 
   const submit = (draft: Draft, how: "save" | "draft") => {
@@ -219,7 +218,7 @@ function ComposeForm({
                 : "Kept just for you.",
           "success",
         );
-        router.back();
+        goBack("/days");
       },
       onError: (e) => {
         toast.show(serviceErrorMessage(e), "error");
@@ -228,7 +227,7 @@ function ComposeForm({
   };
   const leave = () => {
     if (dirty) setSheet("leave");
-    else router.back();
+    else goBack("/days");
   };
   const mood = FEELINGS.find((f) => f.id === d.mood);
   const activity = ACTIVITIES.find((a) => a.id === d.activity);
@@ -257,7 +256,7 @@ function ComposeForm({
           />
         }
       >
-        <Animated.View {...enter(0)}>
+        <Animated.View {...enter()}>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -279,7 +278,7 @@ function ComposeForm({
           </ScrollView>
         </Animated.View>
 
-        <Animated.View {...enter(1)} style={{ gap: spacing.xs }}>
+        <Animated.View {...enter()} style={{ gap: spacing.xs }}>
           <TextField
             label="What's happening?"
             placeholder="Coffee, a walk, a thought…"
@@ -300,7 +299,7 @@ function ComposeForm({
           ) : null}
         </Animated.View>
 
-        <Animated.View {...enter(2)} layout={LinearTransition.springify().damping(18)}>
+        <Animated.View {...enter()} layout={LAYOUT}>
           {d.media === null ? (
             <View style={[styles.row, { gap: spacing.sm }]}>
               <MediaTile
@@ -326,7 +325,7 @@ function ComposeForm({
               />
             </View>
           ) : (
-            <Animated.View entering={FadeIn}>
+            <Animated.View entering={ENTER}>
               <Glass radius={radii.xl} contentStyle={{ padding: spacing.xs }}>
                 {d.media.type === "voice" ? (
                   <View style={{ padding: spacing.md }}>
@@ -364,7 +363,7 @@ function ComposeForm({
           )}
         </Animated.View>
 
-        <Animated.View {...enter(3)}>
+        <Animated.View {...enter()}>
           <Glass radius={radii.xl} contentStyle={{ paddingHorizontal: spacing.lg }}>
             <DetailRow
               icon="smile"
@@ -400,7 +399,7 @@ function ComposeForm({
           </Glass>
         </Animated.View>
 
-        <Animated.View {...enter(4)} style={{ gap: spacing.sm }}>
+        <Animated.View {...enter()} style={{ gap: spacing.sm }}>
           <VisibilityPicker
             value={d.visibility}
             from={editing ? initial.visibility : null}
@@ -474,7 +473,7 @@ function ComposeForm({
         }}
         onConfirm={() => {
           setSheet(null);
-          router.back();
+          goBack("/days");
         }}
       >
         {editing || empty ? null : (
@@ -503,7 +502,7 @@ export function ComposeScreen({ id }: { id?: string }) {
     return (
       <GlassScreen
         onBack={() => {
-          router.back();
+          goBack("/days");
         }}
       >
         <View style={[styles.grow, styles.center]}>
@@ -518,7 +517,7 @@ export function ComposeScreen({ id }: { id?: string }) {
       <SideScope side="garnet">
         <GlassScreen
           onBack={() => {
-            router.back();
+            goBack("/days");
           }}
         >
           <View style={[styles.grow, styles.center]}>

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
-import Animated, { FadeIn } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { Temporal } from "temporal-polyfill";
 import { AppText } from "@/components/ui/AppText";
 import { Glass } from "@/components/ui/Glass";
@@ -8,6 +8,7 @@ import { Icon } from "@/components/ui/Icon";
 import type { DaySummary } from "@/data/repositories/types";
 import { dayLabel, monthGrid, monthLabel } from "@/domain/days";
 import { useTheme } from "@/theme/ThemeProvider";
+import { ENTER } from "@/theme/transitions";
 
 const WEEKDAYS = ["M", "T", "W", "T", "F", "S", "S"];
 
@@ -83,7 +84,7 @@ export function MonthCalendar({
           </AppText>
         ))}
       </View>
-      <Animated.View key={month.toString()} entering={FadeIn.duration(220)} style={{ gap: 4 }}>
+      <Animated.View key={month.toString()} entering={ENTER} style={{ gap: 4 }}>
         {weeks.map((week, w) => (
           <View key={w} style={styles.row}>
             {week.map((d, i) => {

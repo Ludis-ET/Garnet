@@ -1,10 +1,11 @@
-import { Redirect } from "expo-router";
+import { Redirect, usePathname } from "expo-router";
 import { StyleSheet } from "react-native";
 import { TabList, Tabs, TabSlot } from "expo-router/ui";
 import { useAuthStatus } from "@/features/auth/useAuth";
 import { usePairingStatus } from "@/features/pairing/usePairing";
 import { useSetupState } from "@/features/setup/useSetup";
-import { GlassTabBar, tabTriggers } from "@/features/tabs/GlassTabBar";
+import { Watchers } from "@/features/companions/Watchers";
+import { GlassTabBar, HIDES_TAB_BAR, tabTriggers } from "@/features/tabs/GlassTabBar";
 
 /**
  * The five tabs (spec: Home, Days, Us, Moments, Our World) behind a floating liquid-glass tab
@@ -16,12 +17,15 @@ export default function TabsLayout() {
   const signedIn = auth.data?.kind === "signedIn";
   const pairing = usePairingStatus();
   const setup = useSetupState(signedIn);
+  const pathname = usePathname();
   if (auth.data !== undefined && !signedIn) return <Redirect href="/" />;
   if (pairing.data !== undefined && pairing.data.kind !== "paired") return <Redirect href="/" />;
   if (setup.data !== undefined && !setup.data.profile.complete) return <Redirect href="/setup" />;
   return (
     <Tabs style={styles.fill}>
       <TabSlot style={styles.fill} />
+      {/* Ruby and Sapphire peek over the bar on every tab page (P-57). */}
+      <Watchers hidden={HIDES_TAB_BAR.includes(pathname)} />
       <TabList asChild>
         <GlassTabBar>{tabTriggers()}</GlassTabBar>
       </TabList>

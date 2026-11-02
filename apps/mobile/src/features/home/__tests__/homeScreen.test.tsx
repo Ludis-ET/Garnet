@@ -119,8 +119,14 @@ describe("HOME-01 Home", () => {
     expect(screen.getByText("Shared thing")).toBeTruthy();
     expect(screen.getByText("Private thing")).toBeTruthy();
     expect(screen.getAllByLabelText("Only you")).toHaveLength(1);
-    expect(screen.getByRole("button", { name: "Something's waiting for you" })).toBeTruthy();
-    expect(screen.queryByText(/Demo letter body|Open when you miss me/)).toBeNull();
+    expect(
+      screen.getByRole("button", { name: /^Something's waiting for you: 1 letter/ }),
+    ).toBeTruthy();
+    // The Today card says each moment, and which are only yours, as one button.
+    expect(screen.getByRole("button", { name: /Private thing, only you/ })).toBeTruthy();
+    expect(
+      screen.queryByText(/Demo letter body|bench by the river|Open when you miss me/),
+    ).toBeNull();
     expect(screen.queryByText(/streak|days apart|score/i)).toBeNull();
   });
 });
@@ -174,6 +180,15 @@ describe("HOME-03 Log a moment", () => {
     await fireEvent.press(screen.getByRole("button", { name: "Share with Noah" }));
     expect(await screen.findByText("Shared with Noah.", {}, WAIT)).toBeTruthy();
     expect(store.read().days.entries.find((m) => m.text === "Sunset")?.visibility).toBe("shared");
+  });
+
+  it("closing with words keeps a private draft, never a shared one (P-62, §5)", async () => {
+    const store = await renderWith(<HomeScreen />, homeStore());
+    await fireEvent.press(await screen.findByRole("button", { name: "Log a moment" }, WAIT));
+    await fireEvent.changeText(await screen.findByLabelText("A small moment", {}, WAIT), "Rain");
+    await fireEvent.press(screen.getByRole("button", { name: "Close" }));
+    expect(await screen.findByText("Kept as a draft.", {}, WAIT)).toBeTruthy();
+    expect(store.read().days.entries.find((m) => m.text === "Rain")?.visibility).toBe("private");
   });
 });
 

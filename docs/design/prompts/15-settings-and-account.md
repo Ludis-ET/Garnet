@@ -140,3 +140,24 @@ Garnet "About": version, "Prototype — no real accounts or messages", privacy a
 Garnet dialog "Reset demo data?" — "This restores the prototype's sample data on this device."
 Cancel / Reset. Toast "Demo data restored."
 ```
+
+## Built (P-63, Daylight Glass)
+
+SET-01 to SET-17 are built: the profile card, iOS inset groups on glass with coloured icon tiles, and the Prototype group (notification lab, email lab, Reset demo data). Ending the space and deleting the account sit at the bottom, separately.
+
+- **Quiet hours:** off until you choose a window. 22:00–07:00 is offered only as "Suggested" (U-21 open).
+- **Reminders:** start "Not chosen", which sends none (P-65).
+- **Lock-screen previews:** generic by default, and each choice is shown on a drawn lock screen.
+- **End our space and Delete my account:** stepped flows, "Export first", then a typed END or DELETE. The open questions are labelled (U-20, U-23).
+- **Side:** read-only (P-51).
+
+## Control everything (P-66)
+
+- **Quick controls:** glass toggles at the top for Distance, Characters, Quiet hours, Haptics, Calm motion and Shortcut ring.
+- **Search:** "Search settings" finds any page by everyday words ("km", "seen", "dark").
+- **New pages:**
+  - **Home layout:** the ring, the characters and each card.
+  - **Chat:** Seen, typing, message notifications, and "Mark all as read".
+  - **Location & distance:** on/off, what it shows right now, "Update now", and what Noah sees.
+  - **Motion & haptics:** "Like my phone" or "Calm", and haptics on/off.
+- **Takes effect everywhere:** these settings change the whole app right away.

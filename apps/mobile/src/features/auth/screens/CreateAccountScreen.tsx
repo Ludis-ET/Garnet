@@ -5,11 +5,11 @@
  * never cleared, across steps too. A possible duplicate gets neutral copy and returns to the
  * email step (never confirms an account).
  */
-import * as Haptics from "expo-haptics";
+import { Haptics } from "@/components/ui/haptics";
 import { useRouter } from "expo-router";
 import { useRef, useState } from "react";
 import { Platform, StyleSheet, type TextInput, View } from "react-native";
-import Animated, { FadeIn, FadeInLeft, FadeInRight } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { GarnetMark } from "@/components/brand/GarnetMark";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
@@ -33,6 +33,8 @@ import { useTheme } from "@/theme/ThemeProvider";
 import { serviceErrorMessage } from "../authUi";
 import { GlassScreen } from "@/components/ui/GlassScreen";
 import { useCreateAccount } from "../useAuth";
+import { goBack } from "@/navigation/goBack";
+import { ENTER } from "@/theme/transitions";
 
 /** P-25 (proposed, not approved): the prototype uses it explicitly. */
 const POLICY = PASSWORD_POLICY_P25;
@@ -52,7 +54,7 @@ function completedSteps(form: CreateAccountForm): 0 | 1 | 2 | 3 {
 export function CreateAccountScreen() {
   const router = useRouter();
   const toast = useToast();
-  const { spacing, reduceMotion } = useTheme();
+  const { spacing } = useTheme();
   const create = useCreateAccount();
   const [form, setForm] = useState<CreateAccountForm>({
     displayName: "",
@@ -61,7 +63,6 @@ export function CreateAccountScreen() {
     confirmPassword: "",
   });
   const [step, setStep] = useState<CreateAccountStep>(0);
-  const [forward, setForward] = useState(true);
   // Errors for a step appear once the person tries to continue from it.
   const [tried, setTried] = useState<readonly boolean[]>([false, false, false]);
   const [maybeExists, setMaybeExists] = useState(false);
@@ -77,7 +78,6 @@ export function CreateAccountScreen() {
     if (field === "email") setMaybeExists(false);
   };
   const go = (to: CreateAccountStep) => {
-    setForward(to > step);
     setStep(to);
     if (Platform.OS !== "web") void Haptics.selectionAsync();
   };
@@ -119,14 +119,13 @@ export function CreateAccountScreen() {
 
   const back = () => {
     if (step > 0) go((step - 1) as CreateAccountStep);
-    else router.back();
+    else goBack("/welcome");
   };
 
   const busy = create.isPending;
   const checks = passwordChecks(form.password, form.confirmPassword, POLICY);
-  const enter = reduceMotion
-    ? FadeIn.duration(150)
-    : (forward ? FadeInRight : FadeInLeft).springify().damping(20).stiffness(180);
+  // A quick fade between steps (P-74), not a slide.
+  const enter = ENTER;
 
   return (
     <GlassScreen

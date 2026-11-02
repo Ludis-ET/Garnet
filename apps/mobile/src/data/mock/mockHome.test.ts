@@ -34,7 +34,7 @@ describe("mock home (HOME-01 to HOME-05)", () => {
   it("shows only today's own moments that already happened, newest first", async () => {
     const { home: h } = home(); // 14:00 in Addis
     const today = await h.today();
-    expect(today.me).toEqual({ name: "Sel", side: "ruby", zone: "Africa/Addis_Ababa" });
+    expect(today.me).toMatchObject({ name: "Sel", side: "ruby", zone: "Africa/Addis_Ababa" });
     expect(today.moments.map((m) => m.text)).toEqual([
       "Lunch by the window",
       "This meeting is taking forever",
@@ -102,13 +102,55 @@ describe("mock home (HOME-01 to HOME-05)", () => {
     const { home: h } = home();
     const today = await h.today();
     expect(today.waiting).toBe(true);
-    expect(JSON.stringify(today)).not.toMatch(/Demo letter body|Open when you miss me/);
+    expect(JSON.stringify(today)).not.toMatch(
+      /Demo letter body|bench by the river|Open when you miss me/,
+    );
+    // The soonest event from Events: the movie night five days out.
     expect(today.event).toEqual({
-      title: "Noah's birthday",
-      emoji: "🎂",
-      date: "2026-11-02",
-      daysAway: 11,
+      id: "e-movie",
+      kind: "date",
+      title: "Movie night on call",
+      emoji: "🍿",
+      date: "2026-10-27",
+      daysAway: 5,
     });
+  });
+
+  it("lets characters reflect only the partner's shared feelings, never drafts (P-57, §4)", async () => {
+    const { store, home: h } = home();
+    const at = new Date(Date.parse("2026-10-22T10:30:00Z")).toISOString();
+    store.update((s) => ({
+      ...s,
+      days: {
+        ...s.days,
+        entries: [
+          ...s.days.entries.filter((e) => e.mood === undefined),
+          {
+            id: "n-low",
+            authorId: DEMO_PARTNER_ID,
+            kind: "feeling",
+            text: "private",
+            emoji: "🌧️",
+            mood: "low",
+            dayOffset: 0,
+            localTime: null,
+            at,
+            visibility: "private",
+          },
+        ],
+      },
+    }));
+    expect((await h.today()).companions.partner.feeling).toBeNull();
+    store.update((s) => ({
+      ...s,
+      days: {
+        ...s.days,
+        entries: s.days.entries.map((e) =>
+          e.id === "n-low" ? { ...e, visibility: "shared" as const } : e,
+        ),
+      },
+    }));
+    expect((await h.today()).companions.partner.feeling).toBe("low");
   });
 
   it("shows nothing waiting when no letter can be opened yet", async () => {
@@ -138,5 +180,20 @@ describe("mock home (HOME-01 to HOME-05)", () => {
     expect((await h.today()).incoming).toEqual({ id: "in-1", signal: "thought-of-you" });
     await h.dismissIncoming("in-1");
     expect((await h.today()).incoming).toBeNull();
+  });
+
+  it("counts the partner as using the app only once paired and set up (P-63)", async () => {
+    const { store, home: h } = home();
+    expect((await h.today()).partnerActive).toBe(false); // paired, Noah still setting up
+    store.update((s) => ({
+      ...s,
+      profiles: { ...s.profiles, partner: { ...s.profiles.partner, ready: true } },
+    }));
+    expect((await h.today()).partnerActive).toBe(true);
+    store.update((s) => ({
+      ...s,
+      pairing: { ...s.pairing, byUser: { [DEMO_ME_ID]: EMPTY_PAIRING } },
+    }));
+    expect((await h.today()).partnerActive).toBe(false);
   });
 });

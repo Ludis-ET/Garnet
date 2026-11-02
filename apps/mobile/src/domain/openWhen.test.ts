@@ -89,3 +89,33 @@ describe("opening is explicit, recipient-only and eligibility-gated", () => {
     });
   });
 });
+
+describe("letter paper (P-71)", () => {
+  const base = {
+    id: "l1",
+    authorId: "a",
+    recipientId: "b",
+    safePrompt: "Open when you miss me",
+    body: "words",
+    mediaRefs: [],
+    unlock: { type: "manual" as const },
+    sealedAt: "2026-10-01T00:00:00Z",
+    paper: { tone: "rose" as const, font: "italic" as const },
+  };
+  const now = Temporal.Instant.from("2026-10-28T12:00:00Z");
+  it("comes back with the opened letter, and cream serif for older letters", () => {
+    expect(
+      viewLetter({ ...base, state: "opened", openedAt: "2026-10-02T00:00:00Z" }, "b", now),
+    ).toMatchObject({ kind: "opened", paper: { tone: "rose", font: "italic" } });
+    const old: Omit<typeof base, "paper"> = { ...base };
+    delete (old as Partial<typeof base>).paper;
+    expect(
+      viewLetter({ ...old, state: "opened", openedAt: "2026-10-02T00:00:00Z" }, "b", now),
+    ).toMatchObject({ paper: { tone: "cream", font: "serif" } });
+  });
+  it("never travels with a sealed letter", () => {
+    const v = viewLetter({ ...base, state: "sealed", openedAt: null }, "b", now);
+    expect(v.kind).toBe("sealed");
+    expect(JSON.stringify(v)).not.toContain("rose");
+  });
+});

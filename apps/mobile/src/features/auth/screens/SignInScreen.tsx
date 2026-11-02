@@ -4,7 +4,7 @@
  * repeated failures (ADR-0006 proposes back-off, no permanent lockout), and "Keep me signed in
  * on this device" (session lifetime is open, U-27).
  */
-import * as Haptics from "expo-haptics";
+import { Haptics } from "@/components/ui/haptics";
 import { useRouter } from "expo-router";
 import { useRef, useState } from "react";
 import { Platform, StyleSheet, type TextInput, View } from "react-native";
@@ -24,6 +24,7 @@ import { touchTarget } from "@/theme/tokens";
 import { formatSeconds, serviceErrorMessage, useCountdown } from "../authUi";
 import { GlassScreen } from "@/components/ui/GlassScreen";
 import { useSignIn } from "../useAuth";
+import { goBack } from "@/navigation/goBack";
 
 type Problem =
   { kind: "mismatch"; at: number } | { kind: "rate-limited"; seconds: number; at: number } | null;
@@ -78,7 +79,7 @@ export function SignInScreen() {
       {...(router.canGoBack()
         ? {
             onBack: () => {
-              router.back();
+              goBack("/welcome");
             },
           }
         : {})}

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { FlatList, Modal, Pressable, StyleSheet, View } from "react-native";
-import Animated, { FadeIn, SlideInDown } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { Temporal } from "temporal-polyfill";
 import { AppText } from "@/components/ui/AppText";
@@ -10,6 +10,7 @@ import { IconButton } from "@/components/ui/IconButton";
 import { TextField } from "@/components/ui/TextField";
 import { localTimeLabel, offsetLabel, searchZones } from "@/domain/identity";
 import { useTheme } from "@/theme/ThemeProvider";
+import { ENTER, SHEET } from "@/theme/transitions";
 
 /**
  * SETUP-05 "Change" sheet: search cities by name, country or zone; each row shows the city's
@@ -40,10 +41,7 @@ export function ZoneSheet({
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      <Animated.View
-        entering={FadeIn.duration(180)}
-        style={[styles.fill, { backgroundColor: colors.scrim }]}
-      >
+      <Animated.View entering={ENTER} style={[styles.fill, { backgroundColor: colors.scrim }]}>
         <Pressable
           style={StyleSheet.absoluteFill}
           onPress={onClose}
@@ -51,9 +49,7 @@ export function ZoneSheet({
           accessibilityRole="button"
         />
         <Animated.View
-          {...(reduceMotion
-            ? {}
-            : { entering: SlideInDown.springify().damping(19).stiffness(190) })}
+          {...(reduceMotion ? {} : { entering: SHEET })}
           accessibilityViewIsModal
           style={[styles.sheet, { paddingTop: insets.top + spacing.xxl }]}
         >

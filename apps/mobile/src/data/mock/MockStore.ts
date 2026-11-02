@@ -1,26 +1,27 @@
 import { createDemoState, type DemoState } from "@/data/fixtures/demo";
+import { clearStored, readStored, writeStored } from "./storage";
 
 const STORAGE_KEY = "garnet_demo_store_v1";
 
 function loadPersistedState(): DemoState | null {
   try {
-    if (typeof window !== "undefined") {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as Partial<DemoState> | null;
-        if (parsed?.meId && parsed.users && parsed.auth && parsed.profiles) {
-          const fresh = createDemoState();
-          return {
-            ...fresh,
-            ...parsed,
-            auth: { ...fresh.auth, ...parsed.auth },
-            pairing: { ...fresh.pairing, ...parsed.pairing },
-            profiles: { ...fresh.profiles, ...parsed.profiles },
-            home: { ...fresh.home, ...parsed.home },
-            days: { ...fresh.days, ...parsed.days },
-            chat: { ...fresh.chat, ...parsed.chat },
-          };
-        }
+    const raw = readStored(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<DemoState> | null;
+      if (parsed?.meId && parsed.users && parsed.auth && parsed.profiles) {
+        const fresh = createDemoState();
+        return {
+          ...fresh,
+          ...parsed,
+          auth: { ...fresh.auth, ...parsed.auth },
+          pairing: { ...fresh.pairing, ...parsed.pairing },
+          profiles: { ...fresh.profiles, ...parsed.profiles },
+          home: { ...fresh.home, ...parsed.home },
+          days: { ...fresh.days, ...parsed.days },
+          chat: { ...fresh.chat, ...parsed.chat },
+          // Older saves lack newer settings fields (locations, kept-unread marks).
+          settings: { ...fresh.settings, ...parsed.settings },
+        };
       }
     }
   } catch {
@@ -30,23 +31,11 @@ function loadPersistedState(): DemoState | null {
 }
 
 function savePersistedState(state: DemoState): void {
-  try {
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    }
-  } catch {
-    // Ignore quota or access errors
-  }
+  writeStored(STORAGE_KEY, JSON.stringify(state));
 }
 
 function clearPersistedState(): void {
-  try {
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem(STORAGE_KEY);
-    }
-  } catch {
-    // Ignore storage access errors
-  }
+  clearStored(STORAGE_KEY);
 }
 
 /**
@@ -61,7 +50,7 @@ export interface SimulationSettings {
   failCalls: boolean;
   /** Developer toggle for offline UI states (no real sync exists). */
   offline: boolean;
-  /** When true, state changes are persisted to localStorage. Defaults to true outside test runner. */
+  /** When true, state changes are persisted (localStorage on the web, a file on Android). Defaults to true outside test runner. */
   persist: boolean;
 }
 

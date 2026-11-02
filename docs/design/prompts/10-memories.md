@@ -1,89 +1,73 @@
-# 10 — Memories
+# 10 — Memories (Our World)
 
-Spec: §23–24, A1 "Memories", A2 "Memories/collections", A3 "Save chat media as memory", "Delete letter/memory". A private archive of their life. Saving from chat or days is always an **explicit** action. Remove-from-collection and delete-memory are clearly different.
+Spec: §23–24, A1 "Memories", A2 "Memories/collections", A3 "Save chat media as memory", "Delete letter/memory".
 
-### MEM-01 · Memories timeline
+**Design language: [Daylight Glass](./README.md#master-style-v2--daylight-glass-p-48), liquid pass, minimal.** Redesign: **P-59**. Our World is a **shared** page (Garnet violet). A memory's own page and form use its author's colour.
 
-Route `/(tabs)/our-world/memories`
+**Rules:**
 
-```text
-Garnet Memories, iPhone 393×852, dark, Garnet violet accent. Large title "Memories".
-Segmented "Timeline · Collections". Timeline: month headers in serif ("October · Chapter 02"),
-a calm masonry of large rounded photo tiles, voice-note tiles with waveform, text memories as
-quiet serif quotes, each with date. Search and filter icons. Floating "Add memory".
-```
+- A private archive of their life together. Saving from Days or chat is always **explicit**.
+- "Remove from collection" keeps the memory; "Delete" removes it for both of you (MEM-09).
+- Who deleted a memory is never shown (**U-16** open).
+- No per-person counts or comparisons (§5).
 
-**States:** populated · empty ("Your story starts with one memory.") with [GARNET FIGURE] (pose: holding the crystal) small · loading skeleton · unavailable media tile ("This item isn't available here.").
+## MEM-01 · Our World
 
-### MEM-02 · Collections
+Route `/(tabs)/our-world`
 
 ```text
-Garnet Collections grid, dark: 2-column cover cards with large cover photo, title in serif
-("First days apart", "Birthdays", "Trips", "Random moments"), item
-count in small caption. "New collection" card with dashed outline.
+"Our World" with glass search and ＋ buttons. A storybook hero: the current chapter's cover with
+Ruby and Sapphire together on it, "CHAPTER 02", "Our story", the chapter's title — tap to open it.
+A liquid segmented control "Memories · Collections · Chapters". Memories: serif month headers
+("October · Chapter 02"), then a balanced two-column masonry: photos and videos as large rounded
+pictures, voice notes as tinted glass with a waveform, words as quiet serif quotes; each with a
+short date and a thin bar in the author's colour.
 ```
 
-### MEM-03 · Collection detail
+**States:**
 
-```text
-Garnet collection detail: hero cover with title and description over a soft gradient, edit
-button, then the collection's memories as a grid. Actions menu: Edit collection, Add memories,
-Delete collection.
-```
+- **Empty:** Garnet holding the crystal, with "Your story starts with one memory."
+- **Filtered:** a "Filtered · clear" chip; with no matches, "Nothing found. Try another word or filter."
 
-**States:** populated · empty collection ("Nothing here yet. Add a memory.") .
+## MEM-02 · Collections
 
-### MEM-04 · Create / edit memory
+Two columns of glass cover cards, each with its title in serif and how many memories it holds, plus a dashed "New collection" card that opens a sheet with Name and About fields.
 
-```text
-Garnet "New memory" screen, dark. Media area (add photos/videos/voice), title, caption/story text
-area, date picker, place (optional, never automatic), tags chips, destination "Add to collection"
-selector. Primary "Save memory". Autosave "Draft saved on this device."
-```
+## MEM-03 · A collection
 
-**States:** empty · filled · uploading (mock progress) · failed with retry · discard dialog · saved.
+Route `/(tabs)/our-world/collection/[id]`.
 
-### MEM-05 · Memory detail
+- **Hero:** the cover, with the title and description over a soft fade.
+- **Actions:** "Add memories" opens a checklist; a glass trash button deletes the collection after confirming "The memories stay in your Memories."
+- **Body:** a grid of the collection's memories.
 
-```text
-Garnet memory detail: full-bleed media, title in serif, date and place, story text, who added it
-(avatar), collections it belongs to as chips. Actions: Edit, Add to collection, Remove from this
-collection, Delete memory.
-```
+## MEM-04 · New memory
 
-### MEM-06 · Media viewer
+Route `/(tabs)/our-world/memory-new`; the tab bar slides away.
 
-```text
-Garnet full-screen media viewer: black background, swipe between items, pinch to zoom, caption
-and date at the bottom, close button, share disabled by default (private). Video with simple
-controls; voice note with large waveform.
-```
+The form has:
 
-### MEM-07 · Voice note player
+- Photo, Video and Voice tiles (simulated);
+- a title and the story;
+- a date from a glass month picker;
+- a place (optional, never filled in automatically);
+- #tags and collections.
 
-```text
-Garnet voice note player sheet: large waveform with scrubber, play/pause, speed (1×, 1.5×),
-transcript area "Transcript not available" placeholder, author and date.
-```
+Leaving with changes asks first.
 
-### MEM-08 · Save as memory (from chat or days)
+## MEM-05 · A memory
 
-```text
-Garnet "Save as memory" sheet: media preview, title field, caption, choose collection list,
-Save / Cancel. Toast after: "Saved to Memories."
-```
+Route `/(tabs)/our-world/memory/[id]`.
 
-### MEM-09 · Remove from collection vs delete
+- The picture is full width; tapping it opens the viewer (MEM-06).
+- The title in serif, then the date, place and story.
+- "Added by you" or "Added by Noah", the collection chips and the tags.
+- Actions: Edit, Collections (add or remove; removing keeps the memory) and Delete. Delete confirms: "It will be removed for both of you, including its photos and collection links. Copies saved outside Garnet aren't affected."
 
-```text
-Two Garnet dialogs. "Remove from 'Trips'?" — "The memory stays in your Memories." Cancel /
-Remove. "Delete this memory?" — "It will be removed for you and Noah, including its photos and
-collection links. Copies saved outside Garnet aren't affected." Cancel / Delete (destructive).
-```
+## MEM-08 · Save as memory
 
-### MEM-10 · Search and filter
+From chat (a media message) or Days, a sheet with your character holding the crystal offers a preview, title, a few words and collection choices. Saving shows "Saved to Memories."
 
-```text
-Garnet Memories filter: type chips (photos, videos, voice, text), person, collection, date range;
-results grid; no-results state.
-```
+## MEM-10 · Find a memory
+
+A sheet with a search field, Both / Mine / Theirs, kinds (Photos, Videos, Voice, Words) and collections.

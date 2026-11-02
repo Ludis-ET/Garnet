@@ -1,4 +1,5 @@
-"""Make Garnet's face mark and app icons from the OWNER'S image (P-55, owner direction).
+"""Make Garnet's face mark and app icons from the OWNER'S image (P-55, owner direction), and
+Ruby's and Sapphire's small faces for chat (P-61).
 
 Agents may crop and compose the owner's character images but never draw them (AGENTS.md §8).
 Everything this writes goes to the git-ignored assets/characters/brand/, so no character art
@@ -18,10 +19,10 @@ OUT = ROOT / "assets" / "characters" / "brand"
 HEAD = 0.275
 
 
-def face(src: Image.Image) -> Image.Image:
+def face(src: Image.Image, head_share: float = HEAD) -> Image.Image:
     """The head only, centred on a transparent square."""
     x0, y0, x1, y1 = src.getbbox()
-    head = src.crop((x0, y0, x1, y0 + int((y1 - y0) * HEAD)))
+    head = src.crop((x0, y0, x1, y0 + int((y1 - y0) * head_share)))
     head = head.crop(head.getbbox())
     # Fade the cut at the shoulders into transparency, so the mark ends softly.
     alpha = head.getchannel("A")
@@ -60,8 +61,19 @@ def glow(size: int, color: tuple[int, int, int], radius: float, alpha: int) -> I
     return layer
 
 
+# Ruby and Sapphire faces for chat's "Seen" marker (P-61), from their calm owner images. Their
+# heads take a larger share of their (shorter) figures than Garnet's.
+SIDE_FACES = {"ruby": ("ruby-calm.png", 0.36), "sapphire": ("sapphire-calm.png", 0.38)}
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
+    for name, (file, share) in SIDE_FACES.items():
+        src = OUT.parent / file
+        if src.exists():
+            face(Image.open(src).convert("RGBA"), share).resize((256, 256), Image.LANCZOS).save(
+                OUT.parent / f"{name}-face.png"
+            )
     head = face(Image.open(SRC).convert("RGBA"))
     # The in-app mark sits beside the other character images, where the app's loader finds it.
     head.resize((768, 768), Image.LANCZOS).save(OUT.parent / "garnet-face.png")

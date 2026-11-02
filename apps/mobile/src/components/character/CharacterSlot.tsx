@@ -5,7 +5,7 @@ import { AppText } from "@/components/ui/AppText";
 import { useTheme } from "@/theme/ThemeProvider";
 import { findArtwork } from "@/features/figures/art/artwork";
 import { artworkFiles } from "@/features/figures/art/artworkFiles";
-import type { Mood } from "@/features/figures/types";
+import type { Mood, Occasion } from "@/features/figures/types";
 import { characterAssets, characterNames, type CharacterId, type Pose } from "./characterAssets";
 
 /** Owner images are named by mood (assets/characters/README.md); map each pose to its mood. */
@@ -33,6 +33,8 @@ export interface CharacterSlotProps {
   aspectRatio?: number;
   /** Decorative by default. Pass a label only when the figure carries meaning. */
   accessibilityLabel?: string;
+  /** A context look (P-57): overrides the pose's mood, and picks an occasion image if any. */
+  look?: { mood: Mood; occasion: Occasion };
 }
 
 /**
@@ -46,11 +48,18 @@ export function CharacterSlot({
   size = 160,
   aspectRatio = 1,
   accessibilityLabel,
+  look,
 }: CharacterSlotProps) {
   const theme = useTheme();
   const source =
-    characterAssets[character]?.[pose] ??
-    findArtwork(artworkFiles, character, poseMood[pose], "everyday", false);
+    (look === undefined ? characterAssets[character]?.[pose] : undefined) ??
+    findArtwork(
+      artworkFiles,
+      character,
+      look?.mood ?? poseMood[pose],
+      look?.occasion ?? "everyday",
+      false,
+    );
   const a11y =
     accessibilityLabel === undefined
       ? { accessible: false, importantForAccessibility: "no-hide-descendants" as const }

@@ -1,9 +1,31 @@
 import { Temporal } from "temporal-polyfill";
+import type { DemoState } from "@/data/fixtures/demo";
 import type { DemoSignalEvent } from "@/data/fixtures/demoHome";
 import type { SignalItem, UsRepository } from "@/data/repositories/types";
+import { distanceKm } from "@/domain/distance";
+import { coarsen, zonePoint } from "@/domain/location";
+import { withDefaults } from "@/domain/settings";
 import { SIGNAL_LOOK } from "@/domain/us";
+import { EMPTY_PAIRING } from "@/data/fixtures/demoPairing";
 import type { MockStore } from "./MockStore";
 import { signalInstant, viewerOf } from "./viewer";
+
+/**
+ * How far apart (P-66): rounded locations, or the time-zone city when there's none. Null when
+ * this person turned distance off or isn't paired yet. Shared by Us and the widgets (P-73).
+ */
+export function distanceOf(s: DemoState): { km: number; approximate: boolean } | null {
+  const v = viewerOf(s);
+  const paired = (s.pairing.byUser[v.userId] ?? EMPTY_PAIRING).partnerName !== null;
+  const sharing = withDefaults(s.settings.byUser[v.userId]).location.share;
+  const mineAt = s.settings.locations[v.userId] ?? null;
+  const theirsAt = s.settings.locations[v.partnerId] ?? null;
+  const a = mineAt ?? zonePoint(v.me.zone);
+  const b = theirsAt ?? zonePoint(v.partner.zone);
+  return !sharing || !paired || a === null || b === null
+    ? null
+    : { km: distanceKm(a, b), approximate: mineAt === null || theirsAt === null };
+}
 
 /**
  * Mock adapter for UsRepository (US-01 to US-10). Signals are communication, not measurement:
@@ -54,10 +76,28 @@ export function createMockUs(
                   Temporal.Instant.from(latestOkay.at),
                 ) > 0),
           ) ?? null;
-        return { me: v.me, partner: v.partner, openSupport, recent: items.slice(0, 3) };
+        return {
+          me: v.me,
+          partner: v.partner,
+          distance: distanceOf(s),
+          openSupport,
+          recent: items.slice(0, 3),
+        };
       }),
 
     history: () => store.simulate(() => all()),
+
+    saveLocation: (point) =>
+      store.simulate(() => {
+        const id = viewerOf(store.read()).userId;
+        // Rounded again here, so nothing finer than about 11 km is ever kept (P-66).
+        const kept =
+          point === null ? null : { ...coarsen(point.lat, point.lon), at: now().toString() };
+        store.update((s) => ({
+          ...s,
+          settings: { ...s.settings, locations: { ...s.settings.locations, [id]: kept } },
+        }));
+      }),
 
     send: (signal, payload) =>
       store.simulate(() => {

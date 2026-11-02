@@ -113,3 +113,129 @@ export function useHomeDemo() {
     },
   };
 }
+
+const REPLIES = [
+  "Aww, that made me smile 🥰",
+  "Tell me everything!",
+  "Miss you too 💙",
+  "Haha, that's so you 😄",
+  "Can't wait for our call tonight",
+  "Sending you the biggest hug 🫂",
+] as const;
+
+/**
+ * Chat (CHAT-01, P-58), as if from Noah's phone: he looks at the chat, types for a moment and
+ * answers. "Seen" only ever shows when both said yes; the repository filters it, not this.
+ */
+export function useChatDemo() {
+  const store = useDemoControls();
+  const patchChat = (
+    patch: (
+      c: ReturnType<typeof store.read>["chat"],
+    ) => Partial<ReturnType<typeof store.read>["chat"]>,
+  ) => {
+    store.update((s) => ({ ...s, chat: { ...s.chat, ...patch(s.chat) } }));
+  };
+  const read = () => {
+    patchChat(() => ({ partnerSeenUpTo: Temporal.Now.instant().toString() }));
+  };
+  const typing = (on: boolean) => {
+    patchChat(() => ({ partnerTyping: on }));
+  };
+  const reply = () => {
+    patchChat((c) => {
+      const partnerId = store.read().relationship.partnerIds.find((id) => id !== store.read().meId);
+      const at = Temporal.Now.instant().toString();
+      const text = REPLIES[c.messages.length % REPLIES.length] ?? REPLIES[0];
+      // Noah loves your latest message, and every third reply is one of his stickers (P-62).
+      const lastMine = [...c.messages].reverse().find((m) => m.senderId !== partnerId);
+      const side = store.read().profiles.partner.side ?? "sapphire";
+      const sticker =
+        c.messages.length % 3 === 0
+          ? {
+              character: side,
+              mood:
+                (["loving", "happy", "hug", "laughing"] as const)[c.messages.length % 4] ??
+                "loving",
+            }
+          : null;
+      return {
+        partnerTyping: false,
+        partnerSeenUpTo: at,
+        messages: [
+          ...c.messages.map((m) =>
+            m.id === lastMine?.id && !m.reactions.some((r) => r.emoji === "❤️")
+              ? { ...m, reactions: [...m.reactions, { emoji: "❤️", count: 1, reactedByMe: false }] }
+              : m,
+          ),
+          {
+            id: `demo-reply-${String(c.messages.length)}`,
+            senderId: partnerId ?? "demo-user-sapphire",
+            text: sticker === null ? text : "",
+            createdAt: at,
+            editedAt: null,
+            status: "sent",
+            pinned: false,
+            pinnedAt: null,
+            replyTo: null,
+            reactions: [],
+            ...(sticker === null ? {} : { sticker }),
+          },
+        ],
+      };
+    });
+  };
+  /** Noah opens or closes the chat (his character "watching" shows only under mutual Seen). */
+  const here = (on: boolean) => {
+    patchChat(() => ({ partnerInChat: on }));
+  };
+  return {
+    read,
+    typing,
+    reply,
+    here,
+    /** The next upload stops part-way, to show the retry state. */
+    failNextUpload: () => {
+      patchChat(() => ({ failNextUpload: true }));
+    },
+    /**
+     * Simulated upload progress (P-61): moves every unfinished upload along; a real adapter
+     * reports progress from the network instead. An upload set to fail stops at about 60 %.
+     */
+    advanceUploads: (step: number) => {
+      patchChat((c) => {
+        let failNext = c.failNextUpload;
+        const messages = c.messages.map((m) => {
+          if (m.status !== "sending" || m.uploadProgress === undefined) return m;
+          const next = Math.min(1, m.uploadProgress + step);
+          if (failNext && next >= 0.6) {
+            failNext = false;
+            return { ...m, status: "failed" as const, uploadProgress: next };
+          }
+          if (next >= 1) {
+            const done = { ...m, status: "sent" as const };
+            delete done.uploadProgress;
+            return done;
+          }
+          return { ...m, uploadProgress: next };
+        });
+        return { messages, failNextUpload: failNext };
+      });
+    },
+    /** After this person sends: Noah sees it, types, then answers (only if auto-reply is on). */
+    afterSend: () => {
+      if (!store.read().chat.autoReply) return;
+      setTimeout(() => {
+        here(true);
+        read();
+      }, 900);
+      setTimeout(() => {
+        typing(true);
+      }, 1700);
+      setTimeout(reply, 4400);
+      setTimeout(() => {
+        here(false);
+      }, 11_000);
+    },
+  };
+}

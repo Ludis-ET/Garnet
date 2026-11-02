@@ -1,4 +1,4 @@
-import * as Haptics from "expo-haptics";
+import { Haptics } from "@/components/ui/haptics";
 import { usePathname } from "expo-router";
 import { TabTrigger, type TabTriggerSlotProps } from "expo-router/ui";
 import { useEffect, useState } from "react";
@@ -15,6 +15,9 @@ import { AppText } from "@/components/ui/AppText";
 import { Glass } from "@/components/ui/Glass";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { useTheme } from "@/theme/ThemeProvider";
+import { CountBadge } from "@/components/ui/CountBadge";
+import { useChatSummary } from "@/features/chat/useChat";
+import { useHomeToday } from "@/features/home/useHome";
 
 export const TABS = [
   { name: "home", href: "/home", label: "Home", icon: "home" },
@@ -25,21 +28,46 @@ export const TABS = [
 ] as const satisfies readonly { name: string; href: string; label: string; icon: IconName }[];
 
 /** Full-screen forms that hide the bar (it slides away and comes back on leaving). */
-export const HIDES_TAB_BAR: readonly string[] = ["/days/new"];
+export const HIDES_TAB_BAR: readonly string[] = [
+  "/days/new",
+  "/us/chat",
+  "/moments/open-when/new",
+  "/moments/surprises/new",
+  "/moments/event-new",
+  "/our-world/memory-new",
+  "/our-world/plan-new",
+];
 
 /** Height of the floating bar; screens leave this much room at the bottom. */
 export const TAB_BAR_HEIGHT = 64;
 
+/** This person's own counts on a tab (P-66): unread messages on Us, letters to open on Moments. */
+function useTabBadge(name: string): { count: number; words: string } {
+  const chat = useChatSummary();
+  const home = useHomeToday();
+  if (name === "us") {
+    const n = chat.data?.unreadCount ?? 0;
+    return { count: n, words: `${String(n)} unread` };
+  }
+  if (name === "moments") {
+    const n = home.data?.waitingCount ?? 0;
+    return { count: n, words: `${String(n)} to open` };
+  }
+  return { count: 0, words: "" };
+}
+
 /** One tab; TabTrigger passes `isFocused`, `onPress` and the ref (React 19 ref-as-prop). */
 function TabButton({
   isFocused = false,
+  name,
   label,
   icon,
   onPress,
   ref,
   ...rest
-}: TabTriggerSlotProps & { label: string; icon: IconName }) {
+}: TabTriggerSlotProps & { name: string; label: string; icon: IconName }) {
   const { colors } = useTheme();
+  const badge = useTabBadge(name);
   return (
     <Pressable
       ref={ref}
@@ -49,11 +77,14 @@ function TabButton({
         onPress?.(e);
       }}
       accessibilityRole="tab"
-      accessibilityLabel={label}
+      accessibilityLabel={badge.count > 0 ? `${label}, ${badge.words}` : label}
       accessibilityState={{ selected: isFocused }}
       style={styles.tab}
     >
-      <Icon name={icon} size={22} color={isFocused ? colors.accent : colors.textSecondary} />
+      <View>
+        <Icon name={icon} size={22} color={isFocused ? colors.accent : colors.textSecondary} />
+        <CountBadge count={badge.count} style={styles.badge} />
+      </View>
       <AppText
         variant="caption"
         weight={isFocused ? "600" : "500"}
@@ -146,7 +177,7 @@ export function GlassTabBar({ children, ...rest }: ViewProps) {
 export function tabTriggers() {
   return TABS.map((t) => (
     <TabTrigger key={t.name} name={t.name} href={t.href} asChild>
-      <TabButton label={t.label} icon={t.icon} />
+      <TabButton name={t.name} label={t.label} icon={t.icon} />
     </TabTrigger>
   ));
 }
@@ -156,6 +187,7 @@ const styles = StyleSheet.create({
   bar: { width: "100%", maxWidth: 420 },
   row: { flexDirection: "row", height: TAB_BAR_HEIGHT, paddingHorizontal: 4 },
   tab: { flex: 1, alignItems: "center", justifyContent: "center", gap: 2 },
+  badge: { position: "absolute", top: -8, left: 12 },
   thumb: { position: "absolute", top: 6, height: TAB_BAR_HEIGHT - 12 },
   thumbFill: { height: TAB_BAR_HEIGHT - 14 },
 });

@@ -50,7 +50,27 @@ export type IconName =
   | "edit"
   | "chat"
   | "refresh"
-  | "smile";
+  | "smile"
+  | "bookmark"
+  | "camera"
+  | "volume"
+  | "mute"
+  | "leaf"
+  | "cup"
+  | "ball"
+  | "car"
+  | "bulb"
+  | "hash"
+  | "flag"
+  | "backspace"
+  | "reply"
+  | "bell"
+  | "chevron-down"
+  | "chevron-up"
+  | "plane"
+  | "palette"
+  | "download"
+  | "help";
 
 const paths: Record<IconName, readonly string[]> = {
   "chevron-left": ["M15 5 8 12l7 7"],
@@ -130,6 +150,39 @@ const paths: Record<IconName, readonly string[]> = {
   chat: ["M4.5 5.5h15v10h-9l-4.5 3.5v-3.5h-1.5z"],
   refresh: ["M19.5 12a7.5 7.5 0 1 1-2.2-5.3", "M19.5 4.5v4h-4"],
   smile: ["M8.5 14a4.5 4.5 0 0 0 7 0", "M9 9.5h.01", "M15 9.5h.01"],
+  bookmark: ["M7 4.5h10v15l-5-3.5-5 3.5z"],
+  camera: ["M4 8h3.5l1.5-2.5h6L16.5 8H20v11H4z"],
+  volume: ["M4.5 9.5h3l4.5-4v13l-4.5-4h-3z", "M15.5 9a4 4 0 0 1 0 6", "M18 6.5a7.5 7.5 0 0 1 0 11"],
+  mute: ["M4.5 9.5h3l4.5-4v13l-4.5-4h-3z", "M16 9.5l5 5", "M21 9.5l-5 5"],
+  leaf: ["M5 19c0-8 6-13.5 14.5-13.5 0 8.5-5.5 13.5-13.5 13.5z", "M5 19l8-8"],
+  cup: [
+    "M5 9.5h11v5a4.5 4.5 0 0 1-4.5 4.5h-2A4.5 4.5 0 0 1 5 14.5z",
+    "M16 11h1.5a2 2 0 0 1 0 4H16",
+    "M9 4.5v2.5",
+    "M12 4.5v2.5",
+  ],
+  ball: ["M3.5 12h17", "M12 3.5v17", "M6 6c3 3 3 9 0 12", "M18 6c-3 3-3 9 0 12"],
+  car: ["M4.5 16v-3.5l2-5h11l2 5V16z", "M4.5 16v2.5H7V16", "M17 16v2.5h2.5V16", "M4.5 12.5h15"],
+  bulb: [
+    "M9.5 17.5h5",
+    "M10.5 20.5h3",
+    "M9.5 17.5c0-2.5-3.5-3.5-3.5-7.5a6 6 0 0 1 12 0c0 4-3.5 5-3.5 7.5",
+  ],
+  hash: ["M9.5 4.5 8 19.5", "M16 4.5 14.5 19.5", "M5 9h14.5", "M4.5 15H19"],
+  flag: ["M6 20.5V4.5", "M6 5h11.5L15 9l2.5 4H6"],
+  backspace: ["M9 5.5h11.5v13H9L3.5 12z", "M12.5 9.5l5 5", "M17.5 9.5l-5 5"],
+  reply: ["M10 7.5 5 12l5 4.5", "M5 12h9a5 5 0 0 1 5 5v1.5"],
+  bell: ["M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z", "M10 20.5h4"],
+  "chevron-down": ["M5 9l7 7 7-7"],
+  "chevron-up": ["M5 15l7-7 7 7"],
+  plane: [
+    "M10.5 13.5 4 16v-2l6.5-4V5.5a1.5 1.5 0 0 1 3 0V10l6.5 4v2l-6.5-2.5v4l2 1.5v1.5l-3.5-1-3.5 1V19l2-1.5z",
+  ],
+  palette: [
+    "M12 3.5a8.5 8.5 0 0 0 0 17c1.5 0 2-1 2-2s-1-1.5-1-2.5 1-1.5 2-1.5h2a3.5 3.5 0 0 0 3.5-3.5c0-4.5-3.8-7.5-8.5-7.5z",
+  ],
+  download: ["M12 4.5v10", "M8 10.5l4 4 4-4", "M5.5 19.5h13"],
+  help: ["M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5v.7", "M12 16.5h.01"],
 };
 
 /** Icons that also draw circles (alert, user head, clock face, eye pupil, the three dots). */
@@ -155,6 +208,14 @@ const circles: Partial<Record<IconName, readonly { cx: number; cy: number; r: nu
   image: [{ cx: 15.5, cy: 9.5, r: 1.5 }],
   pin: [{ cx: 12, cy: 10, r: 2.5 }],
   smile: [{ cx: 12, cy: 12, r: 8.5 }],
+  camera: [{ cx: 12, cy: 13, r: 3.25 }],
+  ball: [{ cx: 12, cy: 12, r: 8.5 }],
+  help: [{ cx: 12, cy: 12, r: 9 }],
+  palette: [
+    { cx: 8, cy: 11, r: 1 },
+    { cx: 11, cy: 7.5, r: 1 },
+    { cx: 15.5, cy: 8.5, r: 1 },
+  ],
 };
 
 export function Icon({ name, size = 22, color }: { name: IconName; size?: number; color: string }) {

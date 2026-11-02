@@ -8,13 +8,14 @@ import {
   type ReactNode,
 } from "react";
 import { AccessibilityInfo, Pressable, StyleSheet, View } from "react-native";
-import Animated, { FadeIn, FadeOut, FadeOutUp, SlideInUp } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText } from "@/components/ui/AppText";
 import { Glass } from "@/components/ui/Glass";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { useTheme } from "@/theme/ThemeProvider";
 import { touchTarget } from "@/theme/tokens";
+import { ENTER, EXIT, SHEET } from "@/theme/transitions";
 
 export type ToastTone = "info" | "success" | "error";
 
@@ -85,10 +86,10 @@ function ToastView({ toast, onDismiss }: { toast: ToastMessage; onDismiss: () =>
   return (
     <Animated.View
       {...(reduceMotion
-        ? { entering: FadeIn.duration(120), exiting: FadeOut.duration(120) }
+        ? { entering: ENTER, exiting: EXIT }
         : {
-            entering: SlideInUp.springify().damping(17).stiffness(220),
-            exiting: FadeOutUp.duration(180),
+            entering: SHEET,
+            exiting: EXIT,
           })}
       style={[styles.wrap, { top: insets.top + spacing.sm, paddingHorizontal: spacing.lg }]}
       pointerEvents="box-none"

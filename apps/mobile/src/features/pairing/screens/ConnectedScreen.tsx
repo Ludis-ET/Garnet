@@ -5,13 +5,14 @@
  */
 import { Redirect, useRouter } from "expo-router";
 import { StyleSheet, View } from "react-native";
-import Animated, { FadeInDown } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { GlassScreen } from "@/components/ui/GlassScreen";
 import { useTheme } from "@/theme/ThemeProvider";
 import { ConnectedScene } from "../components/ConnectedScene";
 import { usePairingStatus } from "../usePairing";
+import { ENTER } from "@/theme/transitions";
 
 export function ConnectedScreen() {
   const router = useRouter();
@@ -34,10 +35,7 @@ export function ConnectedScreen() {
       <View style={[styles.fill, { gap: spacing.xl }]}>
         <ConnectedScene />
         {/* The words are always there for screen readers; they rise in once the crystal blooms. */}
-        <Animated.View
-          {...(reduceMotion ? {} : { entering: FadeInDown.delay(1000).springify().damping(16) })}
-          style={{ gap: spacing.sm }}
-        >
+        <Animated.View {...(reduceMotion ? {} : { entering: ENTER })} style={{ gap: spacing.sm }}>
           <AppText variant="statement" style={styles.centerText}>
             You're connected.
           </AppText>

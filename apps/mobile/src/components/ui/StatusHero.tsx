@@ -1,11 +1,12 @@
 import type { ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
-import Animated, { FadeInDown, ZoomIn } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { SparkleBurst } from "@/components/brand/SparkleBurst";
 import { AppText } from "@/components/ui/AppText";
 import { Glass, type GlassTint } from "@/components/ui/Glass";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { useTheme } from "@/theme/ThemeProvider";
+import { ENTER, POP } from "@/theme/transitions";
 
 /**
  * A centred status moment (P-48): an icon in a tinted glass circle (or custom art), a title and
@@ -35,10 +36,7 @@ export function StatusHero({
     tone === "success" ? colors.success : tone === "danger" ? colors.danger : colors.accent;
   return (
     <View style={[styles.fill, { gap: spacing.lg }]}>
-      <Animated.View
-        {...(reduceMotion ? {} : { entering: ZoomIn.springify().damping(12) })}
-        style={styles.center}
-      >
+      <Animated.View {...(reduceMotion ? {} : { entering: POP })} style={styles.center}>
         {art ?? (
           <Glass radius={40} tint={tint} contentStyle={styles.circle}>
             {icon === undefined ? null : <Icon name={icon} size={34} color={iconColor} />}
@@ -46,10 +44,7 @@ export function StatusHero({
         )}
         <SparkleBurst play={celebrate} delay={120} />
       </Animated.View>
-      <Animated.View
-        {...(reduceMotion ? {} : { entering: FadeInDown.delay(120).springify().damping(18) })}
-        style={{ gap: spacing.sm }}
-      >
+      <Animated.View {...(reduceMotion ? {} : { entering: ENTER })} style={{ gap: spacing.sm }}>
         <AppText variant="question" style={styles.centerText}>
           {title}
         </AppText>

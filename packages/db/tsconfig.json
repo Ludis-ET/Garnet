@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    // The CLI runs on Node 24 directly, which needs real file extensions in relative imports.
+    "allowImportingTsExtensions": true
+  },
+  "include": ["src"]
+}

@@ -33,6 +33,11 @@ export default tseslint.config(
     },
   },
   {
+    // NestJS modules, controllers and guards are classes defined by their decorators.
+    files: ["apps/api/**/*.ts"],
+    rules: { "@typescript-eslint/no-extraneous-class": ["error", { allowWithDecorator: true }] },
+  },
+  {
     // React rules for the mobile app (hooks correctness and the React Compiler-ready rule set).
     files: ["apps/mobile/**/*.tsx", "apps/mobile/**/*.ts"],
     extends: [reactHooks.configs.flat["recommended-latest"]],
@@ -64,8 +69,8 @@ export default tseslint.config(
     languageOptions: { globals: { jest: "readonly", require: "readonly" } },
   },
   {
-    // Expo reads app.config.js and metro.config.js as Node CommonJS.
-    files: ["apps/mobile/app.config.js", "apps/mobile/metro.config.js"],
+    // Expo reads app.config.js, metro.config.js and local config plugins as Node CommonJS.
+    files: ["apps/mobile/app.config.js", "apps/mobile/metro.config.js", "apps/mobile/plugins/*.js"],
     languageOptions: {
       sourceType: "commonjs",
       globals: { require: "readonly", module: "writable", __dirname: "readonly" },

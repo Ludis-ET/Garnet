@@ -16,7 +16,7 @@ import { Toggle } from "@/components/ui/Toggle";
 import { DEMO_RESET_TOKENS } from "@/data/fixtures/demoAuth";
 import { useDemoControls } from "@/data/RepositoryProvider";
 import { useTheme, useThemeSettings, type SchemePreference } from "@/theme/ThemeProvider";
-import { useHomeDemo, usePairingDemo, useSetupDemo } from "./demoActions";
+import { useChatDemo, useHomeDemo, usePairingDemo, useSetupDemo } from "./demoActions";
 import { touchTarget } from "@/theme/tokens";
 
 const APPEARANCES: readonly { label: string; value: SchemePreference }[] = [
@@ -59,6 +59,7 @@ export function PrototypePanel() {
   const pairingDemo = usePairingDemo();
   const setupDemo = useSetupDemo();
   const homeDemo = useHomeDemo();
+  const chatDemo = useChatDemo();
   const [open, setOpen] = useState(false);
   const state = useSyncExternalStore(
     (l) => store.subscribe(l),
@@ -365,6 +366,67 @@ export function PrototypePanel() {
                   selected={false}
                   onPress={() => {
                     homeDemo.partnerSignals("need-you");
+                    setOpen(false);
+                  }}
+                />
+                {/* P-75: time to lock the phone and see a real notification arrive. */}
+                <Chip
+                  label="In 10 s: Noah thinks of you"
+                  selected={false}
+                  onPress={() => {
+                    setTimeout(() => {
+                      homeDemo.partnerSignals("thought-of-you");
+                    }, 10_000);
+                    setOpen(false);
+                  }}
+                />
+                <Chip
+                  label="In 10 s: Noah replies"
+                  selected={false}
+                  onPress={() => {
+                    setTimeout(() => {
+                      chatDemo.reply();
+                    }, 10_000);
+                    setOpen(false);
+                  }}
+                />
+                <Chip
+                  label="Noah is typing"
+                  selected={false}
+                  onPress={() => {
+                    chatDemo.typing(true);
+                    setOpen(false);
+                  }}
+                />
+                <Chip
+                  label="Noah replies"
+                  selected={false}
+                  onPress={() => {
+                    chatDemo.reply();
+                    setOpen(false);
+                  }}
+                />
+                <Chip
+                  label="Noah sees the chat"
+                  selected={false}
+                  onPress={() => {
+                    chatDemo.read();
+                    setOpen(false);
+                  }}
+                />
+                <Chip
+                  label="Noah opens the chat"
+                  selected={false}
+                  onPress={() => {
+                    chatDemo.here(true);
+                    setOpen(false);
+                  }}
+                />
+                <Chip
+                  label="Next upload stops"
+                  selected={false}
+                  onPress={() => {
+                    chatDemo.failNextUpload();
                     setOpen(false);
                   }}
                 />

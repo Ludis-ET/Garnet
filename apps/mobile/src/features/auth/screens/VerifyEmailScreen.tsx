@@ -3,11 +3,11 @@
  * (demo)" stands in for tapping the link. Only a masked address is shown. States: waiting,
  * resent with cooldown, verified (sparkles), expired link, already verified.
  */
-import * as Haptics from "expo-haptics";
+import { Haptics } from "@/components/ui/haptics";
 import { Redirect, useRouter } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
-import Animated, { FadeInDown } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { GarnetMark } from "@/components/brand/GarnetMark";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
@@ -27,6 +27,7 @@ import {
   useOpenVerificationLink,
   useResendVerification,
 } from "../useAuth";
+import { ENTER } from "@/theme/transitions";
 
 export function VerifyEmailScreen() {
   const router = useRouter();
@@ -137,7 +138,7 @@ export function VerifyEmailScreen() {
       <View style={[styles.fill, { gap: spacing.xl }]}>
         <GlassEnvelope />
         <Animated.View
-          {...(reduceMotion ? {} : { entering: FadeInDown.delay(120).springify().damping(18) })}
+          {...(reduceMotion ? {} : { entering: ENTER })}
           style={[styles.center, { gap: spacing.md }]}
         >
           <AppText variant="largeTitle" style={styles.centerText}>

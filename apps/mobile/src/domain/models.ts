@@ -38,6 +38,14 @@ export type UnlockRule =
 export type OpenWhenState = "draft" | "sealed" | "opened" | "removed";
 
 /** Stored record (mock). The body must never reach a view before the letter is opened. */
+/** OPEN-03 letter paper (P-62, P-71): a tint and a hand. */
+export type PaperTone = "cream" | "rose" | "sky" | "lilac";
+export type PaperFont = "serif" | "italic" | "clean";
+export interface LetterStyle {
+  tone: PaperTone;
+  font: PaperFont;
+}
+
 export interface OpenWhenLetter {
   id: string;
   authorId: UserId;
@@ -49,4 +57,6 @@ export interface OpenWhenLetter {
   state: OpenWhenState;
   sealedAt: string | null;
   openedAt: string | null;
+  /** The paper and hand it was written in (shown the same when read, P-71). */
+  paper?: LetterStyle;
 }

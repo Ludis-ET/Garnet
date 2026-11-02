@@ -1,22 +1,9 @@
-import { useEffect, useEffectEvent, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
-import Animated, {
-  Easing,
-  FadeIn,
-  FadeOut,
-  interpolateColor,
-  LinearTransition,
-  useAnimatedStyle,
-  useSharedValue,
-  withDelay,
-  withRepeat,
-  withTiming,
-} from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { Temporal } from "temporal-polyfill";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { Glass } from "@/components/ui/Glass";
-import type { AvatarChoice } from "@/data/fixtures/demoProfile";
 import type { HomePerson, SignalItem } from "@/data/repositories/types";
 import { localTimeLabel } from "@/domain/identity";
 import {
@@ -27,113 +14,10 @@ import {
   SIGNAL_LOOK,
   type SignalResponse,
 } from "@/domain/us";
-import { ProfileAvatar, sideColor } from "@/features/setup/components/ProfileAvatar";
+import { sideColor } from "@/features/setup/components/ProfileAvatar";
 import { useTheme } from "@/theme/ThemeProvider";
 import { payloadLines, replyLine } from "../signalText";
-
-/**
- * US-01 top: both of you, each ringed in their side's colour, with a thin violet line between
- * and a small light travelling along it. Each person's local time underneath.
- */
-export function PeopleBar({
-  me,
-  partner,
-  avatar,
-  now,
-}: {
-  me: HomePerson;
-  partner: HomePerson;
-  avatar: AvatarChoice;
-  now: Temporal.Instant;
-}) {
-  const { colors, radii, spacing, reduceMotion } = useTheme();
-  const [width, setWidth] = useState(0);
-  const t = useSharedValue(0);
-  useEffect(() => {
-    if (reduceMotion) return;
-    t.set(
-      withRepeat(withTiming(1, { duration: 2600, easing: Easing.inOut(Easing.quad) }), -1, true),
-    );
-  }, [t, reduceMotion]);
-  const from = sideColor(me.side);
-  const to = sideColor(partner.side);
-  const light = useAnimatedStyle(() => ({
-    transform: [{ translateX: t.get() * Math.max(0, width - 10) }],
-    backgroundColor: interpolateColor(t.get(), [0, 1], [from, to]),
-  }));
-  const person = (p: HomePerson, a: AvatarChoice) => (
-    <View style={[styles.person, { gap: spacing.xs }]}>
-      <ProfileAvatar name={p.name} avatar={a} side={p.side} size={64} />
-      <AppText variant="callout" weight="600" numberOfLines={1}>
-        {p.name}
-      </AppText>
-      <AppText variant="caption" color="textSecondary">
-        {localTimeLabel(now, p.zone)}
-      </AppText>
-    </View>
-  );
-  return (
-    <Glass radius={radii.xl} contentStyle={[styles.row, { padding: spacing.lg, gap: spacing.sm }]}>
-      <View
-        accessible
-        accessibilityLabel={`${me.name}, ${localTimeLabel(now, me.zone)}. ${partner.name}, ${localTimeLabel(now, partner.zone)}.`}
-        style={[styles.row, styles.flex, { gap: spacing.sm }]}
-      >
-        {person(me, avatar)}
-        <View
-          style={[styles.link, { backgroundColor: colors.tintGarnet }]}
-          onLayout={(e) => {
-            setWidth(e.nativeEvent.layout.width);
-          }}
-        >
-          <Animated.View style={[styles.light, light]} />
-        </View>
-        {person(partner, { kind: "initials", swatch: 1 })}
-      </View>
-    </Glass>
-  );
-}
-
-/** A signal tile in the 2-column grid: big emoji, title, a soft press. */
-export function SignalTile({
-  emoji,
-  title,
-  onPress,
-  wide = false,
-}: {
-  emoji: string;
-  title: string;
-  onPress: () => void;
-  wide?: boolean;
-}) {
-  const { radii, spacing } = useTheme();
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={title}
-      style={({ pressed }) => [
-        wide ? styles.wide : styles.tile,
-        { transform: [{ scale: pressed ? 0.96 : 1 }] },
-      ]}
-    >
-      <Glass
-        radius={radii.xl}
-        contentStyle={[
-          wide ? styles.wideInner : styles.tileInner,
-          { padding: spacing.lg, gap: spacing.sm },
-        ]}
-      >
-        <AppText variant="title" accessible={false}>
-          {emoji}
-        </AppText>
-        <AppText variant="callout" weight="600" numberOfLines={2}>
-          {title}
-        </AppText>
-      </Glass>
-    </Pressable>
-  );
-}
+import { ENTER, EXIT, LAYOUT } from "@/theme/transitions";
 
 /** "18:42 · 20:42 for you": the sender's time, then the viewer's when the zones differ. */
 export function bothTimes(at: string, from: HomePerson, viewer: HomePerson): string {
@@ -167,11 +51,7 @@ export function SupportCard({
   const title = receivedLine(item.signal, partner.name, item.payload);
   const details = payloadLines(item.payload, title);
   return (
-    <Animated.View
-      entering={FadeIn.duration(300)}
-      exiting={FadeOut.duration(200)}
-      layout={LinearTransition}
-    >
+    <Animated.View entering={ENTER} exiting={EXIT} layout={LAYOUT}>
       <Glass
         radius={radii.xl}
         tint={partner.side ?? "garnet"}
@@ -242,7 +122,7 @@ export function SignalRow({
   const details = payloadLines(item.payload, line);
   const replier = item.mine ? partner.name : "You";
   return (
-    <Animated.View layout={LinearTransition.springify().damping(18)}>
+    <Animated.View layout={LAYOUT}>
       <Pressable
         onPress={onToggle}
         accessibilityRole="button"
@@ -268,10 +148,7 @@ export function SignalRow({
             </AppText>
           </View>
           {expanded ? (
-            <Animated.View
-              entering={FadeIn.duration(200)}
-              style={[styles.detail, { gap: spacing.xs }]}
-            >
+            <Animated.View entering={ENTER} style={[styles.detail, { gap: spacing.xs }]}>
               {details.map((d) => (
                 <AppText key={d} variant="footnote" color="textSecondary">
                   {d}
@@ -302,57 +179,6 @@ export function SignalRow({
         </Glass>
       </Pressable>
     </Animated.View>
-  );
-}
-
-/**
- * US-02 sent: a small light in the sender's colour rises and turns Garnet violet, then "Sent 💭".
- * Mount it (with a new key) for each send; it calls `onDone` when finished. No "seen" (§5).
- * Reduced motion: the words fade in on their own.
- */
-export function SentBurst({
-  emoji,
-  color,
-  onDone,
-}: {
-  emoji: string;
-  color: string;
-  onDone: () => void;
-}) {
-  const { colors, reduceMotion } = useTheme();
-  const p = useSharedValue(0);
-  const words = useSharedValue(0);
-  const finish = useEffectEvent(onDone);
-  useEffect(() => {
-    p.set(withTiming(1, { duration: reduceMotion ? 1 : 900, easing: Easing.out(Easing.cubic) }));
-    words.set(withDelay(reduceMotion ? 0 : 500, withTiming(1, { duration: 260 })));
-    const timer = setTimeout(() => {
-      finish();
-    }, 1800);
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [p, words, reduceMotion]);
-  const garnet = colors.garnet;
-  const orb = useAnimatedStyle(() => ({
-    opacity: reduceMotion ? 0 : 1 - p.get() * 0.4,
-    transform: [{ translateY: -150 * p.get() }, { scale: 0.6 + p.get() * 0.8 }],
-    backgroundColor: interpolateColor(p.get(), [0, 1], [color, garnet]),
-    shadowColor: interpolateColor(p.get(), [0, 1], [color, garnet]),
-  }));
-  const text = useAnimatedStyle(() => ({
-    opacity: words.get(),
-    transform: [{ scale: 0.9 + words.get() * 0.1 }],
-  }));
-  return (
-    <View pointerEvents="none" style={styles.burst}>
-      <Animated.View style={[styles.orb, orb]} />
-      <Animated.View style={text} accessibilityLiveRegion="polite">
-        <Glass radius={999} contentStyle={styles.sent}>
-          <AppText variant="headline">Sent {emoji}</AppText>
-        </Glass>
-      </Animated.View>
-    </View>
   );
 }
 

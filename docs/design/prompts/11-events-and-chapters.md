@@ -1,85 +1,85 @@
 # 11 — Events and chapters
 
-Spec: §24–28, §63, A1 "Events/chapters", A2 "Events/chapters", A3 "Event date/time picker", "Reminder options". Show the timezone wherever confusion is possible. Monthly chapters are optional: no mandatory forms, no guilt for skipping, no scores. Birthday and anniversary are **special pages**, not calendar alerts.
+Spec: §24–28, §63, A1 "Events/chapters", A2, A3 "Event date/time picker", "Reminder options".
 
-### EVT-01 · Events — list and calendar
+**Design language: [Daylight Glass](./README.md#master-style-v2--daylight-glass-p-48), liquid pass, minimal.** Redesign: **P-59**.
 
-Route `/(tabs)/moments/events`
+**Rules:**
 
-```text
-Garnet Events, iPhone 393×852, dark. Large title "Moments" with segmented "Events · Open When ·
-Surprises" (this is the Events tab). Toggle "List · Calendar". List: upcoming events as elegant
-rows with a coloured gem icon per type (birthday ruby/sapphire by person, anniversary violet,
-travel, custom), title, date, "in 4 days", and the time in both zones for timed events.
-Calendar: month grid with small gem markers, today ring. Floating "Add event".
-```
+- Show both zones wherever a time could confuse (ADR-0002). A time the clocks skip is refused with a clear reason, never moved.
+- Birthdays and anniversaries are **special pages**, not alerts.
+- Monthly chapters are optional: Skip is always there, with no forms to finish, no guilt and no scores.
+- Reminders are simulated in the prototype and say so.
 
-**States:** list · calendar · empty ("Dates that matter to you both will appear here.") · loading.
+## EVT-01 · Events (in Moments)
 
-### EVT-02 · Event detail
+Route `/(tabs)/moments`
 
 ```text
-Garnet event detail: cover image or gradient, title, type, date and time with both zones
-("Sat 14 Nov · 19:00 London · 22:00 Addis Ababa"), description, linked memories/letters/surprises
-chips, reminder summary. Actions: Edit, Reminders, Delete.
+"Moments", segmented "Events · Open When". The next event as a hero: its gradient cover, a gem
+badge with its emoji, and a glass caption "Movie night on call · in 5 days · 23:00 Addis Ababa ·
+20:00 London". Then "List · Calendar". List: glass rows with a faceted gem badge (a birthday in
+that person's colour, an anniversary in Garnet violet, a visit sapphire-to-ruby), title, "Sat 31
+Oct · in 5 days" and both zones for timed events. Calendar: a glass month with gem markers and a
+today ring; tapping a day lists its events.
 ```
 
-### EVT-03 · Create / edit event
+## EVT-02 · An event
 
-```text
-Garnet "New event" form: title, type chips, date, time (optional), timezone selector with clear
-labels, repeats (none / yearly / monthly), description, cover, reminder row. Validation for
-ambiguous times (e.g. a time that doesn't exist during the UK clock change). Save / Cancel.
-```
+Route `/(tabs)/moments/event/[id]`.
 
-### EVT-04 · Reminder options
+- **Header:** a glass edit button.
+- **Body:** the cover with its gem, the title in serif, a kind chip, the date and countdown, both zones, and notes.
+- **Reminders:** a summary row that opens a sheet of choices; the sheet notes they're simulated and that you'll get one reminder per time.
+- **Delete:** confirms that it's removed for both of you.
 
-```text
-Garnet reminder sheet: on the day, 1 day before, 1 week before, custom; channel note
-"In-app and notifications (simulated)"; dedupe note "You'll get one reminder per time."
-```
+## EVT-03 · New event
 
-### EVT-05 · Birthday mode
+Route `/(tabs)/moments/event-new`; the tab bar slides away.
 
-```text
-Garnet Birthday mode, dark, celebratory but elegant. The birthday person's colour dominates
-(e.g. sapphire for Noah). Hero: [SAPPHIRE FIGURE] (pose: celebrating) on a crystal plinth with a
-short sparkle flourish (skippable). Title "Happy birthday, Noah" in serif. Sections: birthday
-message from Selam, scheduled surprise ("Something is waiting for you 🎁" — content hidden),
-previous birthday photos carousel, birthday memories. Feels like opening a special page.
-```
+The form has:
 
-**States:** recipient view · sender view (preparing) · reduced motion · artwork unavailable.
+- **Basics:** a name, then kind chips. "Birthday" adds a "Noah / Mine" choice.
+- **When:** a date from a glass month picker. Turning off "All day" adds a time field and a zone choice between your city and Noah's, with a live line showing the time in both zones.
+- **Repeats:** Once, Every year or Every month.
+- **The rest:** notes, a cover and reminders.
 
-### EVT-06 · Anniversary mode
+**Errors:**
 
-```text
-Garnet Anniversary mode, dark, shared Garnet violet dominates. Hero: [RUBY FIGURE] and
-[SAPPHIRE FIGURE] (pose: together) with their lights meeting into the Garnet crystal. Title
-"A day that matters to you both". Curated sections: anniversary message, favourite memory,
-shared photos, a letter, previous anniversaries, "When we meet again" plan. Manual curation
-"Edit this page".
-```
+- No name: "Give it a name."
+- A time the clocks skip: "That time doesn't exist in London that day (the clocks change). Pick another."
 
-### EVT-07 · Monthly chapter
+## EVT-05 · Birthday mode
 
-```text
-Garnet monthly chapter page "October · Our second chapter", dark. Optional reflection prompts
-as gentle cards: Favourite moment, Favourite photo, Something we learned, Something we're
-looking forward to. Each is optional ("Skip" always visible). No statistics.
-```
+The birthday person's colour leads the page:
 
-### EVT-08 · Relationship chapters list and detail
+- **Hero:** their character celebrating on a glass plinth, with a sparkle burst.
+- **Title:** "Happy birthday, Noah" on the day; otherwise the event's name.
+- **Notes:** shown as a letter-like card.
+- **Getting ready:** shown only when it's the partner's birthday. "Leave something waiting" opens a new Open When letter, and nothing about what's in it is shown.
+- **Birthday memories:** a strip of pictures.
 
-```text
-Garnet chapters list: vertical story list "Chapter 01 — London
-begins", "Chapter 02 — Finding our rhythm", "Chapter 03 — Still us", each with a cover photo and
-date range; rename action. Detail: chapter cover, title (editable), dates, memories, letters.
-```
+## EVT-06 · Anniversary mode
 
-### EVT-09 · Celebration state
+A Garnet violet page that belongs to both of you:
 
-```text
-Garnet small celebration banner on Home for today's event: "Your anniversary is today 💜" with
-"Open" — short sparkle once, never repeated nagging.
-```
+- **Hero:** Ruby and Sapphire together, loving, on a glass plinth.
+- **Title:** "A day that matters to you both", with "Our anniversary · 2 years".
+- **Body:** the notes and a strip of your photos.
+
+## EVT-07, EVT-08 · Chapters (in Our World)
+
+Routes `/(tabs)/our-world/chapters` and `/(tabs)/our-world/chapter/[month]`.
+
+- **Which months:** one chapter per month since they started, newest first.
+- **Chapter cards:** "Chapter 02 · now", "Finding our rhythm" and the date range.
+- **A chapter page:**
+  - the cover hero, with a title either of you can rename;
+  - four gentle prompt cards: Favourite moment, Favourite photo, Something we learned, Something we're looking forward to;
+  - "Add yours" opens a sheet; answers are shown with each person's colour and name;
+  - "Skip" hides a prompt that has no answers yet;
+  - the month's memories.
+
+## EVT-09 · Celebration
+
+On the day of a birthday or anniversary, Home shows a glass capsule ("Our anniversary is today") that opens the event. It appears once and never nags.

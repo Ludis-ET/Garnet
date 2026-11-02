@@ -1,7 +1,7 @@
 import type { SignalId } from "@garnet/domain";
 import { useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
-import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { SideCharacter } from "@/components/character/SideCharacter";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
@@ -28,6 +28,7 @@ import {
 import { useNow } from "@/features/setup/useNow";
 import { useTheme } from "@/theme/ThemeProvider";
 import { sendLabel } from "../signalText";
+import { ENTER } from "@/theme/transitions";
 
 type Attachment = "photo" | "voice" | "video";
 const ATTACH: readonly { id: Attachment; label: string; emoji: string }[] = [
@@ -51,7 +52,7 @@ const POSE: Record<SignalId, "happy" | "hug" | "listening" | "thinking" | "idle"
 function Callout({ text }: { text: string }) {
   const { radii, spacing } = useTheme();
   return (
-    <Animated.View entering={FadeIn.duration(220)}>
+    <Animated.View entering={ENTER}>
       <Glass radius={radii.lg} tint="garnet" shadow={false} contentStyle={{ padding: spacing.lg }}>
         <AppText variant="callout" serif italic>
           {text}
@@ -152,15 +153,10 @@ export function SignalSheet({
 
       {signal === "need-you" ? (
         <View accessibilityRole="radiogroup" style={{ gap: spacing.xs }}>
-          {NEEDS.map((n, i) => {
+          {NEEDS.map((n) => {
             const on = need === n.id;
             return (
-              <Animated.View
-                key={n.id}
-                entering={FadeInDown.delay(i * 35)
-                  .springify()
-                  .damping(18)}
-              >
+              <Animated.View key={n.id} entering={ENTER}>
                 <Pressable
                   onPress={() => {
                     setNeed(on ? null : n.id);

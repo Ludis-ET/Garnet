@@ -1,7 +1,7 @@
 /** SETUP-08 · You're all set: the finished card, every answer with a way back, and the partner. */
 import { Fragment } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
-import Animated, { FadeInDown } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { SparkleBurst } from "@/components/brand/SparkleBurst";
 import { CharacterSlot } from "@/components/character/CharacterSlot";
 import { AppText } from "@/components/ui/AppText";
@@ -12,6 +12,7 @@ import { cityForZone, type SetupStep } from "@/domain/identity";
 import { useTheme } from "@/theme/ThemeProvider";
 import { IdentityCard } from "../components/IdentityCard";
 import { ProfileAvatar } from "../components/ProfileAvatar";
+import { ENTER } from "@/theme/transitions";
 
 const SIDE: Record<"ruby" | "sapphire", string> = { ruby: "❤️ Ruby", sapphire: "💙 Sapphire" };
 
@@ -56,13 +57,11 @@ export function SummaryStep({
   onEdit: (step: SetupStep) => void;
 }) {
   const { colors, radii, spacing, reduceMotion } = useTheme();
-  const enter = (i: number) =>
+  const enter = () =>
     reduceMotion
       ? {}
       : {
-          entering: FadeInDown.delay(140 + i * 60)
-            .springify()
-            .damping(18),
+          entering: ENTER,
         };
   return (
     <View style={{ gap: spacing.lg }}>
@@ -83,7 +82,7 @@ export function SummaryStep({
                 ]}
               />
             )}
-            <Animated.View {...enter(i)}>
+            <Animated.View {...enter()}>
               <Pressable
                 onPress={() => {
                   onEdit(row.step);

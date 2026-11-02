@@ -5,11 +5,11 @@
  * typo can be fixed.
  */
 import * as Clipboard from "expo-clipboard";
-import * as Haptics from "expo-haptics";
+import { Haptics } from "@/components/ui/haptics";
 import { Redirect, useRouter } from "expo-router";
 import { useRef, useState } from "react";
 import { Platform, Pressable, StyleSheet, TextInput, View } from "react-native";
-import Animated, { FadeInDown } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { Glass } from "@/components/ui/Glass";
@@ -28,6 +28,8 @@ import { DEMO_INVITE_CODES } from "@/features/prototype/demoActions";
 import { useTheme } from "@/theme/ThemeProvider";
 import { CodeTiles } from "../components/CodeTiles";
 import { useCheckCode, usePairingStatus } from "../usePairing";
+import { goBack } from "@/navigation/goBack";
+import { ENTER } from "@/theme/transitions";
 
 export function JoinScreen() {
   const router = useRouter();
@@ -74,7 +76,7 @@ export function JoinScreen() {
   return (
     <GlassScreen
       onBack={() => {
-        router.back();
+        goBack("/pair");
       }}
       footer={
         <Button
@@ -85,10 +87,7 @@ export function JoinScreen() {
         />
       }
     >
-      <Animated.View
-        {...(reduceMotion ? {} : { entering: FadeInDown.springify().damping(18) })}
-        style={{ gap: spacing.sm }}
-      >
+      <Animated.View {...(reduceMotion ? {} : { entering: ENTER })} style={{ gap: spacing.sm }}>
         <AppText variant="largeTitle">Enter your code</AppText>
       </Animated.View>
 

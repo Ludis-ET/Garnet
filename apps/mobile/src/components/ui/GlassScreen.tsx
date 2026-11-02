@@ -1,6 +1,6 @@
 import { StatusBar } from "expo-status-bar";
 import type { ReactNode } from "react";
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from "react-native";
+import { KeyboardAvoidingView, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Aurora } from "@/components/brand/Aurora";
 import { SideWash } from "@/components/brand/SideWash";
@@ -8,8 +8,11 @@ import { Header } from "@/components/ui/Header";
 import { OfflineBanner } from "@/components/ui/Notice";
 import { useTheme } from "@/theme/ThemeProvider";
 
-/** Room for the floating tab bar (its 64-pt height plus breathing space). */
-export const TAB_BAR_SPACE = 96;
+/**
+ * Room for the floating tab bar (64 pt plus breathing space) and Ruby and Sapphire peeking
+ * over it (62 pt, P-57), so the last item can always scroll clear of them.
+ */
+export const TAB_BAR_SPACE = 150;
 
 export interface GlassScreenProps {
   children: ReactNode;
@@ -20,8 +23,11 @@ export interface GlassScreenProps {
   header?: ReactNode;
   /** A control at the right end of the header row (the account button during onboarding). */
   headerRight?: ReactNode;
-  /** A soft wash of a side's colour over the aurora (SETUP-03 "side flood", P-51). */
-  wash?: "ruby" | "sapphire" | null;
+  /**
+   * A soft wash of a side's colour over the aurora (SETUP-03 "side flood", P-51). "none" keeps
+   * the plain aurora even with the "rich" look (forms that sit on glass, P-63).
+   */
+  wash?: "ruby" | "sapphire" | "none" | null;
   /** Leaves room for the floating tab bar (tab screens). */
   tabBar?: boolean;
 }
@@ -42,17 +48,23 @@ export function GlassScreen({
   wash = null,
   tabBar = false,
 }: GlassScreenProps) {
-  const { spacing, scheme } = useTheme();
+  const { spacing, scheme, side, intensity } = useTheme();
+  // A "rich" look (SETUP-06) washes personal pages in the person's own colour.
+  const flood =
+    wash === "none"
+      ? null
+      : (wash ?? (intensity === "rich" && (side === "ruby" || side === "sapphire") ? side : null));
   return (
     <View style={styles.fill}>
       <Aurora />
-      <SideWash side="ruby" on={wash === "ruby"} />
-      <SideWash side="sapphire" on={wash === "sapphire"} />
+      <SideWash side="ruby" on={flood === "ruby"} />
+      <SideWash side="sapphire" on={flood === "sapphire"} />
       <StatusBar style={scheme === "dark" ? "light" : "dark"} />
       <SafeAreaView style={styles.fill} edges={["top", "bottom"]}>
         <KeyboardAvoidingView
           style={styles.fill}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          // Both platforms: Android draws edge to edge, so its window never shrinks (P-75).
+          behavior="padding"
         >
           <ScrollView
             testID="glass-screen-scroll"

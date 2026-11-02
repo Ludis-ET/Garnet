@@ -1,829 +1,1264 @@
+/**
+ * CHAT-01 to CHAT-08 · The private conversation, redesigned in Daylight Glass with Ruby and
+ * Sapphire joining in like little avatars (P-58): they wave hello when the chat opens, the
+ * partner's character pops up with typing dots while they type (only if they share typing),
+ * yours hops when you send, and under your latest message the partner's tiny face says "Seen"
+ * — only when BOTH of you said yes to it (U-35 open; asked once, nothing preselected).
+ * Nothing claims delivery, presence or "online". Media never becomes a memory on its own.
+ */
+import * as Clipboard from "expo-clipboard";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { useMemo, useRef, useState } from "react";
+import { StatusBar } from "expo-status-bar";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   StyleSheet,
   TextInput,
   View,
 } from "react-native";
-import * as Haptics from "expo-haptics";
-import { LinearGradient } from "expo-linear-gradient";
-import Animated, { FadeIn, FadeInDown, FadeOut, ZoomIn } from "react-native-reanimated";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Animated from "react-native-reanimated";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Temporal } from "temporal-polyfill";
+import { Aurora } from "@/components/brand/Aurora";
+import { CharacterSlot } from "@/components/character/CharacterSlot";
+import { ActionSheet } from "@/components/ui/ActionSheet";
 import { AppText } from "@/components/ui/AppText";
+import { Button } from "@/components/ui/Button";
+import { Glass } from "@/components/ui/Glass";
 import { Icon } from "@/components/ui/Icon";
 import { IconButton } from "@/components/ui/IconButton";
-import { useOptionalToast } from "@/components/ui/Toast";
-import { DEMO_ME_ID } from "@/data/fixtures/demo";
+import { Sheet, SheetAction } from "@/components/ui/Sheet";
+import { TextField } from "@/components/ui/TextField";
+import { noOutline } from "@/components/ui/TextField";
+import { useToast } from "@/components/ui/Toast";
 import type { DemoMedia } from "@/data/fixtures/demoDays";
-import { dateGroupLabel, isMessageEditable, type ChatMedia, type ChatMessage } from "@/domain/chat";
+import {
+  dateGroupLabel,
+  isMessageEditable,
+  messagePreview,
+  messageState,
+  type ChatMessage,
+  type ChatSticker,
+  type MessageState,
+} from "@/domain/chat";
+import type { CompanionLook } from "@/domain/companion";
+import { cityForZone, localTimeLabel } from "@/domain/identity";
+import { serviceErrorMessage } from "@/features/auth/authUi";
+import { useCompanions } from "@/features/companions/useCompanions";
 import { VoiceRecorderSheet } from "@/features/days/components/VoiceRecorderSheet";
+import { FRAME_ASPECT } from "@/features/figures/art/figure";
+import { useMediaPlayer } from "@/features/media/MediaPlayerContext";
+import { SaveMemorySheet } from "@/features/memories/components/SaveMemorySheet";
+import { useChatDemo } from "@/features/prototype/demoActions";
 import { ProfileAvatar } from "@/features/setup/components/ProfileAvatar";
 import { useNow } from "@/features/setup/useNow";
+import { useHomeToday } from "@/features/home/useHome";
 import { SideScope, useTheme } from "@/theme/ThemeProvider";
-import { ChatMediaSheet } from "./components/ChatMediaSheet";
-import { DeleteDialog, type DeleteMode } from "./components/DeleteDialog";
-import { MessageBubble } from "./components/MessageBubble";
-import { MessageContextMenu } from "./components/MessageContextMenu";
-import { MessageDetailsSheet } from "./components/MessageDetailsSheet";
-import { PinnedSheet } from "./components/PinnedSheet";
-import { TypingIndicator } from "./components/TypingIndicator";
+import { AttachTray } from "./components/AttachTray";
+import { Bubble } from "./components/Bubble";
+import { ExpressionPanel, QUICK_EMOJI } from "./components/ExpressionPanel";
+import { MessageMenu, type MenuAction, type MessageAnchor } from "./components/MessageMenu";
+import { MediaComposer } from "./components/MediaComposer";
+import { StatusRow } from "./components/StatusRow";
+import { gemOf, PeekBubble, PeekCharacter, TypingDots } from "./components/Presence";
 import {
+  useCancelUpload,
   useChatMessages,
+  useMarkChatRead,
+  useMarkSaved,
+  useChatPresence,
   useChatSettings,
   useChatSummary,
   useDeleteMessage,
   useEditMessage,
-  usePinnedMessages,
   useRetryMessage,
+  useSearchChat,
   useSendMessage,
   useTogglePin,
   useToggleReaction,
+  useUpdateChatSettings,
 } from "./useChat";
+import { goBack } from "@/navigation/goBack";
+import { removeLastGrapheme } from "@/features/emoji/emoji";
+import { ENTER } from "@/theme/transitions";
+import { useKeyboardVisible } from "@/components/ui/useKeyboardVisible";
 
-interface TimelineItem {
-  key: string;
-  type: "date-separator" | "message";
-  dateLabel?: string;
-  message?: ChatMessage;
+/** Messages closer than this (same person) hug each other. */
+const GROUP_MINUTES = 5;
+
+type Item =
+  | { kind: "date"; key: string; label: string }
+  | {
+      kind: "msg";
+      key: string;
+      message: ChatMessage;
+      joinAbove: boolean;
+      joinBelow: boolean;
+      state: MessageState | null;
+    };
+
+function buildItems(
+  messages: readonly ChatMessage[],
+  meId: string,
+  now: Temporal.Instant,
+  zone: string,
+  seenUpTo: string | null,
+): Item[] {
+  const sorted = [...messages]
+    .filter((m) => m.deletedForMe !== true)
+    .sort((a, b) =>
+      Temporal.Instant.compare(
+        Temporal.Instant.from(a.createdAt),
+        Temporal.Instant.from(b.createdAt),
+      ),
+    );
+  const close = (a: ChatMessage | undefined, b: ChatMessage | undefined) =>
+    a?.senderId !== undefined &&
+    a.senderId === b?.senderId &&
+    dateGroupLabel(a.createdAt, now, zone) === dateGroupLabel(b.createdAt, now, zone) &&
+    Temporal.Instant.from(b.createdAt)
+      .since(Temporal.Instant.from(a.createdAt))
+      .total({ unit: "minutes" }) <= GROUP_MINUTES;
+  const lastMine = [...sorted]
+    .reverse()
+    .find((m) => m.senderId === meId && m.deletedForEveryone !== true);
+  const items: Item[] = [];
+  let label = "";
+  sorted.forEach((m, i) => {
+    const l = dateGroupLabel(m.createdAt, now, zone);
+    if (l !== label) {
+      items.push({ kind: "date", key: `d-${l}-${m.id}`, label: l });
+      label = l;
+    }
+    // P-61: unfinished or failed sends always show their status; sent/seen only on the latest.
+    const state =
+      m.senderId === meId && m.deletedForEveryone !== true ? messageState(m, seenUpTo) : null;
+    const shown =
+      state === null
+        ? null
+        : state === "sent" || state === "seen"
+          ? m.id === lastMine?.id
+            ? state
+            : null
+          : state;
+    items.push({
+      kind: "msg",
+      key: m.id,
+      message: m,
+      joinAbove: close(sorted[i - 1], m),
+      joinBelow: close(m, sorted[i + 1]),
+      state: shown,
+    });
+  });
+  return items.reverse(); // newest first for the inverted list
 }
 
-function ConversationContent() {
-  const insets = useSafeAreaInsets();
-  const { colors, spacing, radii, scheme } = useTheme();
+function Conversation() {
+  const toast = useToast();
+  const { colors, radii, spacing, reduceMotion } = useTheme();
   const now = useNow();
-  const toast = useOptionalToast();
+  const home = useHomeToday();
+  const looks = useCompanions();
+  const messages = useChatMessages();
+  const summary = useChatSummary();
+  const presence = useChatPresence();
+  const settings = useChatSettings();
+  const send = useSendMessage();
+  const edit = useEditMessage();
+  const remove = useDeleteMessage();
+  const pin = useTogglePin();
+  const react = useToggleReaction();
+  const retry = useRetryMessage();
+  const cancel = useCancelUpload();
+  const markSaved = useMarkSaved();
+  const markRead = useMarkChatRead();
+  const updateSettings = useUpdateChatSettings();
+  const demo = useChatDemo();
+  const { openMedia } = useMediaPlayer();
+  const list = useRef<FlatList<Item>>(null);
+  const keyboardUp = useKeyboardVisible();
 
-  const summaryQuery = useChatSummary();
-  const messagesQuery = useChatMessages();
-  const settingsQuery = useChatSettings();
-  const pinnedQuery = usePinnedMessages();
+  const [text, setText] = useState("");
+  const [focused, setFocused] = useState(false);
+  const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  const [editing, setEditing] = useState<ChatMessage | null>(null);
+  const [menu, setMenu] = useState<ChatMessage | null>(null);
+  // Where the held message sits, to lift it in place (CHAT-02, P-63).
+  const [held, setHeld] = useState<{
+    anchor: MessageAnchor;
+    joinAbove: boolean;
+    joinBelow: boolean;
+  } | null>(null);
+  const input = useRef<TextInput>(null);
+  const [sheet, setSheet] = useState<
+    "delete" | "deleteAll" | "details" | "pinned" | "search" | "media" | "voice" | "memory" | null
+  >(null);
+  const [preview, setPreview] = useState<Exclude<DemoMedia, { type: "voice" }> | null>(null);
+  const [query, setQuery] = useState("");
+  const [highlight, setHighlight] = useState<string | null>(null);
+  const [hello, setHello] = useState(true);
+  const [panel, setPanel] = useState(false);
+  const [burst, setBurst] = useState<{ key: number; look: CompanionLook } | null>(null);
+  const results = useSearchChat(query);
 
-  const sendMessage = useSendMessage();
-  const editMessage = useEditMessage();
-  const deleteMessage = useDeleteMessage();
-  const togglePin = useTogglePin();
-  const toggleReaction = useToggleReaction();
-  const retryMessage = useRetryMessage();
+  // Both characters wave when the chat opens, then step back (decorative, not presence).
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setHello(false);
+    }, 2200);
+    return () => {
+      clearTimeout(t);
+    };
+  }, []);
+  // Open on screen means read (this person's own count only; "Seen" stays mutual, P-58).
+  const lastId = messages.data?.at(-1)?.id;
+  const readNow = useEffectEvent(() => {
+    markRead.mutate();
+  });
+  useEffect(() => {
+    if (lastId !== undefined) readNow();
+  }, [lastId]);
+  // Simulated upload progress (P-61) while anything is still on its way.
+  const uploading = (messages.data ?? []).some(
+    (m) => m.status === "sending" && m.uploadProgress !== undefined,
+  );
+  // A stable tick: re-renders (refetches, typing) must not restart the interval.
+  const tick = useEffectEvent(() => {
+    demo.advanceUploads(0.07);
+  });
+  useEffect(() => {
+    if (!uploading) return;
+    const t = setInterval(() => {
+      tick();
+    }, 220);
+    return () => {
+      clearInterval(t);
+    };
+  }, [uploading]);
+  useEffect(() => {
+    if (burst === null) return;
+    const t = setTimeout(() => {
+      setBurst(null);
+    }, 1500);
+    return () => {
+      clearTimeout(t);
+    };
+  }, [burst]);
 
-  // Composer states
-  const [inputText, setInputText] = useState("");
-  const [replyingTo, setReplyingTo] = useState<ChatMessage | null>(null);
-  const [editingMsg, setEditingMsg] = useState<ChatMessage | null>(null);
-
-  // Overlay states
-  const [selectedMsgForMenu, setSelectedMsgForMenu] = useState<ChatMessage | null>(null);
-  const [selectedMsgForDelete, setSelectedMsgForDelete] = useState<ChatMessage | null>(null);
-  const [selectedMsgForDetails, setSelectedMsgForDetails] = useState<ChatMessage | null>(null);
-  const [pinnedSheetOpen, setPinnedSheetOpen] = useState(false);
-  const [mediaSheetOpen, setMediaSheetOpen] = useState(false);
-  const [voiceRecorderOpen, setVoiceRecorderOpen] = useState(false);
-
-  // Scroll state
-  const [showScrollDown, setShowScrollDown] = useState(false);
-  const flatListRef = useRef<FlatList<TimelineItem>>(null);
-
-  const summary = summaryQuery.data;
-  const messages = useMemo(() => messagesQuery.data ?? [], [messagesQuery.data]);
-  const settings = settingsQuery.data;
-  const pinned = pinnedQuery.data ?? [];
-
-  const partner = summary?.partner ?? { name: "Noah", side: "sapphire", zone: "Europe/London" };
-  const readReceipts = settings?.readReceipts ?? false;
-
-  // Build flattened timeline with date separators
-  const timelineData = useMemo<TimelineItem[]>(() => {
-    const items: TimelineItem[] = [];
-    let lastDateLabel: string | null = null;
-
-    for (const msg of messages) {
-      if (msg.deletedForMe) continue;
-      const label = dateGroupLabel(msg.createdAt, now, partner.zone);
-      if (label !== lastDateLabel) {
-        items.push({
-          key: `date-${label}-${msg.id}`,
-          type: "date-separator",
-          dateLabel: label,
-        });
-        lastDateLabel = label;
-      }
-      items.push({
-        key: msg.id,
-        type: "message",
-        message: msg,
-      });
-    }
-
-    return items;
-  }, [messages, now, partner.zone]);
-
-  const handleSend = () => {
-    const text = inputText.trim();
-    if (!text && !editingMsg) return;
-
-    if (editingMsg) {
-      editMessage.mutate(
-        { id: editingMsg.id, text },
-        {
-          onSuccess: () => {
-            setEditingMsg(null);
-            setInputText("");
-            toast?.show("Message updated", "success");
-          },
-          onError: () => {
-            toast?.show("Could not update message", "error");
-          },
-        },
-      );
-      return;
-    }
-
-    sendMessage.mutate(
-      {
-        text,
-        replyToId: replyingTo?.id,
-      },
-      {
-        onSuccess: () => {
-          setInputText("");
-          setReplyingTo(null);
-          flatListRef.current?.scrollToEnd({ animated: true });
-        },
-        onError: () => {
-          toast?.show("Could not send message", "error");
-        },
-      },
-    );
+  const me = home.data?.me;
+  const partner = home.data?.partner;
+  const meId = summary.data?.viewerId ?? "";
+  const seenUpTo = presence.data?.seenUpTo ?? null;
+  const items = useMemo(
+    () => buildItems(messages.data ?? [], meId, now, me?.zone ?? "UTC", seenUpTo),
+    [messages.data, meId, now, me?.zone, seenUpTo],
+  );
+  const pinned = (messages.data ?? []).filter(
+    (m) => m.pinned && m.deletedForEveryone !== true && m.deletedForMe !== true,
+  );
+  const onError = (e: unknown) => {
+    toast.show(serviceErrorMessage(e), "error");
   };
 
-  const handleSendMedia = (media: ChatMedia) => {
-    sendMessage.mutate(
-      {
-        text: media.caption,
-        media,
-        replyToId: replyingTo?.id,
-      },
-      {
-        onSuccess: () => {
-          setReplyingTo(null);
-          flatListRef.current?.scrollToEnd({ animated: true });
-        },
-        onError: () => {
-          toast?.show("Could not send media", "error");
-        },
-      },
-    );
-  };
-
-  const handleSaveVoice = (voiceMedia: Extract<DemoMedia, { type: "voice" }>) => {
-    handleSendMedia(voiceMedia);
-    setVoiceRecorderOpen(false);
-  };
-
-  const handleDeleteConfirm = (mode: DeleteMode) => {
-    if (!selectedMsgForDelete) return;
-    deleteMessage.mutate(
-      { id: selectedMsgForDelete.id, mode },
-      {
-        onSuccess: () => {
-          setSelectedMsgForDelete(null);
-          toast?.show("Message deleted", "success");
-        },
-        onError: () => {
-          toast?.show("Could not delete message", "error");
-        },
-      },
-    );
-  };
-
-  const handleStartEdit = (msg: ChatMessage) => {
-    setEditingMsg(msg);
-    setInputText(msg.text);
-    setReplyingTo(null);
-  };
-
-  const handleCancelEdit = () => {
-    setEditingMsg(null);
-    setInputText("");
-  };
-
-  const canEditSelected = selectedMsgForMenu
-    ? isMessageEditable(selectedMsgForMenu, DEMO_ME_ID, now)
-    : false;
-
-  const scrollToBottom = () => {
-    flatListRef.current?.scrollToEnd({ animated: true });
-    setShowScrollDown(false);
-  };
-
-  const scrollToMessage = (targetId: string) => {
-    const idx = timelineData.findIndex((i) => i.message?.id === targetId);
-    if (idx >= 0) {
-      flatListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.5 });
-    }
-  };
-
-  if (summaryQuery.isLoading || messagesQuery.isLoading) {
+  if (me === undefined || partner === undefined || messages.data === undefined || meId === "") {
     return (
-      <View style={[styles.fill, styles.center, { backgroundColor: colors.background }]}>
-        <ActivityIndicator accessibilityLabel="Loading conversation" />
+      <View style={[styles.fill, styles.center]}>
+        <Aurora />
+        <ActivityIndicator accessibilityLabel="Loading" />
       </View>
     );
   }
 
-  return (
-    <View style={[styles.fill, { backgroundColor: colors.background }]}>
-      {/* Compact iOS Header (CHAT-01) */}
-      <View
-        style={[
-          styles.header,
-          {
-            paddingTop: Math.max(insets.top, 14),
-            paddingHorizontal: spacing.sm,
-            paddingBottom: spacing.sm,
-            borderBottomColor: colors.border,
-            backgroundColor: colors.surface,
+  const myGem = gemOf(me.side);
+  const theirGem = gemOf(partner.side);
+  const theirLook =
+    theirGem === "sapphire" ? looks.sapphire : theirGem === "ruby" ? looks.ruby : looks.garnet;
+  const typing = presence.data?.partnerTyping === true;
+  const here = presence.data?.partnerHere === true;
+
+  const jumpTo = (id: string) => {
+    const index = items.findIndex((i) => i.key === id);
+    setSheet(null);
+    if (index < 0) return;
+    list.current?.scrollToIndex({ index, viewPosition: 0.5, animated: !reduceMotion });
+    setHighlight(id);
+    setTimeout(() => {
+      setHighlight(null);
+    }, 1600);
+  };
+
+  const submit = () => {
+    const body = text.trim();
+    if (body.length === 0) return;
+    if (editing !== null) {
+      edit.mutate(
+        { id: editing.id, text: body },
+        {
+          onSuccess: () => {
+            setEditing(null);
+            setText("");
           },
-        ]}
-      >
-        <IconButton
-          icon="chevron-left"
-          label="Back to messages"
-          onPress={() => {
-            router.back();
-          }}
-        />
+          onError,
+        },
+      );
+      return;
+    }
+    send.mutate(
+      { text: body, ...(replyTo === null ? {} : { replyToId: replyTo.id }) },
+      {
+        onSuccess: () => {
+          setText("");
+          setReplyTo(null);
+          // Your character hops (with love if the message carries some).
+          setBurst({
+            key: Date.now(),
+            look: /[❤💜💙🥰😘💕]/u.test(body)
+              ? { mood: "loving", occasion: "everyday" }
+              : { mood: "happy", occasion: "everyday" },
+          });
+          demo.afterSend();
+        },
+        onError,
+      },
+    );
+  };
 
-        <Pressable
-          onPress={() => {
-            router.push("/us/chat-details");
-          }}
-          accessibilityRole="button"
-          accessibilityLabel={`${partner.name}, local time in London. Tap for conversation details`}
-          style={styles.headerPartner}
+  const sendSticker = (sticker: ChatSticker) => {
+    send.mutate(
+      { text: "", sticker, ...(replyTo === null ? {} : { replyToId: replyTo.id }) },
+      {
+        onSuccess: () => {
+          setReplyTo(null);
+          setBurst({ key: Date.now(), look: { mood: sticker.mood, occasion: "everyday" } });
+          demo.afterSend();
+        },
+        onError,
+      },
+    );
+  };
+
+  const sendMedia = (media: DemoMedia, caption = "") => {
+    send.mutate(
+      {
+        text: "",
+        media: caption.length === 0 ? media : { ...media, caption },
+      },
+      {
+        onSuccess: () => {
+          setPreview(null);
+          setSheet(null);
+          setBurst({ key: Date.now(), look: { mood: "proud", occasion: "everyday" } });
+          demo.afterSend();
+        },
+        onError,
+      },
+    );
+  };
+
+  /** The hold menu's actions for one message (only what applies to it). */
+  const menuActions = (m: ChatMessage): MenuAction[] => {
+    const done = () => {
+      setMenu(null);
+      setHeld(null);
+    };
+    return [
+      {
+        icon: "reply",
+        label: "Reply",
+        onPress: () => {
+          setReplyTo(m);
+          setEditing(null);
+          done();
+          input.current?.focus();
+        },
+      },
+      ...(m.text.length > 0
+        ? [
+            {
+              icon: "copy" as const,
+              label: "Copy",
+              onPress: () => {
+                void Clipboard.setStringAsync(m.text);
+                toast.show("Copied.");
+                done();
+              },
+            },
+          ]
+        : []),
+      ...(isMessageEditable(m, meId, now) && m.text.length > 0
+        ? [
+            {
+              icon: "edit" as const,
+              label: "Edit",
+              onPress: () => {
+                setEditing(m);
+                setReplyTo(null);
+                setText(m.text);
+                done();
+                input.current?.focus();
+              },
+            },
+          ]
+        : []),
+      {
+        icon: "pin",
+        label: m.pinned ? "Unpin" : "Pin",
+        onPress: () => {
+          pin.mutate(m.id, { onError });
+          done();
+        },
+      },
+      ...(m.media !== undefined && m.media.type !== "voice" && m.savedAsMemory !== true
+        ? [
+            {
+              icon: "sparkle" as const,
+              label: "Save as memory",
+              onPress: () => {
+                setSheet("memory");
+              },
+            },
+          ]
+        : []),
+      {
+        icon: "info",
+        label: "Details",
+        onPress: () => {
+          setSheet("details");
+        },
+      },
+      {
+        icon: "trash",
+        label: "Delete",
+        destructive: true,
+        onPress: () => {
+          setSheet("delete");
+        },
+      },
+    ];
+  };
+
+  const rightPeek =
+    burst !== null ? (
+      <PeekCharacter
+        key={`b-${String(burst.key)}`}
+        character={myGem}
+        look={burst.look}
+        size={92}
+        side="right"
+        bubble={<PeekBubble>💌</PeekBubble>}
+      />
+    ) : hello ? (
+      <PeekCharacter
+        key="hello-me"
+        character={myGem}
+        look={{ mood: "hello", occasion: "everyday" }}
+        size={92}
+        side="right"
+        bubble={<PeekBubble>👋</PeekBubble>}
+      />
+    ) : focused && text.length > 0 ? (
+      <PeekCharacter
+        key="me-typing"
+        character={myGem}
+        look={{ mood: "thinking", occasion: "everyday" }}
+        size={78}
+        side="right"
+      />
+    ) : null;
+  const leftPeek = typing ? (
+    <PeekCharacter
+      key="them-typing"
+      character={theirGem}
+      look={{ mood: "listening", occasion: "everyday" }}
+      size={96}
+      side="left"
+      bubble={
+        <PeekBubble>
+          <TypingDots color={colors.textSecondary} />
+        </PeekBubble>
+      }
+    />
+  ) : here ? (
+    <PeekCharacter
+      key="them-here"
+      character={theirGem}
+      look={{ mood: "listening", occasion: "everyday" }}
+      size={96}
+      side="left"
+      bubble={<PeekBubble>👀</PeekBubble>}
+    />
+  ) : hello ? (
+    <PeekCharacter
+      key="hello-them"
+      character={theirGem}
+      look={{ mood: "hello", occasion: "everyday" }}
+      size={92}
+      side="left"
+    />
+  ) : null;
+
+  return (
+    <View style={styles.fill}>
+      <Aurora />
+      <StatusBar style="dark" />
+      <SafeAreaView edges={["top"]} style={styles.header}>
+        <Glass
+          radius={radii.pill}
+          contentStyle={[styles.row, styles.headerInner, { gap: spacing.sm }]}
         >
-          <ProfileAvatar
-            avatar={{ kind: "initials", swatch: 1 }}
-            name={partner.name}
-            side={partner.side ?? "sapphire"}
-            size={36}
+          <IconButton
+            icon="chevron-left"
+            label="Back"
+            onPress={() => {
+              goBack("/us");
+            }}
           />
-          <View style={styles.headerInfo}>
-            <AppText variant="headline" weight="600">
-              {partner.name}
-            </AppText>
-            <AppText variant="caption" color="textSecondary">
-              18:42 in London
-            </AppText>
-          </View>
-        </Pressable>
-
-        <IconButton
-          icon="info"
-          label="Conversation details"
-          onPress={() => {
-            router.push("/us/chat-details");
-          }}
-        />
-      </View>
-
-      {/* Pinned banner if pinned messages exist (CHAT-01) */}
-      {pinned.length > 0 ? (
-        <Pressable
-          onPress={() => {
-            setPinnedSheetOpen(true);
-          }}
-          accessibilityRole="button"
-          accessibilityLabel={`${pinned.length} pinned message${pinned.length > 1 ? "s" : ""}. Tap to view`}
-          style={[
-            styles.pinnedBanner,
-            {
-              backgroundColor: colors.surfaceRaised,
-              borderColor: colors.border,
-              paddingHorizontal: spacing.gutter,
-              paddingVertical: spacing.xs,
-            },
-          ]}
-        >
-          <Icon name="pin" size={14} color={colors.accent} />
-          <AppText variant="caption" weight="600" color="accent" style={styles.flex}>
-            {pinned.length} pinned
-          </AppText>
-          <Icon name="chevron-right" size={14} color={colors.textTertiary} />
-        </Pressable>
-      ) : null}
-
-      {/* Main Conversation Timeline (FlatList) */}
-      <KeyboardAvoidingView
-        style={styles.fill}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
-      >
-        <FlatList
-          ref={flatListRef}
-          data={timelineData}
-          keyExtractor={(item) => item.key}
-          initialNumToRender={50}
-          maxToRenderPerBatch={50}
-          contentContainerStyle={[
-            styles.listContent,
-            {
-              paddingTop: spacing.md,
-              paddingBottom: spacing.lg,
-            },
-          ]}
-          onScroll={(e) => {
-            const offsetY = e.nativeEvent.contentOffset.y;
-            const contentHeight = e.nativeEvent.contentSize.height;
-            const layoutHeight = e.nativeEvent.layoutMeasurement.height;
-            const isScrolledUp = contentHeight - offsetY - layoutHeight > 180;
-            setShowScrollDown(isScrolledUp);
-          }}
-          scrollEventThrottle={100}
-          onScrollToIndexFailed={(info) => {
-            flatListRef.current?.scrollToOffset({
-              offset: info.averageItemLength * info.index,
-              animated: true,
-            });
-          }}
-          ListEmptyComponent={
-            <View style={[styles.emptyContainer, { paddingVertical: spacing.hero }]}>
-              <View
-                style={[
-                  styles.emptyCircle,
-                  { backgroundColor: colors.accentSoft, borderRadius: radii.xl },
-                ]}
-              >
-                <Icon name="chat" size={32} color={colors.accent} />
-              </View>
-              <AppText variant="title" weight="600" style={styles.centerText}>
-                Say hello 💜
+          <Pressable
+            onPress={() => {
+              router.push("/us/chat-details");
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={`${partner.name}, ${localTimeLabel(now, partner.zone)} in ${cityForZone(partner.zone)}. Details`}
+            style={[styles.row, styles.flex, { gap: spacing.sm }]}
+          >
+            <ProfileAvatar
+              name={partner.name}
+              avatar={partner.avatar ?? { kind: "initials", swatch: 1 }}
+              side={partner.side}
+              size={40}
+            />
+            <View style={styles.flex}>
+              <AppText variant="headline" numberOfLines={1}>
+                {partner.name}
               </AppText>
-              <AppText variant="callout" color="textSecondary" style={styles.centerText}>
-                Start a warm conversation with {partner.name}.
+              {/* One line that changes in place (no overlap while it switches). */}
+              <AppText
+                variant="caption"
+                color={typing || here ? "accent" : "textSecondary"}
+                weight={typing || here ? "600" : "400"}
+                accessibilityLiveRegion="polite"
+              >
+                {typing
+                  ? "typing…"
+                  : here
+                    ? "here now"
+                    : `${localTimeLabel(now, partner.zone)} in ${cityForZone(partner.zone)}`}
               </AppText>
             </View>
-          }
-          renderItem={({ item }) => {
-            if (item.type === "date-separator") {
-              return (
-                <View style={styles.dateSeparatorRow}>
-                  <View
-                    style={[
-                      styles.dateBadge,
-                      {
-                        backgroundColor: colors.surfaceRaised,
-                        borderColor: colors.border,
-                        borderRadius: radii.pill,
-                      },
-                    ]}
-                  >
-                    <AppText variant="caption" color="textSecondary" weight="500">
-                      {item.dateLabel}
-                    </AppText>
-                  </View>
-                </View>
-              );
-            }
-
-            if (!item.message) return null;
-            const msg = item.message;
-            const isMine = msg.senderId === DEMO_ME_ID;
-
-            return (
-              <MessageBubble
-                message={msg}
-                isMine={isMine}
-                partnerName={partner.name}
-                viewerZone={partner.zone}
-                readReceiptsEnabled={readReceipts}
-                onLongPress={(m) => {
-                  setSelectedMsgForMenu(m);
-                }}
-                onToggleReaction={(emoji) => {
-                  toggleReaction.mutate({ messageId: msg.id, emoji });
-                }}
-                onRetry={() => {
-                  retryMessage.mutate(msg.id);
-                }}
-              />
-            );
-          }}
-          ListFooterComponent={
-            // Live typing indicator
-            settings?.typingIndicators ? <TypingIndicator partnerName={partner.name} /> : null
-          }
-        />
-
-        {/* Floating scroll-to-latest pill */}
-        {showScrollDown ? (
-          <Animated.View
-            entering={FadeInDown.duration(200)}
-            exiting={FadeOut.duration(150)}
-            style={[styles.scrollDownWrapper, { right: spacing.gutter }]}
-          >
+          </Pressable>
+          <IconButton
+            icon="search"
+            label="Search messages"
+            onPress={() => {
+              setSheet("search");
+            }}
+          />
+        </Glass>
+        {pinned.length === 0 ? null : (
+          <Animated.View entering={ENTER} style={{ marginTop: spacing.xs }}>
             <Pressable
-              onPress={scrollToBottom}
+              onPress={() => {
+                setSheet("pinned");
+              }}
               accessibilityRole="button"
-              accessibilityLabel="Scroll to latest messages"
-              style={[
-                styles.scrollDownBtn,
-                {
-                  backgroundColor: colors.surfaceRaised,
-                  borderColor: colors.border,
-                  borderRadius: radii.pill,
-                },
-              ]}
+              accessibilityLabel={`${String(pinned.length)} pinned. Open`}
             >
-              <View style={styles.downIcon}>
-                <Icon name="chevron-right" size={16} color={colors.textPrimary} />
-              </View>
-              <AppText variant="caption" weight="600">
-                Latest
-              </AppText>
+              <Glass
+                radius={radii.pill}
+                shadow={false}
+                contentStyle={[styles.row, styles.pinned, { gap: spacing.sm }]}
+              >
+                <Icon name="pin" size={15} color={colors.accent} />
+                <AppText variant="footnote" weight="600" color="accent">
+                  {pinned.length} pinned
+                </AppText>
+                <AppText
+                  variant="footnote"
+                  color="textSecondary"
+                  numberOfLines={1}
+                  style={styles.flex}
+                >
+                  {pinned.at(-1)?.text}
+                </AppText>
+                <Icon name="chevron-right" size={14} color={colors.textTertiary} />
+              </Glass>
             </Pressable>
+          </Animated.View>
+        )}
+      </SafeAreaView>
+
+      <KeyboardAvoidingView
+        // Both platforms: Android draws edge to edge, so its window never shrinks (P-75).
+        behavior="padding"
+        style={styles.fill}
+      >
+        <View style={styles.fill}>
+          <FlatList
+            ref={list}
+            inverted
+            data={items}
+            keyExtractor={(i) => i.key}
+            contentContainerStyle={{ paddingTop: 120, paddingBottom: spacing.md }}
+            onScrollToIndexFailed={() => undefined}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            ListFooterComponent={
+              <View style={[styles.center, { paddingVertical: spacing.xl, gap: spacing.sm }]}>
+                <View style={[styles.row, styles.duo]}>
+                  <CharacterSlot
+                    character={theirGem}
+                    look={{ mood: "hello", occasion: "everyday" }}
+                    size={110}
+                    aspectRatio={FRAME_ASPECT}
+                  />
+                  <CharacterSlot
+                    character={myGem}
+                    look={{ mood: "hello", occasion: "everyday" }}
+                    size={104}
+                    aspectRatio={FRAME_ASPECT}
+                  />
+                </View>
+                <AppText variant="headline">Just the two of you 💜</AppText>
+                <View style={[styles.row, { gap: 4 }]}>
+                  <Icon name="lock" size={12} color={colors.textTertiary} />
+                  <AppText variant="caption" color="textTertiary">
+                    Private to {me.name} and {partner.name}
+                  </AppText>
+                </View>
+              </View>
+            }
+            ListEmptyComponent={
+              <AppText variant="callout" color="textSecondary" style={styles.textCenter}>
+                Say hello 💜
+              </AppText>
+            }
+            renderItem={({ item }) =>
+              item.kind === "date" ? (
+                <View style={[styles.center, { marginVertical: spacing.md }]}>
+                  <Glass radius={radii.pill} shadow={false} contentStyle={styles.datePill}>
+                    <AppText variant="caption" weight="600" color="textSecondary">
+                      {item.label}
+                    </AppText>
+                  </Glass>
+                </View>
+              ) : (
+                <View>
+                  <Bubble
+                    message={item.message}
+                    mine={item.message.senderId === meId}
+                    partnerSide={partner.side}
+                    zone={me.zone}
+                    joinAbove={item.joinAbove}
+                    joinBelow={item.joinBelow}
+                    highlighted={highlight === item.message.id}
+                    onLongPress={(anchor) => {
+                      setMenu(item.message);
+                      setHeld({ anchor, joinAbove: item.joinAbove, joinBelow: item.joinBelow });
+                    }}
+                    onOpenMedia={() => {
+                      const media = item.message.media;
+                      if (media === undefined || media.type === "voice") return;
+                      openMedia({
+                        type: media.type,
+                        art: media.art,
+                        caption: media.caption,
+                        ...(media.type === "video" ? { seconds: media.seconds } : {}),
+                        authorName: item.message.senderId === meId ? me.name : partner.name,
+                        at: item.message.createdAt,
+                      });
+                    }}
+                    onRetry={() => {
+                      retry.mutate(item.message.id, { onError });
+                    }}
+                    onCancel={() => {
+                      cancel.mutate(item.message.id, {
+                        onSuccess: () => {
+                          toast.show("Upload cancelled.");
+                        },
+                        onError,
+                      });
+                    }}
+                    onReact={(emoji) => {
+                      react.mutate({ messageId: item.message.id, emoji }, { onError });
+                    }}
+                  />
+                  {item.state === null ? null : (
+                    <StatusRow
+                      state={item.state}
+                      progress={item.message.uploadProgress ?? 0}
+                      time={localTimeLabel(Temporal.Instant.from(item.message.createdAt), me.zone)}
+                      partnerSide={partner.side}
+                      partnerLook={theirLook}
+                      onRetry={() => {
+                        retry.mutate(item.message.id, { onError });
+                      }}
+                    />
+                  )}
+                </View>
+              )
+            }
+          />
+          {/* Ruby and Sapphire popping up from behind the composer (decorative). */}
+          <View pointerEvents="none" style={styles.peekLayer}>
+            {leftPeek}
+            {rightPeek}
+          </View>
+        </View>
+
+        {settings.data?.readReceipts === null ? (
+          <Animated.View entering={ENTER} style={{ paddingHorizontal: spacing.md }}>
+            <Glass radius={radii.xl} contentStyle={{ padding: spacing.lg, gap: spacing.sm }}>
+              <AppText variant="headline">👀 Show when you've seen messages?</AppText>
+              <AppText variant="footnote" color="textSecondary">
+                {`"Seen" appears only if ${partner.name} says yes too. You can change this anytime.`}
+              </AppText>
+              <View style={[styles.row, { gap: spacing.sm }]}>
+                <View style={styles.flex}>
+                  <Button
+                    label="Yes"
+                    variant="secondary"
+                    onPress={() => {
+                      updateSettings.mutate({ readReceipts: true }, { onError });
+                    }}
+                  />
+                </View>
+                <View style={styles.flex}>
+                  <Button
+                    label="No thanks"
+                    variant="secondary"
+                    onPress={() => {
+                      updateSettings.mutate({ readReceipts: false }, { onError });
+                    }}
+                  />
+                </View>
+              </View>
+            </Glass>
           </Animated.View>
         ) : null}
 
-        <View
-          style={[
-            styles.composerContainer,
-            {
-              backgroundColor: colors.surface,
-              borderTopColor: colors.glassRimStart,
-              paddingBottom: Math.max(insets.bottom, 12),
-              paddingHorizontal: spacing.sm,
-            },
-          ]}
+        <SafeAreaView
+          // With the keyboard up it covers the home-indicator area, so no gap above it (P-75).
+          edges={keyboardUp ? [] : ["bottom"]}
+          style={{
+            paddingHorizontal: spacing.md,
+            paddingTop: spacing.sm,
+            ...(keyboardUp ? { paddingBottom: spacing.sm } : {}),
+          }}
         >
-          {/* Top liquid glass specular line */}
-          <LinearGradient
-            colors={[colors.glassSheen, "transparent"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0, y: 1 }}
-            style={styles.composerSheen}
-            pointerEvents="none"
-          />
-          {/* Reply Quote Bar */}
-          {replyingTo ? (
-            <Animated.View
-              entering={FadeIn}
-              style={[styles.replyBar, { backgroundColor: colors.surfaceRaised }]}
-            >
-              <View style={[styles.replyAccent, { backgroundColor: colors.accent }]} />
-              <View style={styles.replyContent}>
-                <AppText variant="caption" weight="600" color="accent">
-                  Replying to {replyingTo.senderId === DEMO_ME_ID ? "yourself" : partner.name}
-                </AppText>
-                <AppText variant="caption" color="textSecondary" numberOfLines={1}>
-                  {replyingTo.text.length > 0
-                    ? replyingTo.text
-                    : (replyingTo.media?.caption ?? "Media")}
-                </AppText>
-              </View>
-              <IconButton
-                icon="x"
-                label="Cancel reply"
-                onPress={() => {
-                  setReplyingTo(null);
-                }}
-              />
-            </Animated.View>
-          ) : null}
-
-          {/* Edit Message Bar (CHAT-03) */}
-          {editingMsg ? (
-            <Animated.View
-              entering={FadeIn}
-              style={[styles.editBar, { backgroundColor: colors.surfaceRaised }]}
-            >
-              <View style={[styles.replyAccent, { backgroundColor: colors.garnet }]} />
-              <View style={styles.replyContent}>
-                <AppText variant="caption" weight="600" color="accent">
-                  Editing message
-                </AppText>
-                <AppText variant="caption" color="textSecondary" numberOfLines={1}>
-                  {editingMsg.text}
-                </AppText>
-              </View>
-              <IconButton icon="x" label="Cancel editing" onPress={handleCancelEdit} />
-            </Animated.View>
-          ) : null}
-
-          {/* Input Controls Row */}
-          <View style={styles.inputRow}>
-            {/* Media button */}
-            <IconButton
-              icon="plus"
-              label="Share media"
-              onPress={() => {
-                setMediaSheetOpen(true);
-              }}
-            />
-
-            {/* Multiline Text Input */}
-            <View
-              style={[
-                styles.inputBox,
-                {
-                  backgroundColor: colors.surfaceRaised,
-                  borderColor: colors.border,
-                  borderRadius: radii.xl,
-                },
-              ]}
-            >
-              <TextInput
-                value={inputText}
-                onChangeText={setInputText}
-                placeholder="Message"
-                placeholderTextColor={colors.textTertiary}
-                multiline
-                accessibilityLabel="Message input field"
-                style={[styles.textInput, { color: colors.textPrimary }]}
-              />
-            </View>
-
-            {/* Voice or Send button */}
-            {inputText.trim().length > 0 || editingMsg ? (
-              <Animated.View entering={ZoomIn.springify().damping(12)}>
+          {replyTo !== null || editing !== null ? (
+            <Animated.View entering={ENTER}>
+              <Glass
+                radius={radii.lg}
+                shadow={false}
+                contentStyle={[styles.row, styles.replyBar, { gap: spacing.sm }]}
+              >
+                <View style={[styles.replyMark, { backgroundColor: colors.accent }]} />
+                <View style={styles.flex}>
+                  <AppText variant="caption" weight="600" color="accent">
+                    {editing !== null
+                      ? "Editing message"
+                      : `Replying to ${replyTo?.senderId === meId ? "yourself" : partner.name}`}
+                  </AppText>
+                  <AppText variant="footnote" color="textSecondary" numberOfLines={1}>
+                    {messagePreview(editing ?? replyTo ?? { text: "", media: undefined })}
+                  </AppText>
+                </View>
                 <Pressable
                   onPress={() => {
-                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    handleSend();
+                    setReplyTo(null);
+                    if (editing !== null) setText("");
+                    setEditing(null);
                   }}
                   accessibilityRole="button"
-                  accessibilityLabel={editingMsg ? "Save edited message" : "Send message"}
-                  style={({ pressed }) => [
-                    styles.sendBtn,
-                    {
-                      backgroundColor: colors.accent,
-                      borderRadius: radii.pill,
-                      transform: [{ scale: pressed ? 0.92 : 1 }],
-                      shadowColor: colors.shadow,
-                      shadowOpacity: scheme === "dark" ? 0.3 : 0.1,
-                      shadowRadius: 8,
-                      shadowOffset: { width: 0, height: 2 },
-                    },
-                  ]}
+                  accessibilityLabel="Cancel"
+                  hitSlop={10}
                 >
-                  <Icon name={editingMsg ? "check" : "send"} size={16} color={colors.onAccent} />
+                  <Icon name="x" size={18} color={colors.textSecondary} />
                 </Pressable>
-              </Animated.View>
-            ) : (
-              <IconButton
-                icon="mic"
-                label="Record voice note"
-                onPress={() => {
-                  setVoiceRecorderOpen(true);
-                }}
+              </Glass>
+            </Animated.View>
+          ) : null}
+          {/* The quick row while typing; with the board open it would only repeat it. */}
+          {focused && !panel ? (
+            <Animated.View
+              {...(reduceMotion ? {} : { entering: ENTER })}
+              accessibilityRole="toolbar"
+              accessibilityLabel="Quick emoji"
+              style={{ marginBottom: spacing.xs }}
+            >
+              <Glass
+                radius={radii.pill}
+                shadow={false}
+                contentStyle={[styles.row, styles.spread, styles.quick]}
+              >
+                {QUICK_EMOJI.map((e) => (
+                  <Pressable
+                    key={e}
+                    onPress={() => {
+                      setText((t) => t + e);
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Add ${e}`}
+                    hitSlop={4}
+                    style={({ pressed }) => ({ transform: [{ scale: pressed ? 1.3 : 1 }] })}
+                  >
+                    <AppText variant="headline" accessible={false}>
+                      {e}
+                    </AppText>
+                  </Pressable>
+                ))}
+              </Glass>
+            </Animated.View>
+          ) : null}
+          <Glass radius={26} contentStyle={[styles.row, styles.composer, { gap: spacing.xs }]}>
+            <Pressable
+              onPress={() => {
+                setSheet("media");
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Add a photo, video or voice note"
+              style={styles.round}
+            >
+              <Icon name="plus" size={22} color={colors.accent} />
+            </Pressable>
+            <TextInput
+              ref={input}
+              value={text}
+              onChangeText={setText}
+              onFocus={() => {
+                setFocused(true);
+                setPanel(false);
+              }}
+              onBlur={() => {
+                setFocused(false);
+              }}
+              placeholder="Message"
+              placeholderTextColor={colors.textTertiary}
+              accessibilityLabel="Message"
+              multiline
+              maxLength={2000}
+              style={[styles.input, noOutline, { color: colors.textPrimary }]}
+            />
+            <Pressable
+              onPress={() => {
+                // Like the iPhone: the emoji board takes the keyboard's place.
+                if (!panel) input.current?.blur();
+                setPanel((p) => !p);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={panel ? "Close stickers and emoji" : "Stickers and emoji"}
+              accessibilityState={{ expanded: panel }}
+              style={styles.round}
+            >
+              <Icon
+                name={panel ? "x" : "smile"}
+                size={21}
+                color={panel ? colors.accent : colors.textSecondary}
               />
+            </Pressable>
+            {text.trim().length > 0 ? (
+              <Pressable
+                onPress={submit}
+                accessibilityRole="button"
+                accessibilityLabel={editing !== null ? "Save edit" : "Send"}
+                disabled={send.isPending || edit.isPending}
+              >
+                <Animated.View {...(reduceMotion ? {} : { entering: ENTER })}>
+                  <LinearGradient
+                    colors={[colors.accentStrong, colors.accentStrongEnd]}
+                    style={styles.send}
+                  >
+                    <Icon
+                      name={editing !== null ? "check" : "send"}
+                      size={18}
+                      color={colors.onAccent}
+                    />
+                  </LinearGradient>
+                </Animated.View>
+              </Pressable>
+            ) : (
+              <Pressable
+                onPress={() => {
+                  setSheet("voice");
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Record a voice note"
+                style={styles.round}
+              >
+                <Icon name="mic" size={21} color={colors.textSecondary} />
+              </Pressable>
             )}
-          </View>
-        </View>
+          </Glass>
+          {panel ? (
+            <ExpressionPanel
+              mySide={me.side ?? "garnet"}
+              onEmoji={(e) => {
+                setText((t) => t + e);
+              }}
+              onBackspace={() => {
+                setText((t) => removeLastGrapheme(t));
+              }}
+              onKeyboard={() => {
+                setPanel(false);
+                input.current?.focus();
+              }}
+              onSticker={sendSticker}
+            />
+          ) : null}
+        </SafeAreaView>
       </KeyboardAvoidingView>
 
-      {/* Context Menu (CHAT-02) */}
-      <MessageContextMenu
-        message={selectedMsgForMenu}
-        visible={Boolean(selectedMsgForMenu)}
-        isMine={selectedMsgForMenu?.senderId === DEMO_ME_ID}
-        canEdit={canEditSelected}
+      {/* CHAT-02 · hold or right-click: reactions above, actions below (P-63) */}
+      {menu !== null && held !== null && sheet === null ? (
+        <MessageMenu
+          anchor={held.anchor}
+          mine={menu.senderId === meId}
+          reacted={menu.reactions.filter((r) => r.reactedByMe).map((r) => r.emoji)}
+          actions={menuActions(menu)}
+          onReact={(emoji) => {
+            react.mutate({ messageId: menu.id, emoji }, { onError });
+          }}
+          onClose={() => {
+            setMenu(null);
+            setHeld(null);
+          }}
+          preview={
+            <Bubble
+              preview
+              message={menu}
+              mine={menu.senderId === meId}
+              partnerSide={partner.side}
+              zone={me.zone}
+              joinAbove={held.joinAbove}
+              joinBelow={held.joinBelow}
+              highlighted={false}
+              onLongPress={() => undefined}
+              onOpenMedia={() => undefined}
+              onRetry={() => undefined}
+              onCancel={() => undefined}
+              onReact={() => undefined}
+            />
+          }
+        />
+      ) : null}
+
+      {/* CHAT-04 · delete for me / for everyone */}
+      <Sheet
+        visible={sheet === "delete" && menu !== null}
+        title="Delete message"
         onClose={() => {
-          setSelectedMsgForMenu(null);
+          setSheet(null);
+          setMenu(null);
         }}
-        onReply={(msg) => {
-          setReplyingTo(msg);
+      >
+        <View style={{ gap: spacing.xxs }}>
+          <SheetAction
+            icon="eye-off"
+            label="Delete for you"
+            onPress={() => {
+              if (menu === null) return;
+              remove.mutate(
+                { id: menu.id, mode: "for-me" },
+                {
+                  onSuccess: () => {
+                    toast.show("Removed from your view.");
+                  },
+                  onError,
+                },
+              );
+              setSheet(null);
+              setMenu(null);
+            }}
+          />
+          {menu?.senderId === meId ? (
+            <SheetAction
+              icon="trash"
+              label="Delete for everyone"
+              destructive
+              onPress={() => {
+                setSheet("deleteAll");
+              }}
+            />
+          ) : null}
+        </View>
+      </Sheet>
+      <ActionSheet
+        visible={sheet === "deleteAll"}
+        title="Delete for everyone?"
+        body={`This removes it for you and ${partner.name}. It can't remove screenshots or copies outside Garnet.`}
+        icon="trash"
+        confirmLabel="Delete for everyone"
+        destructive
+        onCancel={() => {
+          setSheet(null);
+          setMenu(null);
         }}
-        onEdit={(msg) => {
-          handleStartEdit(msg);
-        }}
-        onTogglePin={(msg) => {
-          togglePin.mutate(msg.id);
-        }}
-        onToggleReaction={(msg, emoji) => {
-          toggleReaction.mutate({ messageId: msg.id, emoji });
-        }}
-        onOpenDetails={(msg) => {
-          setSelectedMsgForDetails(msg);
-        }}
-        onDeletePress={(msg) => {
-          setSelectedMsgForDelete(msg);
+        onConfirm={() => {
+          if (menu !== null) remove.mutate({ id: menu.id, mode: "for-everyone" }, { onError });
+          setSheet(null);
+          setMenu(null);
         }}
       />
 
-      {/* Delete Dialogs (CHAT-04) */}
-      <DeleteDialog
-        visible={Boolean(selectedMsgForDelete)}
-        partnerName={partner.name}
-        canDeleteForEveryone={selectedMsgForDelete?.senderId === DEMO_ME_ID}
+      {/* CHAT-07 · details: both zones; "Seen" only when both said yes */}
+      <Sheet
+        visible={sheet === "details" && menu !== null}
+        title="Message details"
         onClose={() => {
-          setSelectedMsgForDelete(null);
+          setSheet(null);
+          setMenu(null);
         }}
-        onConfirm={handleDeleteConfirm}
-      />
+      >
+        {menu === null ? null : (
+          <View style={{ gap: spacing.sm }}>
+            <DetailLine
+              icon="clock"
+              text={`${localTimeLabel(Temporal.Instant.from(menu.createdAt), me.zone)} ${cityForZone(me.zone)} · ${localTimeLabel(Temporal.Instant.from(menu.createdAt), partner.zone)} ${cityForZone(partner.zone)}`}
+            />
+            {menu.editedAt === null ? null : (
+              <DetailLine
+                icon="edit"
+                text={`Edited at ${localTimeLabel(Temporal.Instant.from(menu.editedAt), me.zone)}`}
+              />
+            )}
+            {menu.senderId === meId ? (
+              <DetailLine
+                icon="check"
+                text={
+                  seenUpTo !== null &&
+                  Temporal.Instant.compare(
+                    Temporal.Instant.from(menu.createdAt),
+                    Temporal.Instant.from(seenUpTo),
+                  ) <= 0
+                    ? "Seen"
+                    : "Sent"
+                }
+              />
+            ) : null}
+            <AppText variant="footnote" color="textTertiary">
+              "Seen" shows only when you both have it on.
+            </AppText>
+          </View>
+        )}
+      </Sheet>
 
-      {/* Pinned Messages Sheet (CHAT-05) */}
-      <PinnedSheet
-        visible={pinnedSheetOpen}
-        pinnedMessages={pinned}
-        viewerZone={partner.zone}
+      {/* CHAT-05 · pinned */}
+      <Sheet
+        visible={sheet === "pinned"}
+        title="Pinned"
         onClose={() => {
-          setPinnedSheetOpen(false);
+          setSheet(null);
         }}
-        onSelectMessage={(msg) => {
-          scrollToMessage(msg.id);
-        }}
-        onUnpin={(msg) => {
-          togglePin.mutate(msg.id);
-        }}
-      />
+      >
+        {pinned.length === 0 ? (
+          <AppText variant="callout" color="textSecondary">
+            Pin a message to keep it close.
+          </AppText>
+        ) : (
+          pinned.map((m) => (
+            <Pressable
+              key={m.id}
+              onPress={() => {
+                jumpTo(m.id);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`${m.text || "Media"}. Show in chat`}
+            >
+              <Glass
+                radius={radii.lg}
+                shadow={false}
+                contentStyle={[styles.row, { padding: spacing.md, gap: spacing.md }]}
+              >
+                <Icon name="pin" size={16} color={colors.accent} />
+                <AppText variant="callout" style={styles.flex} numberOfLines={2}>
+                  {messagePreview(m)}
+                </AppText>
+                <AppText variant="caption" color="textTertiary">
+                  {dateGroupLabel(m.createdAt, now, me.zone)}
+                </AppText>
+              </Glass>
+            </Pressable>
+          ))
+        )}
+      </Sheet>
 
-      {/* Message Details Sheet (CHAT-07) */}
-      <MessageDetailsSheet
-        visible={Boolean(selectedMsgForDetails)}
-        message={selectedMsgForDetails}
-        myZone="Africa/Addis_Ababa"
-        partnerZone={partner.zone}
-        readReceiptsEnabled={readReceipts}
+      {/* CHAT-06 · search */}
+      <Sheet
+        visible={sheet === "search"}
+        title="Search messages"
         onClose={() => {
-          setSelectedMsgForDetails(null);
+          setSheet(null);
+          setQuery("");
         }}
-      />
+      >
+        <TextField
+          label="Search"
+          placeholder="A word or two"
+          value={query}
+          onChangeText={setQuery}
+          autoFocus
+          returnKeyType="search"
+        />
+        {query.trim().length === 0 ? null : results.data === undefined ? (
+          <ActivityIndicator />
+        ) : results.data.length === 0 ? (
+          <AppText variant="callout" color="textSecondary">
+            Nothing found. Try another word.
+          </AppText>
+        ) : (
+          results.data.map((m) => (
+            <Pressable
+              key={m.id}
+              onPress={() => {
+                setQuery("");
+                jumpTo(m.id);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`${m.text}. Show in chat`}
+            >
+              <Glass
+                radius={radii.lg}
+                shadow={false}
+                contentStyle={{ padding: spacing.md, gap: 2 }}
+              >
+                <AppText variant="callout" numberOfLines={2}>
+                  {messagePreview(m)}
+                </AppText>
+                <AppText variant="caption" color="textTertiary">
+                  {m.senderId === meId ? "You" : partner.name} ·{" "}
+                  {dateGroupLabel(m.createdAt, now, me.zone)}
+                </AppText>
+              </Glass>
+            </Pressable>
+          ))
+        )}
+      </Sheet>
 
-      {/* Media Picker Sheet (CHAT-08) */}
-      <ChatMediaSheet
-        visible={mediaSheetOpen}
-        partnerName={partner.name}
-        onPick={handleSendMedia}
-        onVoice={() => {
-          setVoiceRecorderOpen(true);
-        }}
-        onClose={() => {
-          setMediaSheetOpen(false);
-        }}
-      />
+      {/* CHAT-08 · media */}
+      {sheet === "media" && preview === null ? (
+        <AttachTray
+          onPick={setPreview}
+          onVoice={() => {
+            setSheet("voice");
+          }}
+          onClose={() => {
+            setSheet(null);
+          }}
+        />
+      ) : null}
+      {preview === null ? null : (
+        <MediaComposer
+          media={preview}
+          partner={partner}
+          sending={send.isPending}
+          onSend={(caption) => {
+            sendMedia(preview, caption);
+          }}
+          onClose={() => {
+            setPreview(null);
+            setSheet(null);
+          }}
+        />
+      )}
+      {sheet === "voice" ? (
+        <VoiceRecorderSheet
+          visible
+          onSave={(media) => {
+            sendMedia(media);
+          }}
+          onClose={() => {
+            setSheet(null);
+          }}
+        />
+      ) : null}
+      {sheet === "memory" && menu !== null ? (
+        <SaveMemorySheet
+          media={menu.media ?? null}
+          title={menu.media?.caption ?? menu.text.slice(0, 60)}
+          story={menu.text}
+          date={Temporal.Instant.from(menu.createdAt)
+            .toZonedDateTimeISO(me.zone)
+            .toPlainDate()
+            .toString()}
+          onSaved={() => {
+            markSaved.mutate(menu.id);
+          }}
+          onClose={() => {
+            setSheet(null);
+            setMenu(null);
+          }}
+        />
+      ) : null}
+    </View>
+  );
+}
 
-      {/* Voice Recorder Sheet (CHAT-08) */}
-      <VoiceRecorderSheet
-        visible={voiceRecorderOpen}
-        onSave={handleSaveVoice}
-        onClose={() => {
-          setVoiceRecorderOpen(false);
-        }}
-      />
+function DetailLine({ icon, text }: { icon: "clock" | "edit" | "check"; text: string }) {
+  const { colors, spacing } = useTheme();
+  return (
+    <View style={[styles.row, { gap: spacing.md, minHeight: 40 }]}>
+      <Icon name={icon} size={18} color={colors.textSecondary} />
+      <AppText variant="callout" style={styles.flex}>
+        {text}
+      </AppText>
     </View>
   );
 }
 
 export function ConversationScreen() {
+  const home = useHomeToday();
   return (
-    <SideScope side="garnet">
-      <ConversationContent />
+    <SideScope side={home.data?.me.side ?? "garnet"}>
+      <Conversation />
     </SideScope>
   );
 }
 
 const styles = StyleSheet.create({
-  fill: {
-    flex: 1,
+  fill: { flex: 1 },
+  flex: { flex: 1 },
+  center: { alignItems: "center", justifyContent: "center" },
+  textCenter: { textAlign: "center" },
+  row: { flexDirection: "row", alignItems: "center" },
+  spread: { justifyContent: "space-between" },
+  header: { paddingHorizontal: 12, paddingBottom: 6, zIndex: 2 },
+  headerInner: { paddingHorizontal: 6, paddingVertical: 6 },
+  pinned: { paddingHorizontal: 14, paddingVertical: 8 },
+  datePill: { paddingHorizontal: 12, paddingVertical: 4 },
+  duo: { alignItems: "flex-end", gap: 0 },
+  status: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    paddingHorizontal: 18,
+    marginTop: 4,
   },
-  center: {
+  face: { width: 24, height: 24, borderRadius: 12, overflow: "hidden", borderWidth: 1 },
+  // The head of a 2:3 standing figure: crop near the top, centred.
+  faceArt: { position: "absolute", top: -9, left: -19 },
+  peekLayer: { position: "absolute", left: 0, right: 0, bottom: -18, height: 140 },
+  replyBar: { paddingHorizontal: 12, paddingVertical: 8, marginBottom: 6 },
+  replyMark: { width: 3, alignSelf: "stretch", borderRadius: 2 },
+  composer: { paddingHorizontal: 6, paddingVertical: 5, minHeight: 52 },
+  round: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  headerPartner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  headerInfo: {
-    alignItems: "center",
-  },
-  pinnedBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    gap: 8,
-  },
-  listContent: {
-    flexGrow: 1,
-  },
-  dateSeparatorRow: {
-    alignItems: "center",
-    marginVertical: 12,
-  },
-  dateBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 3,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  emptyContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
-  },
-  emptyCircle: {
-    width: 68,
-    height: 68,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  centerText: {
-    textAlign: "center",
-  },
-  scrollDownWrapper: {
-    position: "absolute",
-    bottom: 84,
-  },
-  scrollDownBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderWidth: 1,
-    elevation: 4,
-    shadowColor: "#000",
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-  },
-  downIcon: {
-    transform: [{ rotate: "90deg" }],
-  },
-  composerContainer: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    paddingTop: 8,
-    position: "relative",
-  },
-  composerSheen: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 6,
-    opacity: 0.7,
-  },
-  replyBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    marginBottom: 6,
-    gap: 8,
-  },
-  editBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    marginBottom: 6,
-    gap: 8,
-  },
-  replyAccent: {
-    width: 3,
-    height: 24,
-    borderRadius: 1.5,
-  },
-  replyContent: {
+  input: {
     flex: 1,
-  },
-  inputRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  inputBox: {
-    flex: 1,
-    minHeight: 40,
+    fontSize: 17,
+    lineHeight: 22,
     maxHeight: 120,
-    paddingHorizontal: 16,
-    justifyContent: "center",
-    borderWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
   },
-  textInput: {
-    fontSize: 16,
-    paddingTop: 8,
-    paddingBottom: 8,
-  },
-  sendBtn: {
-    width: 38,
-    height: 38,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  flex: {
-    flex: 1,
-  },
+  send: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  quick: { paddingHorizontal: 14, paddingVertical: 6 },
 });

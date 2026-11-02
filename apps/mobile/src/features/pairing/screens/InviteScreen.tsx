@@ -5,11 +5,11 @@
  * assumption; U-33 (link, code or both) stays open.
  */
 import * as Clipboard from "expo-clipboard";
-import * as Haptics from "expo-haptics";
+import { Haptics } from "@/components/ui/haptics";
 import { Redirect, useRouter } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
-import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { SparkleBurst } from "@/components/brand/SparkleBurst";
 import { ActionSheet } from "@/components/ui/ActionSheet";
 import { AppText } from "@/components/ui/AppText";
@@ -26,6 +26,8 @@ import { AvatarLink } from "../components/Avatar";
 import { InviteTicket } from "../components/InviteTicket";
 import { useCreateInvite, usePairingStatus, useRevokeInvite } from "../usePairing";
 import { useTimeLeft } from "../useTimeLeft";
+import { goBack } from "@/navigation/goBack";
+import { ENTER } from "@/theme/transitions";
 
 export function InviteScreen() {
   const router = useRouter();
@@ -69,10 +71,7 @@ export function InviteScreen() {
         }
       >
         <View style={styles.fill}>
-          <Animated.View
-            {...(reduceMotion ? {} : { entering: FadeInUp.springify().damping(15) })}
-            style={styles.full}
-          >
+          <Animated.View {...(reduceMotion ? {} : { entering: ENTER })} style={styles.full}>
             <Glass
               radius={radii.xl + 4}
               contentStyle={[styles.joined, { padding: spacing.xl, gap: spacing.lg }]}
@@ -112,7 +111,7 @@ export function InviteScreen() {
   return (
     <GlassScreen
       onBack={() => {
-        router.back();
+        goBack("/pair");
       }}
       footer={
         expired ? (
@@ -144,10 +143,7 @@ export function InviteScreen() {
         )
       }
     >
-      <Animated.View
-        {...(reduceMotion ? {} : { entering: FadeInDown.springify().damping(18) })}
-        style={{ gap: spacing.sm }}
-      >
+      <Animated.View {...(reduceMotion ? {} : { entering: ENTER })} style={{ gap: spacing.sm }}>
         <AppText variant="largeTitle">Your invitation</AppText>
       </Animated.View>
 

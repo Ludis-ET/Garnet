@@ -1,4 +1,4 @@
-import * as Haptics from "expo-haptics";
+import { Haptics } from "@/components/ui/haptics";
 import { ActivityIndicator, Platform, Pressable, StyleSheet, View } from "react-native";
 import Animated, {
   useAnimatedStyle,

@@ -23,13 +23,18 @@ Spec: §14–21, §59, A1 "Emotional connection", A2 "Emotional signal compose",
 
 Route `/(tabs)/us`
 
+Redesigned in liquid glass (owner direction, **P-60**):
+
 ```text
-Large title "Us", a glass history button. A glass card with both of you: avatars ringed in
-ruby and sapphire, names, local times, and a thin violet line between you with a small light
-gliding from one colour to the other. A 2-column grid of glass tiles, each a big emoji and a
-title: Thought of You 💭, Missing You 🥺, I Need You 🫂, I Need to Talk 💬, Just Listen 👂,
-Please Check On Me 🤍, I Can't Talk Yet ⏳, I'm Okay Now 🌤️; a wide "Messages 💬" tile (chat
-comes later). "Recent" with "All": three quiet rows.
+Large title "Us", a glass history button. A tall glass "bridge": your gem standing on one side,
+your partner's on the other (each in their own day's look, P-57), a dotted bow of light between
+you with a soft light drifting along it, each side washed in its person's colour, and glass name
+tags with local times. Sending a signal sends a bright spark across the bow, then "Sent 💭"
+floats up (never "seen"). Then a bento of glass tiles: a big "Thought of You" ("A little light
+for Noah"), "Missing You" and "I'm Okay" stacked beside it, each with a floating emoji over a
+soft glow in its colour. A glass panel "When it's heavy" with five round glass buttons: Need
+you, Talk, Listen, Check in, Not yet. A Messages tile with Noah's avatar and the last message
+(opens chat, 08). "Between you" with "All": three quiet rows.
 ```
 
 **States:**
@@ -86,3 +91,17 @@ you can see this." opens "Who sees what".
 - **Populated:** the day headings and rows described above.
 - **Empty:** "Little signals between you will appear here."
 - **Who sees what:** a sheet saying both of you see every signal and nobody else does; no counts, no scores, no "seen"; how long signals are kept hasn't been decided yet (U-09).
+
+## US · How far apart (P-64)
+
+- **The card:** a glass card under the hero. The kilometres between your two chosen home cities count up in large serif numerals over a dotted arc from your picture to theirs. A small plane glides along the arc, and a line reads "about 8 h by plane · cities only, never live location".
+- **Before both cities are chosen:** "See how far you are from Noah" with "Choose my city". After you choose, until Noah has chosen one: "Noah hasn't shared a city yet".
+- **The city sheet:** search and a list of cities, with your own time zone's cities first. "Stop sharing my city" sits at the bottom.
+- **What's shared:** only the city's name, and only once you're paired (P-21). There is no history, trend or "days apart" counter.
+
+## Distance on the hero (P-66, replaces the card above)
+
+- **Where:** the kilometres sit at the top of the bow between the two characters, as a small glass pill ("✈ 5,900 km") that counts up. There is no separate card.
+- **How it's worked out:** from the phone's location while Garnet is open, rounded to about 10 km. If location isn't allowed, it shows "≈" and uses the time zones. It never asks for a place.
+- **What Noah sees:** only the kilometres.
+- **Control:** Settings › Location & distance (or the Distance quick toggle) turns it off and forgets the location.

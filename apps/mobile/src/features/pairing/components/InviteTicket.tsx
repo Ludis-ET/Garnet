@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, {
   Easing,
-  FadeInDown,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
@@ -17,6 +16,7 @@ import { SimulatedBadge } from "@/components/ui/SimulatedBadge";
 import { spokenInviteCode } from "@/domain/pairing";
 import { useTheme } from "@/theme/ThemeProvider";
 import { CodeTiles } from "./CodeTiles";
+import { ENTER } from "@/theme/transitions";
 
 /**
  * The invitation as a glass ticket (PAIR-02, P-49): a slow holographic sheen sweeps across it,
@@ -58,7 +58,7 @@ export function InviteTicket({
   }));
 
   return (
-    <Animated.View {...(reduceMotion ? {} : { entering: FadeInDown.springify().damping(16) })}>
+    <Animated.View {...(reduceMotion ? {} : { entering: ENTER })}>
       <Glass
         radius={radii.xl + 4}
         tint={expired ? "none" : "garnet"}

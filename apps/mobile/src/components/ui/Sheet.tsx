@@ -10,19 +10,14 @@ import {
   View,
 } from "react-native";
 import { Gesture, GestureDetector, GestureHandlerRootView } from "react-native-gesture-handler";
-import Animated, {
-  FadeIn,
-  SlideInDown,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from "react-native-reanimated";
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
 import { AppText } from "@/components/ui/AppText";
 import { Glass } from "@/components/ui/Glass";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { useTheme } from "@/theme/ThemeProvider";
+import { ENTER, SHEET } from "@/theme/transitions";
 
 export interface SheetProps {
   visible: boolean;
@@ -71,24 +66,21 @@ export function Sheet({ visible, onClose, title, peek, footer, children }: Sheet
       statusBarTranslucent
     >
       <GestureHandlerRootView style={styles.fill}>
-        <Animated.View
-          entering={FadeIn.duration(200)}
-          style={[styles.fill, { backgroundColor: colors.scrim }]}
-        >
+        <Animated.View entering={ENTER} style={[styles.fill, { backgroundColor: colors.scrim }]}>
           <Pressable
             style={StyleSheet.absoluteFill}
             onPress={close}
             accessibilityRole="button"
             accessibilityLabel="Close"
           />
+          {/* box-none: this full-screen layer must let a tap above the sheet reach the scrim. */}
           <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : undefined}
             style={styles.end}
+            pointerEvents="box-none"
           >
             <Animated.View
-              {...(reduceMotion
-                ? {}
-                : { entering: SlideInDown.springify().damping(19).stiffness(190) })}
+              {...(reduceMotion ? {} : { entering: SHEET })}
               accessibilityViewIsModal
               style={[
                 styles.sheet,

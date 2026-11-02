@@ -1,0 +1,8 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Platform-neutral: used by the API (Node) and the app (Hermes).
+    "types": []
+  },
+  "include": ["src"]
+}

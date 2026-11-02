@@ -1,0 +1,28 @@
+# Garnet's local backend (P-76, phase B0). Local development only: never deploy this.
+# Bound to 127.0.0.1, so nothing outside this PC can reach it. Hosting waits on U-07.
+# The passwords below are local-only defaults, not secrets; override them in your shell.
+name: garnet
+
+services:
+  postgres:
+    image: postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929
+    environment:
+      POSTGRES_DB: garnet
+      # The owner role: runs migrations and owns the tables. The API never uses it.
+      POSTGRES_USER: garnet_owner
+      POSTGRES_PASSWORD: ${GARNET_DB_OWNER_PASSWORD:-garnet-owner-local}
+      # Read once by postgres/init/01-roles.sh to create the API's own login role.
+      GARNET_API_DB_PASSWORD: ${GARNET_API_DB_PASSWORD:-garnet-api-local}
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - garnet-postgres:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U garnet_owner -d garnet"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  garnet-postgres:

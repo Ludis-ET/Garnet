@@ -1,5 +1,5 @@
 import { composite, contrastRatio } from "./contrast";
-import { colorsFor, type ColorScheme, type Side } from "./tokens";
+import { colorsFor, frosted, type ColorScheme, type Side } from "./tokens";
 
 const schemes: ColorScheme[] = ["dark", "light"];
 const sides: Side[] = ["ruby", "sapphire", "garnet"];
@@ -91,5 +91,33 @@ describe("design tokens meet WCAG 2.2 AA contrast", () => {
   it("uses the side's own accent", () => {
     expect(colorsFor("dark", "ruby").accent).toBe(colorsFor("dark", "ruby").ruby);
     expect(colorsFor("dark", "sapphire").accent).toBe(colorsFor("dark", "sapphire").sapphire);
+  });
+});
+
+// P-74: Android has no live blur, so glass is frosted. A frosted pane must hide what is behind
+// it (most of the pane is the veil, not the aurora) and keep every text colour at AA.
+describe("frosted glass on Android (P-74)", () => {
+  const alpha = (rgba: string) => Number(/,\s*([\d.]+)\)$/.exec(rgba)?.[1] ?? "1");
+
+  it.each(schemes.flatMap((s) => sides.map((side) => [s, side] as const)))(
+    "%s/%s: panes are dense frost, and text stays ≥ 4.5:1 on them",
+    (scheme, side) => {
+      const c = frosted(colorsFor(scheme, side), scheme);
+      expect(alpha(c.glassVeil)).toBeGreaterThanOrEqual(0.9);
+      expect(alpha(c.glassVeilSoft)).toBeGreaterThanOrEqual(0.75);
+      for (const orb of [c.auroraRose, c.auroraSky, c.auroraLilac]) {
+        const pane = composite(c.glassVeil, composite(orb, c.background));
+        for (const fg of [c.textPrimary, c.textSecondary, c.textTertiary, c.accent, c.danger]) {
+          expect(contrastRatio(fg, pane)).toBeGreaterThanOrEqual(4.5);
+        }
+      }
+    },
+  );
+
+  it("changes only the glass veils", () => {
+    const c = colorsFor("light", "ruby");
+    const f = frosted(c, "light");
+    const changed = Object.keys(c).filter((k) => c[k as keyof typeof c] !== f[k as keyof typeof f]);
+    expect(changed.sort()).toEqual(["glassVeil", "glassVeilSoft"]);
   });
 });

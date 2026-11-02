@@ -24,7 +24,12 @@ import { DaysScreen } from "../DaysScreen";
 import { DayScreen } from "../DayScreen";
 import { EntryScreen } from "../EntryScreen";
 
-const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn() };
+const mockRouter = {
+  push: jest.fn(),
+  replace: jest.fn(),
+  back: jest.fn(),
+  canGoBack: jest.fn(() => true),
+};
 jest.mock("expo-router", () => ({
   // A getter: the factory runs before `mockRouter` is initialised.
   get router() {

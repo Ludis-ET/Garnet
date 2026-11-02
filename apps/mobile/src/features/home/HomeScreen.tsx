@@ -7,23 +7,15 @@
  */
 import type { SignalId } from "@garnet/domain";
 import { useEffect, useEffectEvent, useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  useWindowDimensions,
-  View,
-} from "react-native";
-import Animated, { FadeInDown, FadeInUp, FadeOutUp } from "react-native-reanimated";
-import { Temporal } from "temporal-polyfill";
+import { Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import Animated from "react-native-reanimated";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { Glass } from "@/components/ui/Glass";
 import { GlassScreen } from "@/components/ui/GlassScreen";
 import { Icon } from "@/components/ui/Icon";
 import { useToast } from "@/components/ui/Toast";
-import { daysLabel, greeting } from "@/domain/home";
+import { greeting } from "@/domain/home";
 import { localTimeLabel } from "@/domain/identity";
 import { serviceErrorMessage } from "@/features/auth/authUi";
 import { SignOutDialog } from "@/features/auth/SignOutDialog";
@@ -31,13 +23,34 @@ import { ProfileAvatar, sideColor } from "@/features/setup/components/ProfileAva
 import { useNow } from "@/features/setup/useNow";
 import { useSetupState } from "@/features/setup/useSetup";
 import { SideScope, useTheme } from "@/theme/ThemeProvider";
-import { HeroOrb, type HeroPulse } from "./components/HeroOrb";
+import { router } from "expo-router";
+import { SIGNAL_LOOK } from "@/domain/us";
+import { useCompanions } from "@/features/companions/useCompanions";
+import { HeroOrb, type HeroPulse, type HeroShortcut } from "./components/HeroOrb";
 import { LogSheet } from "./components/LogSheet";
 import { MoreSheet } from "./components/MoreSheet";
 import { ProfileMenu } from "./components/ProfileMenu";
 import { SignalButton } from "./components/SignalButton";
 import { incomingLine, QUICK_SIGNALS, signalLabel } from "./signals";
-import { useDismissIncoming, useHomeToday, useLogMoment, useSendSignal } from "./useHome";
+import { useSaveEntry } from "@/features/days/useDays";
+import { useDismissIncoming, useHomeToday, useSendSignal } from "./useHome";
+import { useHasUnread, useUnreadCount } from "@/features/notifications/useInbox";
+import { CountBadge } from "@/components/ui/CountBadge";
+import { useAutoLocation } from "@/features/location/deviceLocation";
+import { useChatSummary } from "@/features/chat/useChat";
+import { useSettings } from "@/features/settings/useSettings";
+import { useUsOverview } from "@/features/us/useUs";
+import {
+  LettersTile,
+  MemoryTile,
+  MessagesTile,
+  RightNowCard,
+  TodayCard,
+  UpcomingTile,
+} from "./components/HomeCards";
+import { ErrorState } from "@/components/ui/ErrorState";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { ENTER, EXIT } from "@/theme/transitions";
 
 /** A small, stable number for a string id (spark keys). */
 function keyOf(id: string): number {
@@ -47,20 +60,45 @@ function keyOf(id: string): number {
 }
 
 function HomeContent() {
+  // The distance on Home and Us uses this phone's location while the app is open (P-66).
+  useAutoLocation();
   const toast = useToast();
   const { colors, radii, spacing, reduceMotion } = useTheme();
+  const unread = useUnreadCount();
+  const anyNew = useHasUnread();
+  const chat = useChatSummary();
+  const unreadMessages = chat.data?.unreadCount ?? 0;
+  const distance = useUsOverview().data?.distance ?? null;
+  const prefs = useSettings().data?.settings.home;
+  const cards = prefs?.cards ?? {
+    now: true,
+    messages: true,
+    upcoming: true,
+    letters: true,
+    memory: true,
+    today: true,
+  };
   const { width } = useWindowDimensions();
   const now = useNow();
   const today = useHomeToday();
   const setup = useSetupState();
-  const log = useLogMoment();
+  const log = useSaveEntry();
   const send = useSendSignal();
   const dismiss = useDismissIncoming();
   const [sheet, setSheet] = useState<"log" | "more" | "menu" | "signout" | null>(null);
   const [myPulse, setMyPulse] = useState<HeroPulse | null>(null);
+  const looks = useCompanions();
 
   const data = today.data;
-  const incoming = data?.incoming ?? null;
+  // In-app pop-ups follow the person's own alert choices from setup (SETUP-07, P-57): thoughts
+  // and support signals only float over Home when that category is on.
+  const alerts = setup.data?.profile.notifications;
+  const rawIncoming = data?.incoming ?? null;
+  const incoming =
+    rawIncoming === null ||
+    (SIGNAL_LOOK[rawIncoming.signal].support ? alerts?.support : alerts?.thoughts) === false
+      ? null
+      : rawIncoming;
   const incomingId = incoming?.id ?? null;
   const dismissLater = useEffectEvent((id: string) => {
     dismiss.mutate(id);
@@ -79,9 +117,15 @@ function HomeContent() {
   if (data === undefined) {
     return (
       <GlassScreen tabBar>
-        <View style={styles.fill}>
-          <ActivityIndicator color={colors.accent} accessibilityLabel="Loading" />
-        </View>
+        {today.isError ? (
+          <ErrorState
+            onRetry={() => {
+              void today.refetch();
+            }}
+          />
+        ) : (
+          <Skeleton kind="detail" />
+        )}
       </GlassScreen>
     );
   }
@@ -91,14 +135,81 @@ function HomeContent() {
   const theirs = sideColor(partner.side);
   const pulse: HeroPulse | null =
     incoming === null ? myPulse : { key: keyOf(incoming.id), from: "partner", color: theirs };
-  const orb = Math.round(Math.min(width - spacing.gutter * 2, 300));
-  const enter = (i: number) =>
+  const heroWidth = Math.min(width - spacing.gutter * 2, 440);
+  const orb = Math.round(Math.min(heroWidth - 56, 280));
+  const shortcuts: HeroShortcut[] = [
+    {
+      id: "log",
+      emoji: "✍️",
+      label: "Log",
+      onPress: () => {
+        setSheet("log");
+      },
+    },
+    {
+      id: "days",
+      emoji: "📅",
+      label: "Days",
+      onPress: () => {
+        router.push("/days");
+      },
+    },
+    {
+      id: "chat",
+      emoji: "💬",
+      label: "Chat",
+      badge: unreadMessages,
+      onPress: () => {
+        router.push("/us/chat");
+      },
+    },
+    {
+      id: "letters",
+      emoji: "💌",
+      label: "Open When",
+      badge: data.waitingCount,
+      onPress: () => {
+        router.push("/moments/open-when");
+      },
+    },
+    {
+      id: "memories",
+      emoji: "📸",
+      label: "Memories",
+      onPress: () => {
+        router.push("/our-world");
+      },
+    },
+    {
+      id: "events",
+      emoji: "🎂",
+      label: "Events",
+      onPress: () => {
+        router.push("/moments");
+      },
+    },
+    {
+      id: "chapters",
+      emoji: "📖",
+      label: "Chapters",
+      onPress: () => {
+        router.push("/our-world/chapters");
+      },
+    },
+    {
+      id: "signals",
+      emoji: "🫂",
+      label: "Signals",
+      onPress: () => {
+        router.push("/us");
+      },
+    },
+  ];
+  const enter = () =>
     reduceMotion
       ? {}
       : {
-          entering: FadeInDown.delay(i * 60)
-            .springify()
-            .damping(18),
+          entering: ENTER,
         };
   const sparkle = () => {
     setMyPulse((p) => ({ key: (p?.key ?? 0) + 1, from: "me", color: mine }));
@@ -114,7 +225,7 @@ function HomeContent() {
   return (
     <GlassScreen tabBar>
       {/* Greeting, the two clocks and your picture. */}
-      <Animated.View {...enter(0)} style={[styles.row, { gap: spacing.md }]}>
+      <Animated.View {...enter()} style={[styles.row, { gap: spacing.md }]}>
         <View style={[styles.flex, { gap: spacing.sm }]}>
           <AppText variant="question" numberOfLines={1}>
             {greeting(now, me.zone, me.name)}
@@ -138,6 +249,40 @@ function HomeContent() {
             </AppText>
           </Glass>
         </View>
+        {/* Search and notifications (P-63): small glass buttons beside your picture. */}
+        <View style={[styles.row, { gap: spacing.xs }]}>
+          <Pressable
+            onPress={() => {
+              router.push("/search");
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Search"
+            hitSlop={4}
+          >
+            <Glass radius={20} shadow={false} contentStyle={styles.round}>
+              <Icon name="search" size={19} color={colors.textPrimary} />
+            </Glass>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              router.push("/notifications");
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={
+              unread > 0
+                ? `Notifications, ${String(unread)} new`
+                : anyNew
+                  ? "Notifications, something new"
+                  : "Notifications"
+            }
+            hitSlop={4}
+          >
+            <Glass radius={20} shadow={false} contentStyle={styles.round}>
+              <Icon name="bell" size={19} color={colors.textPrimary} />
+            </Glass>
+            <CountBadge count={unread} dot={anyNew} style={styles.bellBadge} />
+          </Pressable>
+        </View>
         <Pressable
           onPress={() => {
             setSheet("menu");
@@ -150,15 +295,47 @@ function HomeContent() {
         </Pressable>
       </Animated.View>
 
+      {/* EVT-09: today's birthday or anniversary, once, with a sparkle. */}
+      {data.event?.daysAway === 0 &&
+      (data.event.kind === "birthday" || data.event.kind === "anniversary") ? (
+        <Animated.View {...enter()}>
+          <Pressable
+            onPress={() => {
+              const id = data.event?.id;
+              if (id !== undefined)
+                router.push({ pathname: "/moments/event/[id]", params: { id } });
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={`${data.event.title} is today. Open`}
+          >
+            <Glass
+              radius={radii.pill}
+              tint="garnet"
+              contentStyle={[styles.row, styles.capsule, { gap: spacing.sm }]}
+            >
+              <AppText variant="headline">{data.event.emoji}</AppText>
+              <AppText variant="callout" weight="600" style={styles.flex}>
+                {data.event.title} is today
+              </AppText>
+              <Icon name="chevron-right" size={16} color={colors.accent} />
+            </Glass>
+          </Pressable>
+        </Animated.View>
+      ) : null}
+
       {/* The hero, and Noah's signal floating above it. */}
-      <Animated.View {...enter(1)} style={styles.center}>
-        <HeroOrb size={orb} pulse={pulse} />
+      <Animated.View {...enter()} style={styles.center}>
+        <HeroOrb
+          size={orb}
+          width={heroWidth}
+          pulse={pulse}
+          look={looks.garnet}
+          shortcuts={prefs?.ring === false ? [] : shortcuts}
+        />
         {incoming === null ? null : (
           <Animated.View
             key={incoming.id}
-            {...(reduceMotion
-              ? {}
-              : { entering: FadeInUp.springify().damping(16), exiting: FadeOutUp })}
+            {...(reduceMotion ? {} : { entering: ENTER, exiting: EXIT })}
             accessibilityLiveRegion="polite"
             style={styles.incoming}
           >
@@ -175,37 +352,44 @@ function HomeContent() {
         )}
       </Animated.View>
 
-      {/* Hold-to-send signals. */}
-      <Animated.View {...enter(2)} style={{ gap: spacing.md }}>
-        <View style={styles.signals}>
-          {QUICK_SIGNALS.map((s) => (
-            <SignalButton
-              key={s.id}
-              emoji={s.emoji}
-              word={s.word}
-              label={signalLabel(s.id)}
-              partnerName={partner.name}
-              onSend={() => {
-                sendSignal(s.id);
+      {/* Hold-to-send signals, in one glass dock (P-66). */}
+      <Animated.View {...enter()}>
+        <Glass radius={radii.xl + 6} contentStyle={[styles.dock, { gap: spacing.sm }]}>
+          <AppText variant="caption" weight="600" color="textSecondary" style={styles.dockHint}>
+            Hold to send to {partner.name}
+          </AppText>
+          <View style={styles.signals}>
+            {QUICK_SIGNALS.map((s) => (
+              <SignalButton
+                key={s.id}
+                emoji={s.emoji}
+                word={s.word}
+                label={signalLabel(s.id)}
+                partnerName={partner.name}
+                onSend={() => {
+                  sendSignal(s.id);
+                }}
+              />
+            ))}
+            <Pressable
+              onPress={() => {
+                setSheet("more");
               }}
-            />
-          ))}
-          <Pressable
-            onPress={() => {
-              setSheet("more");
-            }}
-            accessibilityRole="button"
-            accessibilityLabel="More signals"
-            style={styles.moreCol}
-          >
-            <Glass radius={32} contentStyle={styles.more}>
-              <Icon name="plus" size={22} color={colors.textSecondary} />
-            </Glass>
-            <AppText variant="caption" color="textSecondary">
-              More
-            </AppText>
-          </Pressable>
-        </View>
+              accessibilityRole="button"
+              accessibilityLabel="More signals"
+              style={styles.moreCol}
+            >
+              <Glass radius={32} contentStyle={styles.more}>
+                <Icon name="plus" size={22} color={colors.textSecondary} />
+              </Glass>
+              <AppText variant="caption" color="textSecondary">
+                More
+              </AppText>
+            </Pressable>
+          </View>
+        </Glass>
+      </Animated.View>
+      <Animated.View {...enter()}>
         <Button
           label="Log a moment"
           onPress={() => {
@@ -214,116 +398,112 @@ function HomeContent() {
         />
       </Animated.View>
 
-      {/* Today: your own moments only. */}
-      <Animated.View {...enter(3)} style={{ gap: spacing.sm }}>
-        <AppText variant="headline">Today</AppText>
-        {data.moments.length === 0 ? (
-          <AppText variant="callout" color="textSecondary">
-            Your day starts here.
-          </AppText>
-        ) : (
-          data.moments.slice(0, 3).map((m) => (
-            <Glass
-              key={m.id}
-              radius={radii.lg}
-              shadow={false}
-              contentStyle={[styles.row, styles.moment, { gap: spacing.md }]}
-            >
-              <AppText variant="footnote" color="textTertiary" style={styles.time}>
-                {localTimeLabel(Temporal.Instant.from(m.at), me.zone)}
-              </AppText>
-              <AppText variant="body">{m.emoji}</AppText>
-              <AppText variant="callout" numberOfLines={1} style={styles.flex}>
-                {m.text}
-              </AppText>
-              {m.visibility !== "private" ? null : (
-                <View accessible accessibilityLabel="Only you" style={[styles.row, { gap: 2 }]}>
-                  <Icon name="lock" size={13} color={colors.textTertiary} />
-                  <AppText variant="caption" color="textTertiary">
-                    Only you
-                  </AppText>
-                </View>
-              )}
-            </Glass>
-          ))
-        )}
-      </Animated.View>
-
-      {/* One upcoming thing and one waiting thing, side by side. */}
-      {data.event === null && !data.waiting ? null : (
-        <Animated.View {...enter(4)}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: spacing.md }}
-          >
-            {data.event === null ? null : (
-              <Glass radius={radii.xl} contentStyle={[styles.card, { gap: spacing.xs }]}>
-                <AppText variant="title">{data.event.emoji}</AppText>
-                <AppText variant="callout" weight="600" numberOfLines={1}>
-                  {data.event.title}
-                </AppText>
-                <AppText variant="footnote" color="textSecondary">
-                  {daysLabel(data.event.daysAway)}
-                </AppText>
-              </Glass>
-            )}
-            {data.waiting ? (
-              <Pressable
-                onPress={() => {
-                  toast.show("Open When is designed next.");
-                }}
-                accessibilityRole="button"
-                accessibilityLabel="Something's waiting for you"
-              >
-                <Glass
-                  radius={radii.xl}
-                  tint="garnet"
-                  contentStyle={[styles.card, { gap: spacing.xs }]}
-                >
-                  <AppText variant="title">💜</AppText>
-                  <AppText variant="callout" weight="600">
-                    Something's waiting
-                  </AppText>
-                  <AppText variant="footnote" color="textSecondary">
-                    For you
-                  </AppText>
-                </Glass>
-              </Pressable>
-            ) : null}
-          </ScrollView>
-        </Animated.View>
-      )}
+      {/* Below Garnet (P-66): glass cards that are actually useful, each one the person can hide. */}
+      {cards.now ? (
+        <RightNowCard
+          index={4}
+          me={me}
+          partner={partner}
+          now={now}
+          km={distance}
+          onPress={() => {
+            router.push("/us");
+          }}
+        />
+      ) : null}
+      {cards.messages || (cards.upcoming && data.event !== null) ? (
+        <View style={[styles.row, styles.pair, { gap: spacing.md }]}>
+          {cards.messages ? (
+            <MessagesTile
+              index={5}
+              partner={partner}
+              unread={unreadMessages}
+              last={chat.data?.lastMessage ?? null}
+              onPress={() => {
+                router.push("/us/chat");
+              }}
+            />
+          ) : null}
+          {cards.upcoming && data.event !== null ? (
+            <UpcomingTile
+              index={6}
+              event={data.event}
+              onPress={() => {
+                const id = data.event?.id;
+                if (id !== undefined)
+                  router.push({ pathname: "/moments/event/[id]", params: { id } });
+              }}
+            />
+          ) : null}
+        </View>
+      ) : null}
+      {cards.letters || (cards.memory && data.memory !== null) ? (
+        <View style={[styles.row, styles.pair, { gap: spacing.md }]}>
+          {cards.letters ? (
+            <LettersTile
+              index={7}
+              count={data.waitingCount}
+              onOpen={() => {
+                router.push("/moments/open-when");
+              }}
+              onWrite={() => {
+                router.push("/moments/open-when/new");
+              }}
+            />
+          ) : null}
+          {cards.memory && data.memory !== null ? (
+            <MemoryTile
+              index={8}
+              memory={data.memory}
+              zone={me.zone}
+              onPress={() => {
+                const id = data.memory?.id;
+                if (id !== undefined)
+                  router.push({ pathname: "/our-world/memory/[id]", params: { id } });
+              }}
+            />
+          ) : null}
+        </View>
+      ) : null}
+      {cards.today ? (
+        <TodayCard
+          index={9}
+          zone={me.zone}
+          moments={data.moments}
+          onPress={() => {
+            router.push("/days");
+          }}
+        />
+      ) : null}
 
       <LogSheet
         visible={sheet === "log"}
         partnerName={partner.name}
         saving={log.isPending}
-        onSave={(moment) => {
-          log.mutate(moment, {
+        onSave={({ input, draft }) => {
+          // Saved through Days, so the kind, picture, feeling, activity and place are all kept.
+          log.mutate(input, {
             onSuccess: () => {
               setSheet(null);
+              if (draft) {
+                toast.show("Kept as a draft.");
+                return;
+              }
               sparkle();
               toast.show(
-                moment.share ? `Shared with ${partner.name}.` : "Kept private.",
+                input.visibility === "shared"
+                  ? `Shared with ${partner.name}.`
+                  : input.visibility === "afterReveal"
+                    ? "Saved for when your days meet."
+                    : "Kept private.",
                 "success",
               );
             },
             onError,
           });
         }}
-        onClose={(unsaved) => {
+        onClose={() => {
           setSheet(null);
-          if (unsaved === null) return;
-          log.mutate(
-            { ...unsaved, share: false },
-            {
-              onSuccess: () => {
-                toast.show("Kept as a draft.");
-              },
-              onError,
-            },
-          );
         }}
       />
       <MoreSheet
@@ -344,7 +524,7 @@ function HomeContent() {
         }}
         onSettings={() => {
           setSheet(null);
-          toast.show("Settings are designed next.");
+          router.push("/settings");
         }}
         onSignOut={() => {
           setSheet("signout");
@@ -370,6 +550,11 @@ export function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  round: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
+  bellBadge: { position: "absolute", top: -6, right: -8 },
+  dock: { paddingTop: 12, paddingBottom: 14, paddingHorizontal: 14 },
+  dockHint: { textAlign: "center" },
+  pair: { alignItems: "stretch" },
   fill: { flex: 1, alignItems: "center", justifyContent: "center" },
   flex: { flex: 1 },
   row: { flexDirection: "row", alignItems: "center" },

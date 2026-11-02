@@ -1,7 +1,8 @@
 import { StyleSheet, View } from "react-native";
-import Animated, { FadeInDown, FadeOut } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { AppText } from "@/components/ui/AppText";
 import { useTheme } from "@/theme/ThemeProvider";
+import { ENTER, EXIT } from "@/theme/transitions";
 
 export interface SpeechBubbleProps {
   speakerName: string;
@@ -14,12 +15,12 @@ export interface SpeechBubbleProps {
 
 /** A figure's speech bubble. Announced politely to screen readers; never steals focus. */
 export function SpeechBubble({ speakerName, line, anchor, lineKey }: SpeechBubbleProps) {
-  const { colors, radii, spacing, motion, reduceMotion, elevation } = useTheme();
+  const { colors, radii, spacing, reduceMotion, elevation } = useTheme();
   const animations = reduceMotion
     ? {}
     : {
-        entering: FadeInDown.duration(motion.duration.standard).springify().damping(16),
-        exiting: FadeOut.duration(motion.duration.quick),
+        entering: ENTER,
+        exiting: EXIT,
       };
   const left = `${Math.round(Math.min(0.85, Math.max(0.15, anchor)) * 100)}%` as const;
   return (
@@ -59,7 +60,7 @@ export function SpeechBubble({ speakerName, line, anchor, lineKey }: SpeechBubbl
 
 const styles = StyleSheet.create({
   wrap: { position: "absolute", top: 12, left: 0, right: 0 },
-  bubble: { borderWidth: StyleSheet.hairlineWidth, alignSelf: "stretch" },
+  bubble: { alignSelf: "stretch" },
   tail: {
     position: "absolute",
     bottom: -7,

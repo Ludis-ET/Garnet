@@ -20,6 +20,8 @@ Expo ships breaking changes every SDK. Before touching an Expo, EAS or React Nat
 
 Never create or edit `ios/` or `android/`: they are generated (Continuous Native Generation); configure native behaviour in `app.json` and config plugins. Libraries with native code need a development build (`npx expo run:android`, or EAS for iOS), not Expo Go.
 
+**Android test APK and widgets (P-73):** build with `pnpm --filter @garnet/mobile apk` (local, no cloud). Android-only code lives in `*.android.ts` files beside a no-op default (`src/widgets/publish.ts`, `register.ts`, `src/data/mock/storage.ts`), so web, iOS and Jest never load the widget library. Widget code may read only the snapshot from `src/widgets/snapshot.ts`; never pass demo state, names or words to a widget.
+
 ## Structure
 
 ```
@@ -27,7 +29,7 @@ src/
   app/            Expo Router routes ONLY (every file is a screen; _layout.tsx defines navigators)
   features/<area> Screens' building blocks, hooks and feature components (one folder per prompt area)
   features/figures Figures: data (moods, motion, occasions, scenes), art/ (image lookup, particles), FigureStage
-  features/{auth,pairing,setup,home,days,us,tabs} Designed pages (P-47 to P-56); tabs = the floating glass tab bar
+  features/{auth,pairing,setup,home,days,us,chat,openWhen,moments,events,memories,companions,tabs} Designed pages (P-47 to P-60); companions = Ruby/Sapphire watchers and looks (P-57); tabs = the floating glass tab bar
   components/
     ui/           Shared primitives (Daylight Glass, P-48): AppText, Glass, GlassScreen, Button, TextField, FieldGroup, ActionSheet, Sheet (draggable glass sheet + SheetAction), GlassChip, Toast, Notice, ProgressBar, Checklist, …
     character/    CharacterSlot + characterAssets registry (the only way to show Ruby/Sapphire/Garnet)
@@ -53,7 +55,7 @@ src/
    - Notification and widget previews are generic by default.
    - Never show "seen", "read" or "delivered" unless it is genuinely known (read receipts are U-35: off by default).
    - UI concealment is **not** authorization; never describe it as security or encryption.
-4. **Simulated means labelled.** Fake sends, emails, invites and uploads show a "Simulated" affordance where a reviewer could mistake them for real.
+4. **Simulated means labelled.** Fake sends, emails, invites and uploads show a "Simulated" affordance where a reviewer could mistake them for real. **Owner direction P-75:** outside sign-in and pairing, these labels show only while testing tools are on (seven taps on the version in Settings › About); the one standing note is "Preview build: everything stays on this phone." in About. Sign-in and pairing keep their labels.
 5. **Characters only via `FigureStage` or `CharacterSlot`** (P-30, P-31, P-44, P-45, U-10, U-26). Both show the owner's images from `assets/characters/` (git-ignored) by the naming scheme in its README, and a neutral placeholder when an image is missing; every screen must look complete with the placeholder. Agents may process the owner's files (cut out, crop, rename) but never draw, generate, download or trace character art, and never quote the show. Moods stay warm or neutral (no sad, angry or abandoned reactions). Rights are unresolved (U-10): never call the images licensed.
 6. **Copy** follows [voice-and-copy.md](../../docs/ux/voice-and-copy.md) and the spec's A4/A5 tables: no guilt, scores, streaks, rankings or day-apart counters; use names, not pronouns.
 7. **Accessibility:** every control has a role and label; touch targets ≥ 48 pt (`touchTarget`); never colour alone; font scaling stays enabled; focus order is logical.

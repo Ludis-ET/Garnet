@@ -68,3 +68,10 @@ Garnet prototype affordances: a small "Simulated" badge style for fake sends and
 developer settings panel (simulate offline, simulate failures, latency slider, reset demo data),
 and the notification/email preview lab entry. Clearly secondary, never mistaken for real features.
 ```
+
+## Built (P-70)
+
+- **SYS-03:** skeletons in glass (timeline, grid, detail) on the main screens, still under reduced motion, with "Still working on it…" after 3 s.
+- **SYS-04:** a calm error state with Try again on Home and Us.
+- **SYS-01, SYS-02:** a live board under Settings › Prototype › Overlays & states, with every overlay (tap outside to close), every toast, loading, error, unavailable and empty states.
+- **SYS-05:** badges are this person's own counts. The bell never counts emotional signals; a new signal only lights a dot.

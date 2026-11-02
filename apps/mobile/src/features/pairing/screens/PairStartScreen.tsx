@@ -5,7 +5,7 @@
  */
 import { Redirect, useRouter } from "expo-router";
 import { StyleSheet, useWindowDimensions, View } from "react-native";
-import Animated, { FadeInDown } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { AppText } from "@/components/ui/AppText";
 import { GlassScreen } from "@/components/ui/GlassScreen";
 import { useToast } from "@/components/ui/Toast";
@@ -15,6 +15,7 @@ import { useTheme } from "@/theme/ThemeProvider";
 import { ChoiceCard } from "../components/ChoiceCard";
 import { LightPath } from "../components/LightPath";
 import { useCreateInvite, usePairingStatus } from "../usePairing";
+import { ENTER } from "@/theme/transitions";
 
 export function PairStartScreen() {
   const router = useRouter();
@@ -23,8 +24,7 @@ export function PairStartScreen() {
   const { width } = useWindowDimensions();
   const status = usePairingStatus();
   const create = useCreateInvite();
-  const enter = (delay: number) =>
-    reduceMotion ? {} : { entering: FadeInDown.delay(delay).springify().damping(18) };
+  const enter = () => (reduceMotion ? {} : { entering: ENTER });
 
   if (status.data?.kind === "paired") return <Redirect href="/pair/already" />;
   if (status.data?.kind === "reviewing") return <Redirect href="/pair/review" />;
@@ -50,14 +50,14 @@ export function PairStartScreen() {
       <View style={styles.center}>
         <LightPath state="waiting" width={Math.min(width, 440) - spacing.gutter * 2} />
       </View>
-      <Animated.View {...enter(120)} style={{ gap: spacing.sm }}>
+      <Animated.View {...enter()} style={{ gap: spacing.sm }}>
         <AppText variant="largeTitle">Create our space</AppText>
         <AppText variant="body" color="textSecondary">
           Just the two of you.
         </AppText>
       </Animated.View>
       <View style={{ gap: spacing.md }}>
-        <Animated.View {...enter(200)}>
+        <Animated.View {...enter()}>
           <ChoiceCard
             icon="send"
             tint="ruby"
@@ -67,7 +67,7 @@ export function PairStartScreen() {
             onPress={invite}
           />
         </Animated.View>
-        <Animated.View {...enter(260)}>
+        <Animated.View {...enter()}>
           <ChoiceCard
             icon="key"
             tint="sapphire"

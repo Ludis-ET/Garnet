@@ -1,10 +1,11 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { StyleSheet, useColorScheme, View } from "react-native";
-import Animated, { FadeIn } from "react-native-reanimated";
+import { Platform, StyleSheet, useColorScheme, View } from "react-native";
+import Animated from "react-native-reanimated";
 import type { AccentIntensity, Appearance } from "@/data/fixtures/demoProfile";
 import type { GemSide } from "@/domain/identity";
 import { useTheme } from "@/theme/ThemeProvider";
-import { colorsFor, palette } from "@/theme/tokens";
+import { colorsFor, frosted, palette } from "@/theme/tokens";
+import { ENTER } from "@/theme/transitions";
 
 /**
  * SETUP-06 live preview: a tiny Garnet screen in a glass phone frame, drawn with the chosen
@@ -23,7 +24,9 @@ export function LookPreview({
   const { radii, reduceMotion } = useTheme();
   const system = useColorScheme();
   const scheme = appearance === "system" ? (system === "dark" ? "dark" : "light") : appearance;
-  const c = colorsFor(scheme, side ?? "garnet");
+  const base = colorsFor(scheme, side ?? "garnet");
+  // The same frosted glass the app uses on Android (P-74).
+  const c = Platform.OS === "android" ? frosted(base, scheme) : base;
   const rich = accent === "rich";
   const W = 200;
   const H = 300;
@@ -52,7 +55,7 @@ export function LookPreview({
     >
       <Animated.View
         key={`${scheme}-${side ?? "g"}-${accent}`}
-        {...(reduceMotion ? {} : { entering: FadeIn.duration(260) })}
+        {...(reduceMotion ? {} : { entering: ENTER })}
         style={[
           styles.screen,
           { width: W, height: H, borderRadius: radii.xl + 8, backgroundColor: c.background },
@@ -118,7 +121,6 @@ const styles = StyleSheet.create({
     marginTop: 22,
     padding: 12,
     borderRadius: 16,
-    borderWidth: 1,
     gap: 6,
   },
   small: { marginTop: 10 },

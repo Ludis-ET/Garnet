@@ -1,11 +1,12 @@
 import { StyleSheet, View } from "react-native";
-import Animated, { FadeInDown } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { Temporal } from "temporal-polyfill";
 import { AppText } from "@/components/ui/AppText";
 import type { EntryView } from "@/data/repositories/types";
 import { localTimeLabel } from "@/domain/identity";
 import { useTheme } from "@/theme/ThemeProvider";
 import { EntryCard } from "./EntryCard";
+import { ENTER } from "@/theme/transitions";
 
 export interface TimelineHandlers {
   onOpen: (entry: EntryView) => void;
@@ -13,13 +14,11 @@ export interface TimelineHandlers {
   onRetry?: (entry: EntryView) => void;
 }
 
-function entering(i: number, reduceMotion: boolean) {
+function entering(reduceMotion: boolean) {
   return reduceMotion
     ? {}
     : {
-        entering: FadeInDown.delay(Math.min(i, 8) * 50)
-          .springify()
-          .damping(18),
+        entering: ENTER,
       };
 }
 
@@ -45,7 +44,7 @@ export function Timeline({
   return (
     <View>
       {entries.map((e, i) => (
-        <Animated.View key={e.id} {...entering(i, reduceMotion)} style={styles.row}>
+        <Animated.View key={e.id} {...entering(reduceMotion)} style={styles.row}>
           <AppText variant="footnote" color="textTertiary" style={styles.time}>
             {localTimeLabel(Temporal.Instant.from(e.at), viewerZone)}
           </AppText>
@@ -116,7 +115,7 @@ export function MergedTimeline({
   return (
     <View>
       <View style={[styles.center, { backgroundColor: colors.garnet }]} />
-      {entries.map((e, i) => {
+      {entries.map((e) => {
         const left = isLeft(e);
         const card = (
           <View style={[styles.half, { gap: spacing.xs }]}>
@@ -141,7 +140,7 @@ export function MergedTimeline({
         return (
           <Animated.View
             key={e.id}
-            {...entering(i, reduceMotion)}
+            {...entering(reduceMotion)}
             style={[styles.mergedRow, { paddingBottom: spacing.md }]}
           >
             {left ? card : <View style={styles.half} />}

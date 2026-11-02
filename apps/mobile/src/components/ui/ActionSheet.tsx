@@ -1,12 +1,13 @@
 import type { ReactNode } from "react";
 import { Modal, Pressable, StyleSheet, View } from "react-native";
-import Animated, { FadeIn, SlideInDown } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { Glass } from "@/components/ui/Glass";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { useTheme } from "@/theme/ThemeProvider";
+import { ENTER, SHEET } from "@/theme/transitions";
 
 export interface ActionSheetProps {
   visible: boolean;
@@ -55,10 +56,7 @@ export function ActionSheet({
       onRequestClose={onCancel}
       statusBarTranslucent
     >
-      <Animated.View
-        entering={FadeIn.duration(reduceMotion ? 120 : 220)}
-        style={[styles.fill, { backgroundColor: colors.scrim }]}
-      >
+      <Animated.View entering={ENTER} style={[styles.fill, { backgroundColor: colors.scrim }]}>
         <Pressable
           style={StyleSheet.absoluteFill}
           onPress={onCancel}
@@ -66,9 +64,7 @@ export function ActionSheet({
           accessibilityRole="button"
         />
         <Animated.View
-          {...(reduceMotion
-            ? {}
-            : { entering: SlideInDown.springify().damping(19).stiffness(190) })}
+          {...(reduceMotion ? {} : { entering: SHEET })}
           accessibilityViewIsModal
           style={[
             styles.sheet,

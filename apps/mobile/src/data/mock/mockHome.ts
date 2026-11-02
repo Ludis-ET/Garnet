@@ -3,10 +3,74 @@ import { EMPTY_PAIRING } from "@/data/fixtures/demoPairing";
 import { newProfile } from "@/data/fixtures/demoProfile";
 import type { HomeRepository, HomeToday, MomentView } from "@/data/repositories/types";
 import type { DemoEntry } from "@/data/fixtures/demoDays";
-import { daysUntil, nextOccurrence, todayIn } from "@/domain/home";
+import type { DemoState } from "@/data/fixtures/demo";
+import type { CompanionSource } from "@/data/repositories/types";
+import type { SpecialDay } from "@/domain/companion";
+import { nextDate } from "@/domain/events";
+import { daysUntil, todayIn } from "@/domain/home";
 import { viewLetter } from "@/domain/openWhen";
 import type { MockStore } from "./MockStore";
-import { entryInstant } from "./viewer";
+import { memoryDate } from "./mockMemories";
+import { entryInstant, viewerOf } from "./viewer";
+
+/** Signals older than this no longer colour the characters. */
+const SIGNAL_HOURS = 3;
+
+/**
+ * What the characters reflect (P-57). Own moments count whatever their visibility (they are the
+ * viewer's own); the partner's count only when shared, so drafts and "after our days meet"
+ * moments never show through a character (§4).
+ */
+export function companionsOf(
+  s: DemoState,
+  at: Temporal.Instant,
+): { me: CompanionSource; partner: CompanionSource; special: SpecialDay | null } {
+  const v = viewerOf(s);
+  const feelingOf = (authorId: string, zone: string, mine: boolean) => {
+    const today = todayIn(at, zone);
+    const latest = s.days.entries
+      .filter((e) => e.authorId === authorId && e.deleted !== true && e.mood !== undefined)
+      .filter((e) => mine || e.visibility === "shared")
+      .map((e) => ({ e, when: entryInstant(e, zone, at) }))
+      .filter(({ when }) => Temporal.Instant.compare(when, at) <= 0)
+      .filter(({ when }) => todayIn(when, zone).equals(today))
+      .sort((a, b) => Temporal.Instant.compare(b.when, a.when))[0];
+    return latest?.e.mood ?? null;
+  };
+  const recent = (events: DemoState["home"]["sent"]) => {
+    const since = at.subtract({ hours: SIGNAL_HOURS });
+    const latest = events
+      .map((e) => ({
+        e,
+        when:
+          e.at === null ? at.subtract({ minutes: e.minutesAgo ?? 0 }) : Temporal.Instant.from(e.at),
+      }))
+      .filter(({ when }) => Temporal.Instant.compare(when, since) >= 0)
+      .sort((a, b) => Temporal.Instant.compare(b.when, a.when))[0];
+    return latest?.e.signal ?? null;
+  };
+  const today = todayIn(at, v.me.zone);
+  const special =
+    s.moments.events
+      .filter((e) => e.deleted !== true && (e.kind === "birthday" || e.kind === "anniversary"))
+      .find((e) => {
+        if (e.date === null) return false;
+        return nextDate(Temporal.PlainDate.from(e.date), e.repeats, today)?.equals(today) === true;
+      })?.kind ?? null;
+  return {
+    me: {
+      zone: v.me.zone,
+      feeling: feelingOf(v.userId, v.me.zone, true),
+      signal: recent(s.home.sent),
+    },
+    partner: {
+      zone: v.partner.zone,
+      feeling: feelingOf(v.partnerId, v.partner.zone, false),
+      signal: recent(s.home.incoming),
+    },
+    special: special === "birthday" || special === "anniversary" ? special : null,
+  };
+}
 
 /**
  * Mock adapter for HomeRepository (HOME-01 to HOME-05). Only the viewer's own moments are
@@ -56,29 +120,54 @@ export function createMockHome(
             Temporal.Instant.compare(Temporal.Instant.from(b.at), Temporal.Instant.from(a.at)),
           );
 
-        const upcoming = s.home.events
-          .map((e) => ({ e, date: nextOccurrence(e.monthDay, today) }))
+        // The next event from Events (EVT-01): one-offs resolve "N days from today".
+        const upcoming = s.moments.events
+          .filter((e) => e.deleted !== true)
+          .map((e) => {
+            const first =
+              e.date === null
+                ? today.add({ days: e.inDays ?? 0 })
+                : Temporal.PlainDate.from(e.date);
+            return { e, date: nextDate(first, e.repeats, today) };
+          })
+          .filter((x): x is { e: (typeof x)["e"]; date: Temporal.PlainDate } => x.date !== null)
           .sort((a, b) => Temporal.PlainDate.compare(a.date, b.date))[0];
 
-        const waiting = s.letters.some((l) => {
+        const waitingCount = s.letters.filter((l) => {
           const v = viewLetter(l, userId, at);
           return v.kind === "sealed" && v.viewerIsRecipient && v.eligible;
-        });
+        }).length;
+        const waiting = waitingCount > 0;
+        // A different memory each day, from the ones you keep together.
+        const kept = s.moments.memories.filter((m) => m.deleted !== true);
+        const pick = kept[today.dayOfYear % Math.max(1, kept.length)];
+        const memory =
+          pick === undefined
+            ? null
+            : {
+                id: pick.id,
+                title: pick.title,
+                art: pick.media === null || pick.media.type === "voice" ? null : pick.media.art,
+                date: memoryDate(pick, today).toString(),
+              };
 
         const latest = [...s.home.incoming].reverse().find((i) => !s.home.dismissed.includes(i.id));
 
         return {
-          me: { name: profile.nickname.trim() || profile.displayName, side: profile.side, zone },
-          partner: {
-            name: partnerName,
-            side: s.profiles.partner.side,
-            zone: s.profiles.partner.timeZone,
-          },
+          me: viewerOf(s).me,
+          partner: { ...viewerOf(s).partner, name: partnerName },
+          partnerActive:
+            (s.pairing.byUser[userId] ?? EMPTY_PAIRING).partnerName !== null &&
+            s.profiles.partner.ready,
           moments,
+          waitingCount,
+          memory,
           event:
             upcoming === undefined
               ? null
               : {
+                  id: upcoming.e.id,
+                  kind: upcoming.e.kind,
                   title: upcoming.e.title,
                   emoji: upcoming.e.emoji,
                   date: upcoming.date.toString(),
@@ -86,6 +175,7 @@ export function createMockHome(
                 },
           waiting,
           incoming: latest === undefined ? null : { id: latest.id, signal: latest.signal },
+          companions: companionsOf(s, at),
         };
       }),
 

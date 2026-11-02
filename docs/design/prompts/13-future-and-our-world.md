@@ -78,3 +78,11 @@ Garnet "Our soundtrack": list of songs with artwork thumbnail, title, artist, an
 Detail opens an external link card ("Open in your music app"). Add-song form: link, title,
 artist, note. No in-app audio.
 ```
+
+## Built (P-69, Daylight Glass)
+
+- **Our World:** three glass doors under the story: When we meet again, Places and Soundtrack, each with how many things it holds.
+- **FUT-01 to FUT-03:** plans by date or by theme, finished plans folded away, a form (name, note, theme, picture, place, Someday / date / range), and "Mark as done together" with the together moment (WORLD-03), then "Add a photo of the moment".
+- **PLACE-01:** an illustrated map ("never live location"), "📍 I'm here today", and a detail sheet.
+- **SONG-01:** songs with a note and who added them, an add sheet that only accepts https links, and an "Open in your music app" card.
+- **Not built yet:** WORLD-01's crystal island and WORLD-02's customisation.

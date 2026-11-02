@@ -4,6 +4,7 @@ import { useReducedMotion } from "react-native-reanimated";
 import {
   colorsFor,
   elevation,
+  frosted,
   gradients,
   motion,
   radii,
@@ -15,6 +16,8 @@ import {
 } from "./tokens";
 
 export type SchemePreference = "system" | ColorScheme;
+/** SETUP-06 accent intensity: "rich" washes the canvas in the person's side colour. */
+export type Intensity = "subtle" | "rich";
 
 export interface Theme {
   scheme: ColorScheme;
@@ -31,6 +34,8 @@ export interface Theme {
   reduceMotion: boolean;
   /** True when the OS asks for less transparency (iOS): glass panes become solid (P-48). */
   reduceTransparency: boolean;
+  /** The person's chosen accent intensity (SETUP-06). */
+  intensity: Intensity;
 }
 
 interface ThemeControls {
@@ -38,6 +43,9 @@ interface ThemeControls {
   schemePreference: SchemePreference;
   setSchemePreference: (preference: SchemePreference) => void;
   setSide: (side: Side) => void;
+  setIntensity: (intensity: Intensity) => void;
+  /** Calm motion in the app whatever the phone says (Settings › Motion). */
+  setForceReduceMotion: (on: boolean) => void;
 }
 
 const ThemeContext = createContext<ThemeControls | null>(null);
@@ -47,11 +55,17 @@ function buildTheme(
   side: Side,
   reduceMotion: boolean,
   reduceTransparency: boolean,
+  intensity: Intensity = "subtle",
 ): Theme {
   return {
+    intensity,
     scheme,
     side,
-    colors: colorsFor(scheme, side),
+    // Android has no live backdrop blur here, so its glass is frosted (P-74).
+    colors:
+      Platform.OS === "android"
+        ? frosted(colorsFor(scheme, side), scheme)
+        : colorsFor(scheme, side),
     spacing,
     radii,
     typography,
@@ -94,11 +108,15 @@ export function ThemeProvider({
   initialSchemePreference?: SchemePreference;
 }) {
   const system = useColorScheme();
-  const reduceMotion = useReducedMotion();
+  const systemReduceMotion = useReducedMotion();
+  // Settings › Motion can calm Garnet even when the phone doesn't ask to (P-66).
+  const [forceReduceMotion, setForceReduceMotion] = useState(false);
+  const reduceMotion = systemReduceMotion || forceReduceMotion;
   const reduceTransparency = useReduceTransparency();
   const [schemePreference, setSchemePreference] =
     useState<SchemePreference>(initialSchemePreference);
   const [side, setSide] = useState<Side>(initialSide);
+  const [intensity, setIntensity] = useState<Intensity>("subtle");
 
   // When following the system and it gives no answer, use light (P-48).
   const scheme: ColorScheme =
@@ -106,12 +124,14 @@ export function ThemeProvider({
 
   const value = useMemo<ThemeControls>(
     () => ({
-      theme: buildTheme(scheme, side, reduceMotion, reduceTransparency),
+      theme: buildTheme(scheme, side, reduceMotion, reduceTransparency, intensity),
       schemePreference,
       setSchemePreference,
       setSide,
+      setIntensity,
+      setForceReduceMotion,
     }),
-    [scheme, side, reduceMotion, reduceTransparency, schemePreference],
+    [scheme, side, reduceMotion, reduceTransparency, schemePreference, intensity],
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
@@ -128,8 +148,9 @@ export function useTheme(): Theme {
 }
 
 export function useThemeSettings(): Omit<ThemeControls, "theme"> {
-  const { schemePreference, setSchemePreference, setSide } = useThemeControls();
-  return { schemePreference, setSchemePreference, setSide };
+  const { schemePreference, setSchemePreference, setSide, setIntensity, setForceReduceMotion } =
+    useThemeControls();
+  return { schemePreference, setSchemePreference, setSide, setIntensity, setForceReduceMotion };
 }
 
 /**
@@ -138,10 +159,13 @@ export function useThemeSettings(): Omit<ThemeControls, "theme"> {
  */
 export function SideScope({ side, children }: { side: Side; children: ReactNode }) {
   const controls = useThemeControls();
-  const { scheme, reduceMotion, reduceTransparency } = controls.theme;
+  const { scheme, reduceMotion, reduceTransparency, intensity } = controls.theme;
   const value = useMemo<ThemeControls>(
-    () => ({ ...controls, theme: buildTheme(scheme, side, reduceMotion, reduceTransparency) }),
-    [controls, scheme, side, reduceMotion, reduceTransparency],
+    () => ({
+      ...controls,
+      theme: buildTheme(scheme, side, reduceMotion, reduceTransparency, intensity),
+    }),
+    [controls, scheme, side, reduceMotion, reduceTransparency, intensity],
   );
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
@@ -150,7 +174,8 @@ export function SideScope({ side, children }: { side: Side; children: ReactNode 
 export function useSideTheme(side: Side): Theme {
   const theme = useTheme();
   return useMemo(
-    () => buildTheme(theme.scheme, side, theme.reduceMotion, theme.reduceTransparency),
-    [theme.scheme, side, theme.reduceMotion, theme.reduceTransparency],
+    () =>
+      buildTheme(theme.scheme, side, theme.reduceMotion, theme.reduceTransparency, theme.intensity),
+    [theme.scheme, side, theme.reduceMotion, theme.reduceTransparency, theme.intensity],
   );
 }

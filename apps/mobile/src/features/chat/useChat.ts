@@ -7,6 +7,7 @@ export const CHAT_QUERY_KEYS = {
   summary: ["chat", "summary"] as const,
   messages: ["chat", "messages"] as const,
   settings: ["chat", "settings"] as const,
+  presence: ["chat", "presence"] as const,
   pinned: ["chat", "pinned"] as const,
   sharedMedia: ["chat", "sharedMedia"] as const,
   search: (q: string) => ["chat", "search", q] as const,
@@ -141,6 +142,11 @@ export function useRetryMessage() {
   });
 }
 
+export function useChatPresence() {
+  const { chat } = useRepositories();
+  return useQuery({ queryKey: CHAT_QUERY_KEYS.presence, queryFn: () => chat.presence() });
+}
+
 export function useChatSettings() {
   const { chat } = useRepositories();
   return useQuery({
@@ -157,6 +163,7 @@ export function useUpdateChatSettings() {
     mutationFn: (patch: Partial<ChatSettings>) => chat.updateSettings(patch),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.settings });
+      void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.presence });
     },
   });
 }
@@ -183,5 +190,40 @@ export function useSearchChat(query: string) {
     queryKey: CHAT_QUERY_KEYS.search(query),
     queryFn: () => chat.search(query),
     enabled: query.trim().length > 0,
+  });
+}
+
+export function useCancelUpload() {
+  const { chat } = useRepositories();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => chat.cancelUpload(id),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ["chat"] });
+    },
+  });
+}
+
+export function useMarkSaved() {
+  const { chat } = useRepositories();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => chat.markSaved(id),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: CHAT_QUERY_KEYS.messages });
+    },
+  });
+}
+
+/** Clears this person's own unread count (P-66). Never tells the partner anything. */
+export function useMarkChatRead() {
+  const { chat } = useRepositories();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => chat.markRead(),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ["chat"] });
+      void queryClient.invalidateQueries({ queryKey: ["inbox"] });
+    },
   });
 }

@@ -1,6 +1,20 @@
 import { Temporal } from "temporal-polyfill";
+import { DEMO_ME_ID } from "@/data/fixtures/demo";
+import { newProfile } from "@/data/fixtures/demoProfile";
 import { MockStore } from "../MockStore";
 import { createMockChat } from "../mockChat";
+
+/** The chat belongs to whoever is signed in (P-58), so the tests sign Selam in. */
+function signedInStore() {
+  const store = new MockStore({ latencyMs: 0 });
+  store.update((s) => ({
+    ...s,
+    auth: { ...s.auth, status: { kind: "signedIn", userId: DEMO_ME_ID, keepSignedIn: true } },
+    // Selam chose Ruby, so Noah is Sapphire (P-51, P-57).
+    profiles: { ...s.profiles, byUser: { [DEMO_ME_ID]: { ...newProfile("Selam"), side: "ruby" } } },
+  }));
+  return store;
+}
 
 describe("mockChat repository", () => {
   const fixedInstant = Temporal.Instant.from("2026-10-24T18:00:00Z");
@@ -9,7 +23,7 @@ describe("mockChat repository", () => {
   const localIdOf = () => `test-id-${++counter}`;
 
   it("returns summary with partner and counts", async () => {
-    const store = new MockStore({ latencyMs: 0 });
+    const store = signedInStore();
     const chat = createMockChat(store, now, localIdOf);
 
     const summary = await chat.getSummary();
@@ -21,7 +35,7 @@ describe("mockChat repository", () => {
   });
 
   it("sends a message and respects replyTo", async () => {
-    const store = new MockStore({ latencyMs: 0 });
+    const store = signedInStore();
     const chat = createMockChat(store, now, localIdOf);
 
     const sent = await chat.sendMessage({
@@ -39,7 +53,7 @@ describe("mockChat repository", () => {
   });
 
   it("edits a message", async () => {
-    const store = new MockStore({ latencyMs: 0 });
+    const store = signedInStore();
     const chat = createMockChat(store, now, localIdOf);
 
     const edited = await chat.editMessage("msg-chat-2", "Updated text");
@@ -48,7 +62,7 @@ describe("mockChat repository", () => {
   });
 
   it("handles delete for me and delete for everyone (CHAT-04)", async () => {
-    const store = new MockStore({ latencyMs: 0 });
+    const store = signedInStore();
     const chat = createMockChat(store, now, localIdOf);
 
     // Delete for me
@@ -66,7 +80,7 @@ describe("mockChat repository", () => {
   });
 
   it("toggles reactions and pins", async () => {
-    const store = new MockStore({ latencyMs: 0 });
+    const store = signedInStore();
     const chat = createMockChat(store, now, localIdOf);
 
     // Toggle reaction
@@ -85,12 +99,12 @@ describe("mockChat repository", () => {
     expect(unpinned.pinned).toBe(false);
   });
 
-  it("manages settings and respects U-35 read receipts default off", async () => {
-    const store = new MockStore({ latencyMs: 0 });
+  it("manages settings: Seen starts unanswered, with no default (U-35, P-58)", async () => {
+    const store = signedInStore();
     const chat = createMockChat(store, now, localIdOf);
 
     const settings = await chat.getSettings();
-    expect(settings.readReceipts).toBe(false); // U-35
+    expect(settings.readReceipts).toBeNull(); // U-35: asked, never assumed
 
     const updated = await chat.updateSettings({ readReceipts: true });
     expect(updated.readReceipts).toBe(true);

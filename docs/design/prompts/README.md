@@ -6,7 +6,7 @@ Use them in your design tool of choice (Figma AI / Figma Make, Uizard, Galileo, 
 
 ## How to use a prompt
 
-1. Paste the master style once per session (or at the top of each prompt if your tool forgets context): **[v2 Daylight Glass](#master-style-v2--daylight-glass-p-48)** for pages already redesigned under P-48 to P-56 (01, 02, 03, 05, 06 and 07 so far), otherwise **[v1](#master-style-paste-first)**.
+1. Paste the master style once per session (or at the top of each prompt if your tool forgets context): **[v2 Daylight Glass](#master-style-v2--daylight-glass-p-48)** for pages already redesigned under P-48 to P-60 (01, 02, 03 and 05 to 11 so far), otherwise **[v1](#master-style-paste-first)**.
 2. Paste the page prompt. Each one names its frame, layout, content, states and the rules it must not break.
 3. Design **every state listed** for that page. A page is not done until its empty, loading, error and edge states exist.
 4. Export or link the frames and tell me the page ID (for example `HOME-01`). I'll implement it against the design, with tests.
@@ -30,7 +30,7 @@ The intended experience uses the **actual _Steven Universe_ characters Ruby, Sap
 
 > **Update (P-55):** the logo is the **Garnet mark** (Garnet's face from the owner's image in a glass disc with a ruby → violet → sapphire ring), not the crystal. Personal pages, sheets and forms show the viewer's own gem and a warm (Ruby) or cool (Sapphire) canvas; shared pages show Garnet and the mixed canvas.
 
-Owner direction **P-48** (2026-10-22): white, iOS-quiet, glassy, award-level polish with Duolingo-smooth, springy interaction. It applies to the pages redesigned so far ([01 — Welcome and account](./01-welcome-and-account.md) [02 — Pairing](./02-pairing.md), [03 — Identity and setup](./03-identity-and-setup.md), [05 — Home](./05-home.md), [06 — Days and logging](./06-days-and-logging.md) and [07 — Us](./07-us-emotional.md), P-49, P-51, P-53, P-56); the other pages keep v1 until they are redesigned. Product rules, copy voice, privacy and accessibility from v1 all still apply.
+Owner direction **P-48** (2026-10-22): white, iOS-quiet, glassy, award-level polish with Duolingo-smooth, springy interaction. It applies to the pages redesigned so far ([01 — Welcome and account](./01-welcome-and-account.md) [02 — Pairing](./02-pairing.md), [03 — Identity and setup](./03-identity-and-setup.md), [05 — Home](./05-home.md), [06 — Days and logging](./06-days-and-logging.md), [07 — Us](./07-us-emotional.md), [08 — Chat](./08-chat.md), [09 — Open When](./09-open-when.md), [10 — Memories](./10-memories.md) and [11 — Events and chapters](./11-events-and-chapters.md), P-49, P-51, P-53, P-56 to P-60); the other pages keep v1 until they are redesigned. Product rules, copy voice, privacy and accessibility from v1 all still apply.
 
 ```text
 GARNET — MASTER STYLE v2 "DAYLIGHT GLASS"

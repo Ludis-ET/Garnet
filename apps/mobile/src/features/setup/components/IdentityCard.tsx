@@ -109,7 +109,6 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   chip: {
     borderRadius: 999,
-    borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },

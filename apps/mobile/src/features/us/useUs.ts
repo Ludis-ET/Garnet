@@ -47,3 +47,13 @@ export function useRespond() {
     us.respond(input.id, input.response),
   );
 }
+
+/** Keeps (or forgets) this person's rounded location for the distance (P-66). */
+export function useSaveLocation() {
+  const { us } = useRepositories();
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (point: { lat: number; lon: number } | null) => us.saveLocation(point),
+    onSettled: () => client.invalidateQueries({ queryKey: usKeys.all }),
+  });
+}

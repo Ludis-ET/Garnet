@@ -38,6 +38,10 @@ const mockRouter = {
 };
 
 jest.mock("expo-router", () => ({
+  // goBack() uses the module router (a getter: the factory runs before mockRouter exists).
+  get router() {
+    return mockRouter;
+  },
   useRouter: () => mockRouter,
   useLocalSearchParams: () => ({}),
   Redirect: ({ href }: { href: string }) => {

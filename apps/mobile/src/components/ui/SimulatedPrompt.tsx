@@ -1,9 +1,11 @@
 import { Modal, Pressable, StyleSheet, View } from "react-native";
-import Animated, { FadeIn, ZoomIn } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { AppText } from "@/components/ui/AppText";
 import { Glass } from "@/components/ui/Glass";
 import { SimulatedBadge } from "@/components/ui/SimulatedBadge";
 import { useTheme } from "@/theme/ThemeProvider";
+import { ENTER, POP } from "@/theme/transitions";
+import { useTestingTools } from "@/features/prototype/devTools";
 
 /**
  * A stand-in for an OS permission prompt (SETUP-04, SETUP-07). Styled like an iOS alert but
@@ -24,6 +26,8 @@ export function SimulatedPrompt({
   onDeny: () => void;
 }) {
   const { colors, radii, spacing, reduceMotion } = useTheme();
+  // Testing tools only (P-75); the app itself looks finished.
+  const tools = useTestingTools();
   return (
     <Modal
       visible={visible}
@@ -33,11 +37,11 @@ export function SimulatedPrompt({
       statusBarTranslucent
     >
       <Animated.View
-        entering={FadeIn.duration(160)}
+        entering={ENTER}
         style={[styles.fill, { backgroundColor: colors.scrim, padding: spacing.xxl }]}
       >
         <Animated.View
-          {...(reduceMotion ? {} : { entering: ZoomIn.springify().damping(16).stiffness(240) })}
+          {...(reduceMotion ? {} : { entering: POP })}
           accessibilityViewIsModal
           accessibilityRole="alert"
           style={styles.card}
@@ -50,7 +54,7 @@ export function SimulatedPrompt({
               <AppText variant="footnote" color="textSecondary" style={styles.center}>
                 {body}
               </AppText>
-              <SimulatedBadge text="Simulated system prompt" />
+              {tools ? <SimulatedBadge text="Simulated system prompt" /> : null}
             </View>
             {(["Allow", "Don't Allow"] as const).map((label) => (
               <Pressable

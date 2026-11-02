@@ -1,82 +1,55 @@
 # 09 — Open When
 
-Spec: §22, §61, A1 "Open When", A2 "Open When list/locked", "Open When create/open", A3 "Open letter confirmation", A8, A9. **Privacy rule on every surface:** a sealed letter shows only its safe prompt/title, sender, status and eligibility. Never the body, attachments, a peek, a blur of the text or a character count — not in lists, search, notifications, emails, widgets, accessibility labels or route params. State model: `draft → sealed → opening → opened` (+ removed). The app enforces this in its views (`apps/mobile/src/domain/openWhen.ts`), but UI hiding is **not** authorization; a server fix is a known blocker (B-90).
+Spec: §22, §61, A1 "Open When", A2, A3 "Open letter confirmation", A8, A9.
 
-### OPEN-01 · Open When library
+**Design language: [Daylight Glass](./README.md#master-style-v2--daylight-glass-p-48), liquid pass, minimal.** Redesign: **P-59**. Letters are **glass-paper envelopes closed with a gem seal in the author's colour**, replacing the capsule motif.
 
-Route `/(tabs)/moments/open-when`
+**Privacy rule on every surface:** a sealed letter shows only its safe prompt, sender, status and eligibility. It never shows the body, attachments, a peek, blurred text or a count of any kind. This applies in lists, search, notifications, emails, widgets, accessibility labels and routes.
 
-```text
-Garnet Open When library, iPhone 393×852, dark. Large title "Open When". Segmented control
-"For me · From me". Grid of 2 columns of gem capsules (original 3D motif): ruby, sapphire or
-violet capsule per sender, each on a soft reflective floor, with the safe prompt underneath in
-the serif ("Open when you miss me"), sender name, and a status chip: "Sealed", "Ready to open"
-(gentle pulse) or "Opened". Floating "Write a letter" button.
-```
+- State model: `draft → sealed → opening → opened` (+ removed).
+- Hiding in the UI is not authorization; the server fix is blocker B-90.
+- Whether the author may re-read a sealed letter is open (**U-34**), so the body is never shown to them.
+- Who may delete a letter is open (**U-31**).
 
-**States:** populated · empty for me ("Letters from Noah will rest here until you need them.") · empty from me ("Leave something for the days apart.") · loading · offline · removed letter in list ("This item isn't available here.").
-**Never:** body text, a preview line, attachment counts or blurred text.
+## OPEN-01 · Letters (in Moments)
 
-### OPEN-02 · Create — prompt and category
+Routes `/(tabs)/moments` (the Open When segment) and `/(tabs)/moments/open-when`.
 
 ```text
-Garnet "Write an Open When letter" step 1, dark. Title "Open when…". Suggestion chips: you miss
-me, you have a terrible day, you can't sleep, you're homesick, you're angry with me, you need to
-laugh, you need motivation, on your first day at work, you need to hear my voice, you want to
-remember us — plus "Write your own". Selected chip shows the full prompt in the serif.
+"Moments" with a liquid segmented control "Events · Open When", then "For me · From me". Two
+columns of glass cards: an envelope (sealed: still; ready: the gem seal glows and the envelope
+floats; opened: flap up, letter showing; draft: dashed outline with a pencil), the prompt in
+serif ("Open when you miss me"), "From Noah", a status chip ("Ready to open", "Sealed",
+"Sealed for Noah", "Opened", "Draft"). A lip button "Write a letter".
 ```
 
-### OPEN-03 · Create — body and attachments
+**Empty states:** your character dreaming over a letter, with "Letters from Noah will rest here until you need them." or "Leave something for the days apart."
 
-```text
-Garnet letter editor, dark, writing-focused: paper-like surface with generous margins, serif
-body text, word count hidden, formatting kept minimal. Attachment row: photos, voice recording,
-video, song link (curated only). Autosave indicator "Draft saved on this device". Top right
-"Next".
-```
+## OPEN-02 to OPEN-08
 
-**States:** empty · writing · attachments added · draft saved · discard dialog.
+The create flow (prompt → letter → when it may open), the sealed letter, the opening storyboard, the opened letter and the unavailable state keep their structure. They now use the envelope:
 
-### OPEN-04 · Create — unlock condition and recipient preview
+- **Opening:** the flap lifts and the letter rises, driven by the opening progress; under reduced motion it cross-fades.
+- **Colour:** each envelope and its tints are in its author's colour from setup (P-57). Earlier code hard-coded the demo users' colours.
 
-```text
-Garnet "When can Noah open it?" step, dark. Options: "Anytime" (manual), "On a date and time"
-(picker showing both zones), "On an event" (pick from events). Then "What Noah will see before
-opening": a preview of the sealed capsule with only the prompt and "From Selam". Buttons
-"Save draft" and primary "Seal letter". Confirmation: "Once sealed, you can't edit it."
-```
+## OPEN-03 · The letter paper (P-62)
 
-### OPEN-05 · Sealed letter (recipient)
+- **Paper:** you write on a sheet of tinted, ruled paper (cream, rose, sky or lilac) with a margin line. The text sits on the rules.
+- **Wording:** it opens with "Dear Noah," and is signed "— Selam" (the setup names).
+- **Type:** a small toolbar picks the hand (serif, italic or clean). The ink is always dark on light paper, in both schemes. There is no outline and no word count.
+- **Attachments:** a strip under the paper holds photos, a voice note and a song. The author names the song; the app never quotes or plays a show song.
+- **Seal and discard:** both confirm in a glass sheet, not a system alert.
+- The "Open when…" prompt of your own is a glass text field.
 
-```text
-Garnet sealed letter detail, dark, cinematic. A single gem capsule centred, softly glowing seam,
-floating above a reflective floor. Prompt in large serif: "Open when you miss me". "From Noah ·
-sealed 30 Aug". Status: "Opens on 5 January · 06:00 for you" or, if eligible, primary "Open
-letter". No peek, no preview, no blurred text. Back button.
-```
+## OPEN-03 and OPEN-07 · The same paper, larger (P-71)
 
-**States:** locked until a date · eligible (gentle pulse + Open button) · event-locked ("Opens on your first day at work") · sender's view of their own sealed letter (prompt + "Sealed for Noah"; whether the author can re-read is **U-34** — design without the body).
+- The sheet is larger (21 pt on 36 pt rules) and **grows with each line**; it never scrolls inside itself.
+- The chosen paper and hand are saved with the letter, and the letter is **read on the same paper** once opened, with "Opened …" under the signature. Your own draft shows on its paper too.
+- A sealed letter never carries its paper or words (`viewLetter`). A letter surprise uses the same paper once opened.
 
-### OPEN-06 · Opening confirmation and animation
+## OPEN-02 and OPEN-04 · Glass forms (P-63)
 
-```text
-Garnet "Open this letter now?" dialog: the prompt, "From Noah", buttons "Not now" / "Open".
-Then the opening storyboard (5 frames, ≤ 1.5 s, skippable): capsule glows → seam splits → light
-spills out → halves rest apart → letter rises into view. [SAPPHIRE FIGURE] (pose: writing a
-letter) may appear small at the end. Reduced-motion version: cross-fade to the opened letter.
-```
-
-### OPEN-07 · Opened letter
-
-```text
-Garnet opened letter, dark. Paper-like surface, serif body text, author signature line
-"— Noah", opened time "Opened today at 21:04". Attachments below: photos gallery, voice note
-player with waveform, video, song link card. Actions: "Save as memory", "Reply with a thought".
-```
-
-### OPEN-08 · Unavailable, removed, access denied
-
-```text
-Garnet unavailable letter state, dark: soft empty capsule outline, "This item isn't available
-here." No details about why or what it contained. Button "Back to letters".
-```
+- **Frame:** the shared glass frame, with Back, "Step n of 3" over a progress bar, and a glass Next pill. The plain aurora sits behind it, never a colour flood.
+- **Step 1:** a large serif "Open when…" and a glass envelope preview that updates as you choose: "For Noah · from Selam". The suggested moments are glass chips, each with a small emoji. "Write your own…" opens a glass text field.
+- **Step 3:** each unlock option is a glass card with an emoji and a radio mark. The preview shows only the sealed envelope.
+- **Names:** every name on these screens is the real setup name, with nothing hard-coded. The opened letter is signed by its author, with the opening time on both clocks.

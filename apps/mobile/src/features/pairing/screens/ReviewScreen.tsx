@@ -6,7 +6,7 @@
 import { Redirect, useRouter } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
-import Animated, { FadeInDown } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { ActionSheet } from "@/components/ui/ActionSheet";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
@@ -19,6 +19,7 @@ import { serviceErrorMessage } from "@/features/auth/authUi";
 import { useTheme } from "@/theme/ThemeProvider";
 import { AvatarLink } from "../components/Avatar";
 import { useAcceptInvite, useDeclineInvite, usePairingStatus } from "../usePairing";
+import { ENTER } from "@/theme/transitions";
 
 export function ReviewScreen() {
   const router = useRouter();
@@ -77,10 +78,7 @@ export function ReviewScreen() {
     >
       <View style={[styles.center, { gap: spacing.xl, marginTop: spacing.xl }]}>
         <AvatarLink left={inviter} right={data.me} connected={false} />
-        <Animated.View
-          {...(reduceMotion ? {} : { entering: FadeInDown.delay(100).springify().damping(18) })}
-          style={{ gap: spacing.xs }}
-        >
+        <Animated.View {...(reduceMotion ? {} : { entering: ENTER })} style={{ gap: spacing.xs }}>
           <AppText variant="largeTitle" style={styles.centerText}>
             {inviter} invited you
           </AppText>

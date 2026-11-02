@@ -1,509 +1,289 @@
-import { router } from "expo-router";
-import { useState } from "react";
+/**
+ * CHAT-09 · Conversation details: the two of you, pinned messages, shared media, and each
+ * person's own settings. "Seen" works only when both turn it on (P-58, U-35 open); typing is
+ * shared unless turned off; message alerts are simulated. A shared page, so Garnet violet.
+ */
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
-import Animated, { FadeInDown } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
+import { CharacterSlot } from "@/components/character/CharacterSlot";
 import { AppText } from "@/components/ui/AppText";
+import { Glass } from "@/components/ui/Glass";
 import { GlassScreen } from "@/components/ui/GlassScreen";
-import { Icon } from "@/components/ui/Icon";
-import { IconButton } from "@/components/ui/IconButton";
-import { Segmented } from "@/components/ui/Segmented";
+import { Icon, type IconName } from "@/components/ui/Icon";
 import { Toggle } from "@/components/ui/Toggle";
+import { useToast } from "@/components/ui/Toast";
+import { messagePreview } from "@/domain/chat";
 import { formatDuration } from "@/domain/days";
+import { cityForZone, localTimeLabel } from "@/domain/identity";
+import { serviceErrorMessage } from "@/features/auth/authUi";
 import { MediaArt } from "@/features/days/components/MediaArt";
+import { FRAME_ASPECT } from "@/features/figures/art/figure";
+import { useHomeToday } from "@/features/home/useHome";
 import { useMediaPlayer } from "@/features/media/MediaPlayerContext";
 import { ProfileAvatar } from "@/features/setup/components/ProfileAvatar";
+import { useNow } from "@/features/setup/useNow";
 import { SideScope, useTheme } from "@/theme/ThemeProvider";
-import { ChatSearchModal } from "./components/ChatSearchModal";
-import { PinnedSheet } from "./components/PinnedSheet";
+import { gemOf } from "./components/Presence";
 import {
-  useChatMessages,
   useChatSettings,
-  useChatSummary,
   usePinnedMessages,
   useSharedMedia,
-  useTogglePin,
   useUpdateChatSettings,
 } from "./useChat";
+import { goBack } from "@/navigation/goBack";
+import { ENTER } from "@/theme/transitions";
 
-type MediaFilter = "all" | "photo" | "video" | "voice";
+function SettingRow({
+  icon,
+  label,
+  note,
+  value,
+  onChange,
+}: {
+  icon: IconName;
+  label: string;
+  note: string;
+  value: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  const { colors, spacing } = useTheme();
+  return (
+    <View style={[styles.row, { gap: spacing.md, paddingVertical: spacing.sm }]}>
+      <Icon name={icon} size={20} color={colors.textSecondary} />
+      <View style={styles.flex}>
+        <AppText variant="callout" weight="500">
+          {label}
+        </AppText>
+        <AppText variant="caption" color="textSecondary">
+          {note}
+        </AppText>
+      </View>
+      <Toggle value={value} onValueChange={onChange} accessibilityLabel={label} />
+    </View>
+  );
+}
 
-function ConversationDetailsContent() {
-  const { colors, spacing, radii, reduceMotion } = useTheme();
-  const { openMedia, playVoice } = useMediaPlayer();
-
-  const summaryQuery = useChatSummary();
-  const messagesQuery = useChatMessages();
-  const settingsQuery = useChatSettings();
-  const sharedMediaQuery = useSharedMedia();
-  const pinnedQuery = usePinnedMessages();
-  const updateSettings = useUpdateChatSettings();
-  const togglePin = useTogglePin();
-
-  const [mediaFilter, setMediaFilter] = useState<MediaFilter>("all");
-  const [pinnedSheetOpen, setPinnedSheetOpen] = useState(false);
-  const [searchModalOpen, setSearchModalOpen] = useState(false);
-
-  if (summaryQuery.isLoading || settingsQuery.isLoading) {
-    return (
-      <GlassScreen>
-        <View style={styles.center}>
-          <ActivityIndicator accessibilityLabel="Loading conversation details" />
-        </View>
-      </GlassScreen>
-    );
-  }
-
-  const summary = summaryQuery.data;
-  const partner = summary?.partner ?? { name: "Noah", side: "sapphire", zone: "Europe/London" };
-  const settings = settingsQuery.data ?? {
-    notifications: true,
-    readReceipts: false,
-    typingIndicators: true,
-  };
-  const allMedia = sharedMediaQuery.data ?? [];
-  const pinned = pinnedQuery.data ?? [];
-  const messages = messagesQuery.data ?? [];
-
-  const filteredMedia = allMedia.filter((m) => {
-    if (!m.media) return false;
-    if (mediaFilter === "all") return true;
-    return m.media.type === mediaFilter;
-  });
-
-  const enter = (i: number) =>
+function Details() {
+  const toast = useToast();
+  const { colors, radii, spacing, reduceMotion } = useTheme();
+  const now = useNow();
+  const home = useHomeToday();
+  const settings = useChatSettings();
+  const update = useUpdateChatSettings();
+  const pinned = usePinnedMessages();
+  const media = useSharedMedia();
+  const { openMedia } = useMediaPlayer();
+  const me = home.data?.me;
+  const partner = home.data?.partner;
+  const s = settings.data;
+  const enter = () =>
     reduceMotion
       ? {}
       : {
-          entering: FadeInDown.delay(i * 60)
-            .springify()
-            .damping(18),
+          entering: ENTER,
         };
+  const set = (patch: Parameters<typeof update.mutate>[0]) => {
+    update.mutate(patch, {
+      onError: (e) => {
+        toast.show(serviceErrorMessage(e), "error");
+      },
+    });
+  };
+
+  if (me === undefined || partner === undefined || s === undefined)
+    return (
+      <GlassScreen
+        onBack={() => {
+          goBack("/us/chat");
+        }}
+      >
+        <View style={[styles.grow, styles.center]}>
+          <ActivityIndicator accessibilityLabel="Loading" />
+        </View>
+      </GlassScreen>
+    );
 
   return (
-    <View style={styles.fill}>
-      <GlassScreen>
-        {/* Navigation bar */}
-        <Animated.View {...enter(0)} style={[styles.navRow, { gap: spacing.sm }]}>
-          <IconButton
-            icon="chevron-left"
-            label="Back to chat"
-            onPress={() => {
-              router.back();
-            }}
+    <GlassScreen
+      tabBar
+      onBack={() => {
+        goBack("/us/chat");
+      }}
+    >
+      <Animated.View {...enter()} style={[styles.center, { gap: spacing.sm }]}>
+        <View style={[styles.row, styles.duo]}>
+          <CharacterSlot
+            character={gemOf(partner.side)}
+            look={{ mood: "loving", occasion: "together" }}
+            size={120}
+            aspectRatio={FRAME_ASPECT}
           />
-          <AppText variant="largeTitle" style={styles.titleText}>
-            Details
-          </AppText>
-        </Animated.View>
-
-        {/* Noah Profile Card */}
-        <Animated.View {...enter(1)}>
-          <View
-            style={[
-              styles.profileCard,
-              {
-                backgroundColor: colors.surfaceRaised,
-                borderColor: colors.border,
-                borderRadius: radii.lg,
-                padding: spacing.lg,
-              },
-            ]}
-          >
-            <ProfileAvatar
-              avatar={{ kind: "initials", swatch: 1 }}
-              name={partner.name}
-              side={partner.side ?? "sapphire"}
-              size={64}
-            />
-            <AppText variant="title" weight="600" style={{ marginTop: 8 }}>
-              {partner.name}
-            </AppText>
-            <AppText variant="caption" color="textSecondary">
-              18:42 in London (Europe/London)
-            </AppText>
-          </View>
-        </Animated.View>
-
-        {/* Links: Pinned & Search */}
-        <Animated.View {...enter(2)} style={[styles.linksGroup, { gap: spacing.sm }]}>
-          <Pressable
-            onPress={() => {
-              setPinnedSheetOpen(true);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={`Pinned messages, ${pinned.length} total`}
-            style={({ pressed }) => [
-              styles.linkRow,
-              {
-                backgroundColor: colors.surfaceRaised,
-                borderColor: colors.border,
-                borderRadius: radii.md,
-                padding: spacing.md,
-                opacity: pressed ? 0.75 : 1,
-              },
-            ]}
-          >
-            <View style={styles.linkLeading}>
-              <Icon name="pin" size={18} color={colors.accent} />
-              <AppText variant="callout" weight="500">
-                Pinned messages
-              </AppText>
-            </View>
-            <View style={styles.linkTrailing}>
-              {pinned.length > 0 ? (
-                <View style={[styles.countBadge, { backgroundColor: colors.accentSoft }]}>
-                  <AppText variant="caption" weight="600" color="accent">
-                    {pinned.length}
-                  </AppText>
-                </View>
-              ) : null}
-              <Icon name="chevron-right" size={16} color={colors.textTertiary} />
-            </View>
-          </Pressable>
-
-          <Pressable
-            onPress={() => {
-              setSearchModalOpen(true);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel="Search conversation"
-            style={({ pressed }) => [
-              styles.linkRow,
-              {
-                backgroundColor: colors.surfaceRaised,
-                borderColor: colors.border,
-                borderRadius: radii.md,
-                padding: spacing.md,
-                opacity: pressed ? 0.75 : 1,
-              },
-            ]}
-          >
-            <View style={styles.linkLeading}>
-              <Icon name="search" size={18} color={colors.ruby} />
-              <AppText variant="callout" weight="500">
-                Search in conversation
-              </AppText>
-            </View>
-            <Icon name="chevron-right" size={16} color={colors.textTertiary} />
-          </Pressable>
-        </Animated.View>
-
-        {/* Settings Group (Notifications, Read Receipts [U-35], Typing) */}
-        <Animated.View
-          {...enter(3)}
-          style={[
-            styles.settingsCard,
-            {
-              backgroundColor: colors.surfaceRaised,
-              borderColor: colors.border,
-              borderRadius: radii.lg,
-              padding: spacing.lg,
-            },
-          ]}
-        >
-          <AppText variant="headline" weight="600" style={{ marginBottom: spacing.sm }}>
-            Preferences
-          </AppText>
-
-          {/* Notifications Toggle */}
-          <View style={styles.settingItem}>
-            <View style={styles.settingTextCol}>
-              <AppText variant="callout" weight="500">
-                Notifications
-              </AppText>
-              <AppText variant="caption" color="textSecondary">
-                Get notified when {partner.name} sends a message
-              </AppText>
-            </View>
-            <Toggle
-              value={settings.notifications}
-              onValueChange={(val: boolean) => {
-                updateSettings.mutate({ notifications: val });
-              }}
-              accessibilityLabel="Messages notifications"
-            />
-          </View>
-
-          {/* Read Receipts Toggle (U-35: default off) */}
-          <View
-            style={[
-              styles.settingItem,
-              {
-                borderTopColor: colors.border,
-                borderTopWidth: StyleSheet.hairlineWidth,
-                paddingTop: spacing.md,
-              },
-            ]}
-          >
-            <View style={styles.settingTextCol}>
-              <AppText variant="callout" weight="500">
-                Read receipts
-              </AppText>
-              <AppText variant="caption" color="textSecondary">
-                When on for both of you, shows when messages have been read. Neither partner is ever
-                pressured. (U-35)
-              </AppText>
-            </View>
-            <Toggle
-              value={settings.readReceipts}
-              onValueChange={(val: boolean) => {
-                updateSettings.mutate({ readReceipts: val });
-              }}
-              accessibilityLabel="Read receipts setting"
-            />
-          </View>
-
-          {/* Typing indicator toggle */}
-          <View
-            style={[
-              styles.settingItem,
-              {
-                borderTopColor: colors.border,
-                borderTopWidth: StyleSheet.hairlineWidth,
-                paddingTop: spacing.md,
-              },
-            ]}
-          >
-            <View style={styles.settingTextCol}>
-              <AppText variant="callout" weight="500">
-                Typing indicator
-              </AppText>
-              <AppText variant="caption" color="textSecondary">
-                Show when you're typing in this conversation
-              </AppText>
-            </View>
-            <Toggle
-              value={settings.typingIndicators}
-              onValueChange={(val: boolean) => {
-                updateSettings.mutate({ typingIndicators: val });
-              }}
-              accessibilityLabel="Typing indicator setting"
-            />
-          </View>
-        </Animated.View>
-
-        {/* Shared Media Gallery Section */}
-        <Animated.View {...enter(4)} style={{ marginTop: spacing.md, gap: spacing.sm }}>
-          <View style={styles.mediaHeaderRow}>
-            <AppText variant="headline" weight="600">
-              Shared media
-            </AppText>
-            <AppText variant="caption" color="textSecondary">
-              {allMedia.length} item{allMedia.length === 1 ? "" : "s"}
-            </AppText>
-          </View>
-
-          {/* Filter tabs */}
-          <Segmented<MediaFilter>
-            label="Filter media"
-            value={mediaFilter}
-            onChange={setMediaFilter}
-            options={[
-              { value: "all", label: "All" },
-              { value: "photo", label: "Photos" },
-              { value: "video", label: "Videos" },
-              { value: "voice", label: "Voice" },
-            ]}
+          <ProfileAvatar
+            name={partner.name}
+            avatar={partner.avatar ?? { kind: "initials", swatch: 1 }}
+            side={partner.side}
+            size={84}
           />
+          <CharacterSlot
+            character={gemOf(me.side)}
+            look={{ mood: "loving", occasion: "together" }}
+            size={112}
+            aspectRatio={FRAME_ASPECT}
+          />
+        </View>
+        <AppText variant="title" serif>
+          {partner.name}
+        </AppText>
+        <AppText variant="footnote" color="textSecondary">
+          {localTimeLabel(now, partner.zone)} in {cityForZone(partner.zone)}
+        </AppText>
+      </Animated.View>
 
-          {/* Media Grid */}
-          {filteredMedia.length === 0 ? (
-            <View style={[styles.emptyMedia, { paddingVertical: spacing.xl }]}>
-              <Icon name="image" size={28} color={colors.textTertiary} />
-              <AppText variant="caption" color="textSecondary">
-                No media in this category.
+      {pinned.data === undefined || pinned.data.length === 0 ? null : (
+        <Animated.View {...enter()} style={{ gap: spacing.sm }}>
+          <AppText variant="headline">Pinned</AppText>
+          {pinned.data.map((m) => (
+            <Glass
+              key={m.id}
+              radius={radii.lg}
+              shadow={false}
+              contentStyle={[styles.row, { padding: spacing.md, gap: spacing.md }]}
+            >
+              <Icon name="pin" size={16} color={colors.accent} />
+              <AppText variant="callout" numberOfLines={2} style={styles.flex}>
+                {messagePreview(m)}
               </AppText>
-            </View>
-          ) : (
-            <View style={[styles.mediaGrid, { gap: spacing.sm }]}>
-              {filteredMedia.map((item) => {
-                if (!item.media) return null;
-                const media = item.media;
-                if (media.type === "voice") {
-                  return (
-                    <Pressable
-                      key={item.id}
-                      onPress={() => {
-                        playVoice(item.id, media.seconds);
-                      }}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Voice note: ${formatDuration(media.seconds)}`}
-                      style={[
-                        styles.voiceCell,
-                        {
-                          backgroundColor: colors.surfaceRaised,
-                          borderColor: colors.border,
-                          borderRadius: radii.md,
-                          padding: spacing.sm,
-                        },
-                      ]}
-                    >
-                      <Icon name="mic" size={20} color={colors.accent} />
-                      <AppText variant="caption" weight="600" style={{ marginTop: 4 }}>
-                        {formatDuration(media.seconds)}
+            </Glass>
+          ))}
+        </Animated.View>
+      )}
+
+      <Animated.View {...enter()} style={{ gap: spacing.sm }}>
+        <AppText variant="headline">Shared</AppText>
+        {media.data === undefined || media.data.length === 0 ? (
+          <AppText variant="callout" color="textSecondary">
+            Photos, videos and voice notes you send will gather here.
+          </AppText>
+        ) : (
+          <View style={[styles.grid, { gap: spacing.sm }]}>
+            {media.data.map((m) => {
+              const item = m.media;
+              if (item === undefined) return null;
+              return (
+                <Pressable
+                  key={m.id}
+                  style={styles.cell}
+                  onPress={() => {
+                    if (item.type === "voice") return;
+                    openMedia({
+                      type: item.type,
+                      art: item.art,
+                      caption: item.caption,
+                      ...(item.type === "video" ? { seconds: item.seconds } : {}),
+                    });
+                  }}
+                  accessibilityRole={item.type === "voice" ? "text" : "imagebutton"}
+                  accessibilityLabel={
+                    item.type === "voice"
+                      ? `Voice note, ${formatDuration(item.seconds)}`
+                      : `Open ${item.type}`
+                  }
+                >
+                  {item.type === "voice" ? (
+                    <Glass radius={radii.md} shadow={false} contentStyle={styles.voiceCell}>
+                      <AppText variant="title">🎙️</AppText>
+                      <AppText variant="caption" color="textSecondary">
+                        {formatDuration(item.seconds)}
                       </AppText>
-                    </Pressable>
-                  );
-                }
-
-                return (
-                  <Pressable
-                    key={item.id}
-                    onPress={() => {
-                      openMedia({
-                        type: media.type,
-                        art: media.art,
-                        caption: media.caption,
-                        seconds: media.type === "video" ? media.seconds : undefined,
-                        authorName: item.senderId === summary?.partner.name ? partner.name : "You",
-                      });
-                    }}
-                    accessibilityRole="image"
-                    accessibilityLabel={`${media.type === "video" ? "Video" : "Photo"} item`}
-                    style={[styles.mediaCell, { borderRadius: radii.md }]}
-                  >
+                    </Glass>
+                  ) : (
                     <MediaArt
-                      art={media.art}
-                      {...(media.type === "video" ? { seconds: media.seconds } : {})}
-                      height={96}
+                      art={item.art}
+                      {...(item.type === "video" ? { seconds: item.seconds } : {})}
+                      height={104}
                       radius={radii.md}
                     />
-                  </Pressable>
-                );
-              })}
-            </View>
-          )}
-        </Animated.View>
-      </GlassScreen>
+                  )}
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
+      </Animated.View>
 
-      {/* Pinned Sheet */}
-      <PinnedSheet
-        visible={pinnedSheetOpen}
-        pinnedMessages={pinned}
-        viewerZone={partner.zone}
-        onClose={() => {
-          setPinnedSheetOpen(false);
-        }}
-        onSelectMessage={() => {
-          setPinnedSheetOpen(false);
-          router.back();
-        }}
-        onUnpin={(msg) => {
-          togglePin.mutate(msg.id);
-        }}
-      />
+      <Animated.View {...enter()} style={{ gap: spacing.sm }}>
+        <AppText variant="headline">Just for you</AppText>
+        <Glass
+          radius={radii.xl}
+          contentStyle={{ paddingHorizontal: spacing.lg, paddingVertical: spacing.sm }}
+        >
+          <SettingRow
+            icon="eye"
+            label='Show "Seen"'
+            note={
+              s.readReceipts === null
+                ? `Not chosen yet. Shows only if you and ${partner.name} both turn it on.`
+                : `Shows only when you and ${partner.name} both have it on.`
+            }
+            value={s.readReceipts === true}
+            onChange={(v) => {
+              set({ readReceipts: v });
+            }}
+          />
+          <View style={[styles.hairline, { backgroundColor: colors.glassHairline }]} />
+          <SettingRow
+            icon="chat"
+            label="Show when I'm typing"
+            note={`${partner.name} sees typing dots while you write.`}
+            value={s.typingIndicators}
+            onChange={(v) => {
+              set({ typingIndicators: v });
+            }}
+          />
+          <View style={[styles.hairline, { backgroundColor: colors.glassHairline }]} />
+          <SettingRow
+            icon="heart"
+            label="Message alerts"
+            note="A notification for each new message."
+            value={s.notifications}
+            onChange={(v) => {
+              set({ notifications: v });
+            }}
+          />
+        </Glass>
+      </Animated.View>
 
-      {/* Search Modal */}
-      <ChatSearchModal
-        visible={searchModalOpen}
-        messages={messages}
-        viewerZone={partner.zone}
-        onClose={() => {
-          setSearchModalOpen(false);
-        }}
-        onSelectResult={() => {
-          setSearchModalOpen(false);
-          router.back();
-        }}
-      />
-    </View>
+      <View style={[styles.row, styles.centerRow, { gap: spacing.xs }]}>
+        <Icon name="lock" size={13} color={colors.textTertiary} />
+        <AppText variant="footnote" color="textTertiary">
+          Only the two of you can see this conversation.
+        </AppText>
+      </View>
+    </GlassScreen>
   );
 }
 
 export function ConversationDetailsScreen() {
   return (
     <SideScope side="garnet">
-      <ConversationDetailsContent />
+      <View style={styles.fill}>
+        <Details />
+      </View>
     </SideScope>
   );
 }
 
 const styles = StyleSheet.create({
-  fill: {
-    flex: 1,
-  },
-  center: {
-    flexGrow: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  navRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  titleText: {
-    flex: 1,
-  },
-  profileCard: {
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-  },
-  linksGroup: {
-    marginTop: 18,
-  },
-  linkRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderWidth: 1,
-  },
-  linkLeading: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  linkTrailing: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  countBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 999,
-  },
-  settingsCard: {
-    marginTop: 18,
-    borderWidth: 1,
-    gap: 16,
-  },
-  settingItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  settingTextCol: {
-    flex: 1,
-    gap: 2,
-  },
-  mediaHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 8,
-  },
-  mediaGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    marginTop: 8,
-  },
-  mediaCell: {
-    width: "31.5%",
-    overflow: "hidden",
-  },
-  voiceCell: {
-    width: "31.5%",
-    height: 96,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-  },
-  emptyMedia: {
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-  },
+  fill: { flex: 1 },
+  // Inside GlassScreen's scroll content: grow, never `flex: 1` (rule 11).
+  grow: { flexGrow: 1 },
+  flex: { flex: 1 },
+  center: { alignItems: "center", justifyContent: "center" },
+  centerRow: { justifyContent: "center" },
+  row: { flexDirection: "row", alignItems: "center" },
+  duo: { alignItems: "flex-end" },
+  grid: { flexDirection: "row", flexWrap: "wrap" },
+  cell: { width: "31.5%" },
+  voiceCell: { height: 104, alignItems: "center", justifyContent: "center", gap: 4 },
+  hairline: { height: StyleSheet.hairlineWidth },
 });

@@ -1,15 +1,12 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { Pressable, StyleSheet } from "react-native";
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  ZoomIn,
-} from "react-native-reanimated";
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Icon } from "@/components/ui/Icon";
+import { WATCHER_PEEK } from "@/features/companions/Watchers";
 import { TAB_BAR_HEIGHT } from "@/features/tabs/GlassTabBar";
 import { useTheme } from "@/theme/ThemeProvider";
+import { POP } from "@/theme/transitions";
 
 /**
  * The floating "＋" (DAYS-02): a round lip button in the page's accent, above the tab bar
@@ -35,12 +32,15 @@ export function AddButton({
   // transform of the view it runs on).
   return (
     <Animated.View
-      {...(reduceMotion ? {} : { entering: ZoomIn.springify().damping(14) })}
+      {...(reduceMotion ? {} : { entering: POP })}
       style={[
         styles.wrap,
         {
           right: spacing.gutter,
-          bottom: insets.bottom + (tabBar ? TAB_BAR_HEIGHT + spacing.sm + spacing.lg : spacing.lg),
+          // Above the tab bar and the characters peeking over it (P-57).
+          bottom:
+            insets.bottom +
+            (tabBar ? TAB_BAR_HEIGHT + spacing.sm + WATCHER_PEEK + spacing.md : spacing.lg),
           shadowColor: colors.accent,
         },
       ]}

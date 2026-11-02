@@ -1,4 +1,4 @@
-import * as Haptics from "expo-haptics";
+import { Haptics } from "@/components/ui/haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import {
   ActivityIndicator,

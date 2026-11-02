@@ -5,6 +5,11 @@ import { createDemoHome, type DemoHomeState } from "./demoHome";
 import { createDemoPairing, type DemoPairingState } from "./demoPairing";
 import { createDemoProfiles, type DemoProfilesState } from "./demoProfile";
 import { createDemoChat, type DemoChatState } from "./demoChat";
+import { createDemoMoments, type DemoMomentsState } from "./demoMoments";
+import { createDemoSettings, type DemoSettingsState } from "./demoSettings";
+import { createDemoSurprises } from "./demoSurprises";
+import { createDemoTogether, type DemoTogetherState } from "./demoTogether";
+import type { SurpriseRecord } from "@/domain/surprises";
 
 /**
  * Deterministic demo data (spec §5: stable IDs, fictional identities, no real private data).
@@ -24,6 +29,10 @@ export interface DemoState {
   home: DemoHomeState;
   days: DemoDaysState;
   chat: DemoChatState;
+  moments: DemoMomentsState;
+  settings: DemoSettingsState;
+  surprises: SurpriseRecord[];
+  together: DemoTogetherState;
 }
 
 export function createDemoState(): DemoState {
@@ -63,7 +72,7 @@ export function createDemoState(): DemoState {
         authorId: DEMO_PARTNER_ID,
         recipientId: DEMO_ME_ID,
         safePrompt: "Open when you miss me",
-        body: "Demo letter body. Fictional content for the prototype.",
+        body: "Close your eyes for a second. I'm on the other end of the same sky, thinking of the bench by the river and how you always steal the warm side. Miss me a little, then go and make yourself tea. I'll be home in your pocket until I'm home for real.",
         mediaRefs: [],
         unlock: { type: "manual" },
         state: "sealed",
@@ -101,5 +110,9 @@ export function createDemoState(): DemoState {
     home: createDemoHome(),
     days: createDemoDays(DEMO_ME_ID, DEMO_PARTNER_ID),
     chat: createDemoChat(DEMO_ME_ID, DEMO_PARTNER_ID),
+    moments: createDemoMoments(DEMO_ME_ID, DEMO_PARTNER_ID),
+    settings: createDemoSettings(DEMO_PARTNER_ID),
+    surprises: createDemoSurprises(DEMO_ME_ID, DEMO_PARTNER_ID),
+    together: createDemoTogether(DEMO_ME_ID, DEMO_PARTNER_ID),
   };
 }

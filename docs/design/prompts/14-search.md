@@ -22,3 +22,10 @@ date). Sealed letters appear only as their prompt with a "Sealed" chip and no sn
 ```text
 Garnet dialog "Clear search history?" — "This clears recent searches on this device." Cancel / Clear.
 ```
+
+## Built (P-63, Daylight Glass)
+
+- **The field:** a glass field and Cancel, then kind chips (All, Messages, Moments, Letters, Memories, Events) and Both / Mine / Noah.
+- **Before typing:** your recent searches, each removable, "Clear history" (SEARCH-02) and "Searches stay on this device".
+- **While typing:** results grouped by kind, with the match in bold and the date. Sealed letters show their prompt with a "Sealed" mark and no snippet.
+- **Never found:** a partner's private or not-yet-revealed moment, a partner's draft letter, a letter's words, or anything deleted (tested in `mockSearchInbox.test.ts`).

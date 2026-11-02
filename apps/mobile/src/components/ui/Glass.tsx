@@ -23,7 +23,7 @@ export interface GlassProps {
 /**
  * A liquid glass pane (Daylight Glass, P-48; "liquid" pass, P-51): backdrop blur, a light veil
  * (text colours pass AA on the raw aurora, so the veil can stay see-through), an optional colour
- * tint, a gradient rim bright at the top-left, a soft top sheen and a long soft shadow. With
+ * tint, a soft top sheen and a long soft shadow, and no outline (P-67). With
  * Reduce Transparency the pane is solid.
  *
  * Android: expo-blur only blurs with a blur target, so there the veil alone frosts the pane.
@@ -61,14 +61,8 @@ export function Glass({
         style,
       ]}
     >
-      {/* The liquid rim: light catching the top-left edge, fading toward the bottom-right. */}
-      <LinearGradient
-        colors={[colors.glassRimStart, colors.glassRimEnd, colors.glassRimStart]}
-        locations={[0, 0.6, 1]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[styles.rim, { borderRadius: radius }]}
-      >
+      {/* No rim (owner direction P-67): depth comes from blur, veil, sheen and the soft shadow. */}
+      <View style={{ borderRadius: radius }}>
         <View
           style={[
             styles.clip,
@@ -117,16 +111,15 @@ export function Glass({
           )}
           <View style={contentStyle}>{children}</View>
         </View>
-      </LinearGradient>
+      </View>
     </View>
   );
 }
 
-/** Rim thickness in points. */
-const RIM = 1;
+/** No visible rim (P-67); kept as a constant so the clip radius stays explicit. */
+const RIM = 0;
 
 const styles = StyleSheet.create({
-  rim: { padding: RIM },
   clip: { overflow: "hidden" },
   sheen: { position: "absolute", top: 0, left: 0, right: 0, height: "48%" },
 });

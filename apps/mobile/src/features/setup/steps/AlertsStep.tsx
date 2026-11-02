@@ -5,7 +5,7 @@
  */
 import { Fragment } from "react";
 import { StyleSheet, View } from "react-native";
-import Animated, { ZoomIn } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { AppText } from "@/components/ui/AppText";
 import { Glass } from "@/components/ui/Glass";
 import { Icon, type IconName } from "@/components/ui/Icon";
@@ -14,6 +14,7 @@ import { Toggle } from "@/components/ui/Toggle";
 import type { NotificationPrefs } from "@/data/fixtures/demoProfile";
 import { useTheme } from "@/theme/ThemeProvider";
 import { LockScreenPreview } from "../components/LockScreenPreview";
+import { POP } from "@/theme/transitions";
 
 type Category = "thoughts" | "support" | "days";
 
@@ -84,7 +85,7 @@ export function AlertsStep({
       <LockScreenPreview />
 
       {prefs.status === "on" ? (
-        <Animated.View {...(reduceMotion ? {} : { entering: ZoomIn.springify().damping(12) })}>
+        <Animated.View {...(reduceMotion ? {} : { entering: POP })}>
           <Notice tone="success" icon="check" text="Notifications are on." />
         </Animated.View>
       ) : prefs.status === "denied" ? (

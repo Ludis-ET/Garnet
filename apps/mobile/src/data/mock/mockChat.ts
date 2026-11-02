@@ -1,30 +1,25 @@
 import type { Temporal } from "temporal-polyfill";
 import type { ChatRepository, SendMessageInput } from "@/data/repositories/types";
 import {
+  unreadCount as countUnread,
+  receiptsActive,
   searchChatMessages,
   type ChatMessage,
   type ChatSettings,
   type ConversationSummary,
 } from "@/domain/chat";
 import type { MockStore } from "./MockStore";
+import { viewerOf } from "./viewer";
 
 export function createMockChat(
   store: MockStore,
   now: () => Temporal.Instant,
   localIdOf: () => string,
 ): ChatRepository {
+  // The signed-in person and their partner, with the sides and zones chosen in setup.
   const getMeAndPartner = () => {
-    const { meId, profiles } = store.read();
-    const partnerProfile = profiles.partner;
-
-    return {
-      meId,
-      partnerPerson: {
-        name: partnerProfile.name,
-        side: partnerProfile.side ?? "sapphire",
-        zone: partnerProfile.timeZone,
-      },
-    };
+    const v = viewerOf(store.read());
+    return { meId: v.userId, me: v.me, partnerPerson: v.partner };
   };
 
   return {
@@ -35,13 +30,13 @@ export function createMockChat(
         const visible = messages.filter((m) => !m.deletedForMe);
         const lastMessage = visible[visible.length - 1] ?? null;
 
-        const unreadCount =
-          visible.filter((m) => m.senderId !== meId && !m.deletedForEveryone).length > 0 ? 1 : 0; // Simulated 1 unread conversation dot
+        const unreadCount = countUnread(messages, meId, store.read().chat.readUpTo ?? null);
 
         const pinnedCount = visible.filter((m) => m.pinned && !m.deletedForEveryone).length;
         const mediaCount = visible.filter((m) => Boolean(m.media) && !m.deletedForEveryone).length;
 
         const summary: ConversationSummary = {
+          viewerId: meId,
           partner: partnerPerson,
           lastMessage,
           unreadCount,
@@ -83,12 +78,15 @@ export function createMockChat(
           text: input.text ?? "",
           createdAt: nowIso,
           editedAt: null,
-          status: "sent",
+          // Media uploads first (simulated progress, P-61); words send at once.
+          status: input.media === undefined ? "sent" : "sending",
+          ...(input.media === undefined ? {} : { uploadProgress: 0 }),
           pinned: false,
           pinnedAt: null,
           replyTo: replyPreview,
           reactions: [],
           ...(input.media ? { media: input.media } : {}),
+          ...(input.sticker ? { sticker: input.sticker } : {}),
         };
 
         store.update((s) => ({
@@ -224,7 +222,11 @@ export function createMockChat(
       store.simulate(() => {
         const target = store.read().chat.messages.find((m) => m.id === messageId);
         if (!target) throw new Error(`Message not found: ${messageId}`);
-        const updated: ChatMessage = { ...target, status: "sent" };
+        // A media message starts its upload again from the beginning.
+        const updated: ChatMessage =
+          target.media === undefined
+            ? { ...target, status: "sent" }
+            : { ...target, status: "sending", uploadProgress: 0 };
 
         store.update((s) => ({
           ...s,
@@ -235,6 +237,54 @@ export function createMockChat(
         }));
 
         return updated;
+      }),
+
+    presence: () =>
+      store.simulate(() => {
+        const { chat } = store.read();
+        // Typing only if the partner shares it; "Seen" only when both said yes (P-58, U-35).
+        return {
+          partnerTyping: chat.partner.typingIndicators && chat.partnerTyping,
+          seenUpTo: receiptsActive(chat.settings.readReceipts, chat.partner.readReceipts)
+            ? chat.partnerSeenUpTo
+            : null,
+          partnerHere:
+            receiptsActive(chat.settings.readReceipts, chat.partner.readReceipts) &&
+            chat.partnerInChat,
+        };
+      }),
+
+    cancelUpload: (messageId: string) =>
+      store.simulate(() => {
+        // Never sent: an unfinished upload simply goes away.
+        store.update((s) => ({
+          ...s,
+          chat: {
+            ...s.chat,
+            messages: s.chat.messages.filter((m) => !(m.id === messageId && m.status !== "sent")),
+          },
+        }));
+      }),
+
+    markRead: () =>
+      store.simulate(() => {
+        const at = now().toString();
+        store.update((s) =>
+          s.chat.readUpTo === at ? s : { ...s, chat: { ...s.chat, readUpTo: at } },
+        );
+      }),
+
+    markSaved: (messageId: string) =>
+      store.simulate(() => {
+        store.update((s) => ({
+          ...s,
+          chat: {
+            ...s.chat,
+            messages: s.chat.messages.map((m) =>
+              m.id === messageId ? { ...m, savedAsMemory: true } : m,
+            ),
+          },
+        }));
       }),
 
     getSettings: () =>

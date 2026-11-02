@@ -4,11 +4,11 @@
  * Answers are saved after each step so setup resumes where it was left. Sides follow P-51
  * (owner direction for U-22): the two partners can never hold the same side.
  */
-import * as Haptics from "expo-haptics";
+import { Haptics } from "@/components/ui/haptics";
 import { Redirect, useRouter } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, Platform, Pressable, StyleSheet, View } from "react-native";
-import Animated, { FadeIn, FadeInDown, FadeInLeft, FadeInRight } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { CharacterSlot } from "@/components/character/CharacterSlot";
 import type { Pose } from "@/components/character/characterAssets";
 import { ActionSheet } from "@/components/ui/ActionSheet";
@@ -45,6 +45,8 @@ import { SideStep } from "./steps/SideStep";
 import { SummaryStep } from "./steps/SummaryStep";
 import { TimeStep } from "./steps/TimeStep";
 import { useChooseSide, useCompleteSetup, useSaveSetup, useSetupState } from "./useSetup";
+import { ENTER } from "@/theme/transitions";
+import { notificationsSupported, permission } from "@/notifications/system";
 
 const SUMMARY = SETUP_STEPS.length;
 
@@ -91,7 +93,6 @@ function SetupFlow({ initial }: { initial: SetupState }) {
   const server = live.data ?? initial;
   const partner = server.partner;
   const [step, setStep] = useState(() => firstOpenStep(initial.profile));
-  const [forward, setForward] = useState(true);
   const [draft, setDraft] = useState<Profile>(() => ({
     ...initial.profile,
     timeZone: initial.profile.timeZone ?? detectedZone(),
@@ -105,7 +106,6 @@ function SetupFlow({ initial }: { initial: SetupState }) {
   const card: Profile = { ...draft, side: pick ?? server.profile.side };
   const current = SETUP_STEPS[step];
   const go = (to: number) => {
-    setForward(to > step);
     setStep(to);
     setTried(false);
     if (Platform.OS !== "web") void Haptics.selectionAsync();
@@ -186,9 +186,8 @@ function SetupFlow({ initial }: { initial: SetupState }) {
 
   const busy = save.isPending || choose.isPending || complete.isPending;
   const q = current === undefined ? null : QUESTIONS[current](partner.name);
-  const enter = reduceMotion
-    ? FadeIn.duration(150)
-    : (forward ? FadeInRight : FadeInLeft).springify().damping(20).stiffness(180);
+  // A quick fade between steps (P-74), not a slide.
+  const enter = ENTER;
 
   const footer =
     current === "alerts" && draft.notifications.status === "unset" ? (
@@ -255,10 +254,7 @@ function SetupFlow({ initial }: { initial: SetupState }) {
 
       <Animated.View key={step} entering={enter} style={{ gap: spacing.xl }}>
         {q === null ? (
-          <Animated.View
-            {...(reduceMotion ? {} : { entering: FadeInDown.springify().damping(18) })}
-            style={{ gap: spacing.xs }}
-          >
+          <Animated.View {...(reduceMotion ? {} : { entering: ENTER })} style={{ gap: spacing.xs }}>
             <AppText variant="largeTitle" style={styles.center}>
               You're all set
             </AppText>
@@ -412,7 +408,16 @@ function SetupFlow({ initial }: { initial: SetupState }) {
           setAlertSheet(null);
         }}
         onConfirm={() => {
-          setAlertSheet("prompt");
+          // Android asks the real question (P-75); elsewhere the simulated prompt stands in.
+          if (!notificationsSupported()) {
+            setAlertSheet("prompt");
+            return;
+          }
+          setAlertSheet(null);
+          void permission(true).then((answer) => {
+            const status = answer === "granted" ? "on" : "denied";
+            setDraft((d) => ({ ...d, notifications: { ...d.notifications, status } }));
+          });
         }}
       />
       <SimulatedPrompt

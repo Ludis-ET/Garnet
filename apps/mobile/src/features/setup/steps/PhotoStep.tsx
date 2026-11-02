@@ -88,11 +88,11 @@ export function PhotoStep({
       ) : access === "granted" ? (
         <View style={{ gap: spacing.sm }}>
           <AppText variant="footnote" color="textSecondary" style={styles.textCenter}>
-            Demo pictures (simulated photo library)
+            Choose a picture
           </AppText>
           <View
             accessibilityRole="radiogroup"
-            accessibilityLabel="Demo pictures"
+            accessibilityLabel="Pictures"
             style={[styles.row, { gap: spacing.md }]}
           >
             {DEMO_PHOTOS.map((photo) => {

@@ -1,5 +1,5 @@
 import { Modal, Pressable, StyleSheet, View } from "react-native";
-import Animated, { FadeIn, SlideInDown } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { SignalId } from "@garnet/domain";
 import { AppText } from "@/components/ui/AppText";
@@ -7,6 +7,7 @@ import { Glass } from "@/components/ui/Glass";
 import { useTheme } from "@/theme/ThemeProvider";
 import { MORE_SIGNALS, signalLabel } from "../signals";
 import { SignalButton } from "./SignalButton";
+import { ENTER, SHEET } from "@/theme/transitions";
 
 /** HOME-04 "More": the other five signals, each hold-to-send, in a glass sheet. */
 export function MoreSheet({
@@ -30,10 +31,7 @@ export function MoreSheet({
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      <Animated.View
-        entering={FadeIn.duration(200)}
-        style={[styles.fill, { backgroundColor: colors.scrim }]}
-      >
+      <Animated.View entering={ENTER} style={[styles.fill, { backgroundColor: colors.scrim }]}>
         <Pressable
           style={StyleSheet.absoluteFill}
           onPress={onClose}
@@ -41,9 +39,7 @@ export function MoreSheet({
           accessibilityLabel="Close"
         />
         <Animated.View
-          {...(reduceMotion
-            ? {}
-            : { entering: SlideInDown.springify().damping(19).stiffness(190) })}
+          {...(reduceMotion ? {} : { entering: SHEET })}
           accessibilityViewIsModal
           style={[styles.sheet, { padding: spacing.sm, paddingBottom: insets.bottom + spacing.sm }]}
         >

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
-import Animated, { FadeIn } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { SideCharacter } from "@/components/character/SideCharacter";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
@@ -9,6 +9,7 @@ import { Segmented } from "@/components/ui/Segmented";
 import { Sheet } from "@/components/ui/Sheet";
 import { ACTIVITIES, FEELINGS, type ActivityId, type FeelingId } from "@/domain/days";
 import { useTheme } from "@/theme/ThemeProvider";
+import { ENTER } from "@/theme/transitions";
 
 /** One soft labelled emoji tile; chosen shows fill, rim and a check (never colour alone). */
 function Tile({
@@ -34,8 +35,6 @@ function Tile({
         {
           borderRadius: radii.lg,
           backgroundColor: selected ? colors.accentSoft : colors.glassVeilSoft,
-          borderColor: selected ? colors.accent : colors.glassRimEnd,
-          borderWidth: selected ? 1.5 : 1,
           transform: [{ scale: pressed ? 0.96 : 1 }],
         },
       ]}
@@ -51,7 +50,7 @@ function Tile({
         {label}
       </AppText>
       {selected ? (
-        <Animated.View entering={FadeIn} style={[styles.check, { backgroundColor: colors.accent }]}>
+        <Animated.View entering={ENTER} style={[styles.check, { backgroundColor: colors.accent }]}>
           <Icon name="check" size={11} color={colors.onAccent} />
         </Animated.View>
       ) : null}

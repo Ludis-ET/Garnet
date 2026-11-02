@@ -18,7 +18,12 @@ import { ThemeProvider } from "@/theme/ThemeProvider";
 import { HistoryScreen } from "../HistoryScreen";
 import { UsScreen } from "../UsScreen";
 
-const mockRouter = { push: jest.fn(), replace: jest.fn(), back: jest.fn() };
+const mockRouter = {
+  push: jest.fn(),
+  replace: jest.fn(),
+  back: jest.fn(),
+  canGoBack: jest.fn(() => true),
+};
 jest.mock("expo-router", () => ({
   // A getter: the factory runs before `mockRouter` is initialised.
   get router() {
@@ -103,6 +108,68 @@ describe("US-01 to US-04 Us", () => {
     expect(
       screen.getByText("Garnet will remind Noah gently, respecting quiet hours."),
     ).toBeTruthy();
+  });
+});
+
+describe("How far apart on the hero (P-66)", () => {
+  const Location = jest.requireMock<{
+    requestForegroundPermissionsAsync: jest.Mock;
+    getCurrentPositionAsync: jest.Mock;
+  }>("expo-location");
+  afterEach(() => {
+    Location.requestForegroundPermissionsAsync.mockImplementation(() =>
+      Promise.resolve({ status: "denied" }),
+    );
+  });
+
+  it("uses the phone's location, keeping only a rounded point, and shows the kilometres", async () => {
+    Location.requestForegroundPermissionsAsync.mockImplementation(() =>
+      Promise.resolve({ status: "granted" }),
+    );
+    Location.getCurrentPositionAsync.mockImplementation(() =>
+      Promise.resolve({ coords: { latitude: 9.03456, longitude: 38.74321 } }),
+    );
+    const store = await renderWith(<UsScreen />, usStore());
+    expect(
+      await screen.findByLabelText(/ 5,9\d0 kilometres apart, about 8 h by plane\.$/, {}, WAIT),
+    ).toBeTruthy();
+    expect(store.read().settings.locations[DEMO_ME_ID]).toMatchObject({ lat: 9, lon: 38.7 });
+    // Distance, not a score: no streaks, counts or comparisons alongside it.
+    expect(screen.queryByText(METRICS)).toBeNull();
+  });
+
+  it('falls back to time zones ("about") when location is refused, never asking for a place', async () => {
+    await renderWith(<UsScreen />, usStore());
+    expect(await screen.findByLabelText(/About 5,[89]\d0 kilometres apart/, {}, WAIT)).toBeTruthy();
+    expect(screen.queryByText(/choose my city/i)).toBeNull();
+  });
+
+  it("shows nothing and forgets the location when this person turns distance off", async () => {
+    const store = usStore();
+    store.update((s) => ({
+      ...s,
+      settings: {
+        ...s.settings,
+        byUser: { [DEMO_ME_ID]: { location: { share: false } } },
+        locations: { ...s.settings.locations, [DEMO_ME_ID]: { lat: 9, lon: 38.7, at: "x" } },
+      },
+    }));
+    await renderWith(<UsScreen />, store);
+    await waitFor(() => {
+      expect(store.read().settings.locations[DEMO_ME_ID]).toBeNull();
+    }, WAIT);
+    expect(screen.queryByLabelText(/kilometres apart/)).toBeNull();
+  });
+
+  it("uses nothing of the partner's before the two of you are paired", async () => {
+    const store = usStore();
+    store.update((s) => ({
+      ...s,
+      pairing: { ...s.pairing, byUser: { [DEMO_ME_ID]: EMPTY_PAIRING } },
+    }));
+    await renderWith(<UsScreen />, store);
+    await screen.findByRole("button", { name: "I Need You" }, WAIT);
+    expect(screen.queryByLabelText(/kilometres apart/)).toBeNull();
   });
 });
 

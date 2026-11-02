@@ -23,6 +23,7 @@ import { serviceErrorMessage } from "../authUi";
 import { GlassScreen } from "@/components/ui/GlassScreen";
 import { StatusHero } from "@/components/ui/StatusHero";
 import { useRequestPasswordReset } from "../useAuth";
+import { goBack } from "@/navigation/goBack";
 
 /** The one message every request gets (AUTH-05). Exported for the privacy test. */
 export const RESET_SENT_MESSAGE =
@@ -96,7 +97,7 @@ export function ForgotPasswordScreen() {
   return (
     <GlassScreen
       onBack={() => {
-        router.back();
+        goBack("/sign-in");
       }}
       footer={
         <>

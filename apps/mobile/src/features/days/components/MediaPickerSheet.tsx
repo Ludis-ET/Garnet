@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
-import Animated, { FadeIn, FadeInRight } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
@@ -9,6 +9,8 @@ import { SimulatedBadge } from "@/components/ui/SimulatedBadge";
 import type { DemoArt, DemoMedia } from "@/data/fixtures/demoDays";
 import { useTheme } from "@/theme/ThemeProvider";
 import { MediaArt } from "./MediaArt";
+import { ENTER } from "@/theme/transitions";
+import { useTestingTools } from "@/features/prototype/devTools";
 
 const ARTS: readonly DemoArt[] = ["sunrise", "sea", "night", "garden", "city", "coffee"];
 const VIDEO_SECONDS = [12, 31, 8, 45, 19, 24];
@@ -35,6 +37,8 @@ export function MediaPickerSheet({
   onClose: () => void;
 }) {
   const { colors, radii, spacing } = useTheme();
+  // Testing tools only (P-75); the app itself looks finished.
+  const tools = useTestingTools();
   const [step, setStep] = useState<"source" | "grid">("source");
   const [chosen, setChosen] = useState<number | null>(null);
   const close = () => {
@@ -65,11 +69,9 @@ export function MediaPickerSheet({
           }
         : {})}
     >
-      <View style={styles.center}>
-        <SimulatedBadge text="Simulated picker" />
-      </View>
+      <View style={styles.center}>{tools ? <SimulatedBadge text="Simulated picker" /> : null}</View>
       {step === "source" ? (
-        <Animated.View entering={FadeIn} style={{ gap: spacing.xxs }}>
+        <Animated.View entering={ENTER} style={{ gap: spacing.xxs }}>
           <SheetAction
             icon="image"
             label="Photo library"
@@ -94,10 +96,7 @@ export function MediaPickerSheet({
           <SheetAction icon="mic" label="Voice note" onPress={onVoice} />
         </Animated.View>
       ) : (
-        <Animated.View
-          entering={FadeInRight.springify().damping(18)}
-          style={[styles.grid, { gap: spacing.sm }]}
-        >
+        <Animated.View entering={ENTER} style={[styles.grid, { gap: spacing.sm }]}>
           {SAMPLES.map((m, i) => {
             const on = chosen === i;
             if (m.type === "voice") return null;
@@ -127,7 +126,7 @@ export function MediaPickerSheet({
                 />
                 {on ? (
                   <Animated.View
-                    entering={FadeIn}
+                    entering={ENTER}
                     style={[styles.check, { backgroundColor: colors.accent }]}
                   >
                     <Icon name="check" size={13} color={colors.onAccent} />

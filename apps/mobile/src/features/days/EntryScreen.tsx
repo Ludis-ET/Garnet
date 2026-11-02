@@ -4,10 +4,9 @@
  * (§4, U-18 open). Either partner may delete a shared moment (D-11). Missing, deleted or not
  * yours to see all read the same: "This item isn't available here." (ADR-0004).
  */
-import { router } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
-import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { Temporal } from "temporal-polyfill";
 import { GarnetMark } from "@/components/brand/GarnetMark";
 import { ActionSheet } from "@/components/ui/ActionSheet";
@@ -30,6 +29,8 @@ import { VisibilityPicker } from "./components/VisibilityPicker";
 import { VoicePlayer } from "./components/VoicePlayer";
 import { editEntry } from "./DayScreen";
 import { useDaysOverview, useEntry, useRemoveEntry, useSetVisibility } from "./useDays";
+import { goBack } from "@/navigation/goBack";
+import { ENTER } from "@/theme/transitions";
 
 function InfoRow({ icon, text }: { icon: IconName; text: string }) {
   const { colors, spacing } = useTheme();
@@ -76,13 +77,11 @@ function EntryBody({
   const author = entry.mine ? me : partner;
   const other = entry.mine ? partner : me;
   const canDelete = entry.mine || entry.visibility === "shared";
-  const enter = (i: number) =>
+  const enter = () =>
     reduceMotion
       ? {}
       : {
-          entering: FadeInDown.delay(i * 60)
-            .springify()
-            .damping(18),
+          entering: ENTER,
         };
   const onError = (e: unknown) => {
     toast.show(serviceErrorMessage(e), "error");
@@ -93,11 +92,11 @@ function EntryBody({
       <GlassScreen
         tabBar
         onBack={() => {
-          router.back();
+          goBack("/days");
         }}
       >
         {media !== undefined && media.type !== "voice" ? (
-          <Animated.View {...enter(0)}>
+          <Animated.View {...enter()}>
             <Glass radius={radii.xl + 2} contentStyle={{ padding: spacing.xs }}>
               <MediaArt
                 art={media.art}
@@ -110,7 +109,7 @@ function EntryBody({
           </Animated.View>
         ) : null}
 
-        <Animated.View {...enter(1)} style={{ gap: spacing.md }}>
+        <Animated.View {...enter()} style={{ gap: spacing.md }}>
           <AppText variant="hero" accessible={false}>
             {entry.emoji}
           </AppText>
@@ -129,14 +128,14 @@ function EntryBody({
         </Animated.View>
 
         {media?.type === "voice" ? (
-          <Animated.View {...enter(2)}>
+          <Animated.View {...enter()}>
             <Glass radius={radii.xl} contentStyle={{ padding: spacing.lg }}>
               <VoicePlayer seconds={media.seconds} wave={media.wave} />
             </Glass>
           </Animated.View>
         ) : null}
 
-        <Animated.View {...enter(3)}>
+        <Animated.View {...enter()}>
           <Glass radius={radii.xl} contentStyle={{ padding: spacing.lg, gap: spacing.xs }}>
             <View style={[styles.row, { gap: spacing.md, minHeight: 44 }]}>
               <ProfileAvatar
@@ -166,7 +165,7 @@ function EntryBody({
           </Glass>
         </Animated.View>
 
-        <Animated.View {...enter(4)} style={{ gap: spacing.sm }}>
+        <Animated.View {...enter()} style={{ gap: spacing.sm }}>
           {entry.mine && entry.editable ? (
             <>
               <Button
@@ -237,7 +236,7 @@ function EntryBody({
             onSuccess: () => {
               setDialog(null);
               toast.show("Deleted.");
-              router.back();
+              goBack("/days");
             },
             onError,
           });
@@ -300,7 +299,7 @@ export function EntryScreen({ id }: { id: string }) {
       <GlassScreen
         tabBar
         onBack={() => {
-          router.back();
+          goBack("/days");
         }}
       >
         <View style={[styles.grow, styles.center]}>
@@ -314,13 +313,10 @@ export function EntryScreen({ id }: { id: string }) {
         <GlassScreen
           tabBar
           onBack={() => {
-            router.back();
+            goBack("/days");
           }}
         >
-          <Animated.View
-            entering={FadeIn}
-            style={[styles.grow, styles.center, { gap: spacing.lg }]}
-          >
+          <Animated.View entering={ENTER} style={[styles.grow, styles.center, { gap: spacing.lg }]}>
             <GarnetMark size={96} progress={0} dim />
             <AppText variant="callout" color="textSecondary">
               This item isn't available here.

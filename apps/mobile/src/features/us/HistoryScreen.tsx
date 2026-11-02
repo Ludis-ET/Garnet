@@ -3,10 +3,9 @@
  * replies only: no totals, charts or "seen" (§5). How long signals are kept is open (U-09), and
  * the privacy sheet says so.
  */
-import { router } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
-import Animated, { FadeInDown } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { Temporal } from "temporal-polyfill";
 import { SideCharacter } from "@/components/character/SideCharacter";
 import { AppText } from "@/components/ui/AppText";
@@ -20,6 +19,8 @@ import { useNow } from "@/features/setup/useNow";
 import { SideScope, useTheme } from "@/theme/ThemeProvider";
 import { SignalRow } from "./components/UsParts";
 import { useSignalHistory, useUsOverview } from "./useUs";
+import { goBack } from "@/navigation/goBack";
+import { ENTER } from "@/theme/transitions";
 
 function HistoryContent() {
   const { colors, spacing, reduceMotion } = useTheme();
@@ -32,7 +33,7 @@ function HistoryContent() {
   const people = overview.data;
 
   const back = () => {
-    router.back();
+    goBack("/us");
   };
   if (items === undefined || people === undefined)
     return (
@@ -73,15 +74,13 @@ function HistoryContent() {
             </AppText>
           </View>
         ) : (
-          groups.map((g, gi) => (
+          groups.map((g) => (
             <Animated.View
               key={g.label}
               {...(reduceMotion
                 ? {}
                 : {
-                    entering: FadeInDown.delay(Math.min(gi, 6) * 60)
-                      .springify()
-                      .damping(18),
+                    entering: ENTER,
                   })}
               style={{ gap: spacing.sm }}
             >

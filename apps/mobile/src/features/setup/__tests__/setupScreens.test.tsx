@@ -145,7 +145,7 @@ describe("SETUP-03 Choose your side (P-51)", () => {
 });
 
 describe("SETUP-04 to SETUP-07", () => {
-  it("offers a photo only through a labelled, simulated permission prompt", async () => {
+  it("offers a photo only through a permission prompt (labelled with testing tools on)", async () => {
     await renderWith(<SetupScreen />, setupStore({ done: ["name", "side"], side: "ruby" }));
     await fireEvent.press(await screen.findByRole("radio", { name: "Photo" }, WAIT));
     await press("Choose a photo");
@@ -157,7 +157,11 @@ describe("SETUP-04 to SETUP-07", () => {
       ),
     ).toBeTruthy();
     await press("Open photo library");
-    expect(await screen.findByText("Simulated system prompt", {}, WAIT)).toBeTruthy();
+    // The prompt itself; its "Simulated" badge shows only with testing tools on (P-75).
+    expect(
+      await screen.findByText("“Garnet” would like to access your photos", {}, WAIT),
+    ).toBeTruthy();
+    expect(screen.queryByText("Simulated system prompt")).toBeNull();
     await press("Don't Allow");
     expect(
       await screen.findByText(
