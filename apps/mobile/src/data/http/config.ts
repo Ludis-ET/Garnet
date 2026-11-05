@@ -1,10 +1,10 @@
 /**
  * Where the API is, and which areas use it (P-76). Both are set when the app is built:
  *   EXPO_PUBLIC_API_URL=http://127.0.0.1:3000   (the PC, through `adb reverse`)
- *   EXPO_PUBLIC_API_AREAS=auth,pairing,setup    (areas moved from mock data to the API)
+ *   EXPO_PUBLIC_API_AREAS=auth,pairing,setup,settings   (areas moved from mock data to the API)
  * Unset, the app runs on mock data only, exactly as before. Areas move one at a time (B1 on).
  */
-export const API_AREAS = ["auth", "pairing", "setup", "settings", "profile"] as const;
+export const API_AREAS = ["auth", "pairing", "setup", "settings"] as const;
 export type ApiArea = (typeof API_AREAS)[number];
 
 /** A usable http(s) base URL, or null. */

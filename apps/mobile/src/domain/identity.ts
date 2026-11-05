@@ -22,12 +22,19 @@ export function isSideAvailable(side: GemSide, partnerSide: GemSide | null): boo
   return partnerSide !== side;
 }
 
-/** The setup steps, in order (SETUP-02 to SETUP-07; SETUP-08 is the summary). */
-export const SETUP_STEPS = ["name", "side", "photo", "time", "look", "alerts"] as const;
+/**
+ * The setup steps, in order (SETUP-02 to SETUP-07; SETUP-08 is the summary). "together" asks
+ * when the two got together: one answer for the pair, whoever gives it first (P-79).
+ */
+export const SETUP_STEPS = ["name", "side", "photo", "time", "together", "look", "alerts"] as const;
 export type SetupStep = (typeof SETUP_STEPS)[number];
 
 /** Steps a person may skip; the rest need an answer before the summary. */
-export const OPTIONAL_STEPS: ReadonlySet<SetupStep> = new Set<SetupStep>(["photo", "look"]);
+export const OPTIONAL_STEPS: ReadonlySet<SetupStep> = new Set<SetupStep>([
+  "photo",
+  "together",
+  "look",
+]);
 
 export interface NamePolicy {
   maxDisplayName: number;

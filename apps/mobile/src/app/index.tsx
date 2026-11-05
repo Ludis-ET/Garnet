@@ -7,7 +7,7 @@ import { useSetupState } from "@/features/setup/useSetup";
 import { useTheme } from "@/theme/ThemeProvider";
 
 /**
- * Entry gate: sends each account, pairing and setup state to its screen (AUTH-01 to AUTH-07,
+ * Entry gate: sends each account, pairing and setup state to its screen (AUTH-01 to AUTH-09,
  * PAIR-01 to PAIR-04, SETUP-01). Set-up people go to the Home placeholder until HOME-01 is
  * designed (P-49, B-04).
  */
@@ -30,6 +30,8 @@ export default function EntryGate() {
       return <Redirect href="/verify-email" />;
     case "expired":
       return <Redirect href="/session-expired" />;
+    case "registering":
+      return <Redirect href="/finish-account" />;
     case "signedIn":
       break;
   }

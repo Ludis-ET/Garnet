@@ -1,3 +1,4 @@
+import { TERMS_VERSION } from "@garnet/contracts";
 import type { DemoUser, OpenWhenLetter, Relationship } from "@/domain/models";
 import { createDemoAuth, type DemoAuthState } from "./demoAuth";
 import { createDemoDays, type DemoDaysState } from "./demoDays";
@@ -104,7 +105,7 @@ export function createDemoState(): DemoState {
         openedAt: null,
       },
     ],
-    auth: createDemoAuth(DEMO_ME_ID),
+    auth: createDemoAuth(DEMO_ME_ID, TERMS_VERSION),
     pairing: createDemoPairing(),
     profiles: createDemoProfiles(),
     home: createDemoHome(),

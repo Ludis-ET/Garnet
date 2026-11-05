@@ -63,7 +63,8 @@ export const useCreateAccount = () =>
 
 export const useResendVerification = () => useAuthAction((auth) => auth.resendVerification());
 
-export const useOpenVerificationLink = () => useAuthAction((auth) => auth.openVerificationLink());
+export const useOpenVerificationLink = () =>
+  useAuthMutation((auth, token: string | undefined) => auth.openVerificationLink(token));
 
 export const useFinishVerification = () => useAuthAction((auth) => auth.finishVerification());
 
@@ -78,3 +79,26 @@ export const useResetPassword = () =>
   );
 
 export const useSignOut = () => useAuthAction((auth) => auth.signOut());
+
+/** Which ways in this server offers (Google and Apple need the server set up for them). */
+export function useSignInMethods() {
+  const { auth } = useRepositories();
+  return useQuery({
+    queryKey: ["auth", "methods"],
+    queryFn: () => auth.signInMethods(),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export const useContinueWith = () =>
+  useAuthMutation((auth, provider: Parameters<AuthRepository["continueWith"]>[0]) =>
+    auth.continueWith(provider),
+  );
+
+export const useCompleteRegistration = () =>
+  useAuthMutation((auth, input: Parameters<AuthRepository["completeRegistration"]>[0]) =>
+    auth.completeRegistration(input),
+  );
+
+export const useConfirmEmailChange = () =>
+  useAuthMutation((auth, token: string) => auth.confirmEmailChange(token));

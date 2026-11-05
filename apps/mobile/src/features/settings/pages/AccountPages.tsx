@@ -5,6 +5,7 @@ import { Temporal } from "temporal-polyfill";
 import { ActionSheet } from "@/components/ui/ActionSheet";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
+import { Checklist } from "@/components/ui/Checklist";
 import { Glass } from "@/components/ui/Glass";
 import { InfoList } from "@/components/ui/InfoList";
 import { Notice } from "@/components/ui/Notice";
@@ -12,6 +13,12 @@ import { ProgressBar } from "@/components/ui/ProgressBar";
 import { TextField } from "@/components/ui/TextField";
 import { useToast } from "@/components/ui/Toast";
 import { serviceErrorMessage } from "@/features/auth/authUi";
+import {
+  fieldErrorMessage,
+  passwordChecks,
+  passwordError,
+  PASSWORD_POLICY_P78,
+} from "@/domain/auth";
 import { cityForZone } from "@/domain/identity";
 import { ProfileAvatar } from "@/features/setup/components/ProfileAvatar";
 import { useSaveSetup, useSetupState } from "@/features/setup/useSetup";
@@ -21,10 +28,14 @@ import { palette } from "@/theme/tokens";
 import { SettingsPage, SettingsRow, SettingsSection } from "../components/SettingsList";
 import { useTestingTools } from "@/features/prototype/devTools";
 import {
+  useAccountMethods,
+  useChangePassword,
   useDeleteAccount,
+  useDevices,
   useEndSpace,
   useExpireExport,
   usePrepareExport,
+  useSendPasswordLink,
   useSettings,
   useSignOutDevice,
   useSignOutOthers,
@@ -43,6 +54,27 @@ export function maskEmail(email: string): string {
   return `${user.slice(0, 2)}•••@${domain}`;
 }
 
+const MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+/** "12 March 1998". */
+function birthdayLabel(iso: string): string {
+  const [y = "", m = "", d = ""] = iso.split("-");
+  return `${String(Number(d))} ${MONTHS[Number(m) - 1] ?? ""} ${y}`;
+}
+
 /** SET-02 · Profile, with Save and Cancel (unsaved changes are kept until either). */
 export function ProfilePage() {
   const { spacing, radii } = useTheme();
@@ -51,7 +83,11 @@ export function ProfilePage() {
   const setup = useSetupState().data;
   const settings = useSettings().data;
   const save = useSaveSetup();
-  const [draft, setDraft] = useState<{ displayName: string; nickname: string } | null>(null);
+  const [draft, setDraft] = useState<{
+    displayName: string;
+    nickname: string;
+    homeCity: string;
+  } | null>(null);
   if (setup === undefined || settings === undefined)
     return (
       <SettingsPage title="Profile">
@@ -59,9 +95,16 @@ export function ProfilePage() {
       </SettingsPage>
     );
   const p = setup.profile;
-  const form = draft ?? { displayName: p.displayName, nickname: p.nickname };
+  const form = draft ?? {
+    displayName: p.displayName,
+    nickname: p.nickname,
+    homeCity: p.homeCity ?? "",
+  };
   const changed =
-    draft !== null && (draft.displayName !== p.displayName || draft.nickname !== p.nickname);
+    draft !== null &&
+    (draft.displayName !== p.displayName ||
+      draft.nickname !== p.nickname ||
+      draft.homeCity !== (p.homeCity ?? ""));
   const sideName = p.side === "ruby" ? "Ruby" : p.side === "sapphire" ? "Sapphire" : "Not chosen";
   return (
     <SettingsPage title="Profile">
@@ -91,9 +134,37 @@ export function ProfilePage() {
             setDraft({ ...form, nickname: t });
           }}
         />
+        <TextField
+          label="Home town"
+          icon="pin"
+          value={form.homeCity}
+          maxLength={80}
+          placeholder={cityForZone(p.timeZone ?? "UTC")}
+          autoCapitalize="words"
+          helper={`${setup.partner.name || "Your partner"} sees it.`}
+          onChangeText={(t) => {
+            setDraft({ ...form, homeCity: t });
+          }}
+        />
       </Glass>
       <SettingsSection title="Account">
-        <SettingsRow icon="mail" label="Email" value={maskEmail(settings.email)} />
+        <SettingsRow
+          icon="mail"
+          label="Email"
+          value={maskEmail(settings.email)}
+          onPress={() => {
+            router.push("/settings/email");
+          }}
+        />
+        <SettingsRow
+          icon="heart"
+          tint={palette.ruby500}
+          label="Birthday"
+          {...(settings.birthDate === null ? {} : { value: birthdayLabel(settings.birthDate) })}
+          onPress={() => {
+            router.push("/settings/birthday");
+          }}
+        />
         <SettingsRow
           icon="gem"
           tint={palette.ruby500}
@@ -107,6 +178,17 @@ export function ProfilePage() {
           label="Time zone"
           value={cityForZone(p.timeZone ?? "UTC")}
         />
+        {settings.termsVersion === null ? null : (
+          <SettingsRow
+            icon="shield"
+            tint={palette.violet400}
+            label="Terms and privacy"
+            detail={`Agreed to version ${settings.termsVersion}`}
+            onPress={() => {
+              router.push("/terms");
+            }}
+          />
+        )}
       </SettingsSection>
       {changed ? (
         <View style={{ gap: spacing.sm }}>
@@ -117,7 +199,11 @@ export function ProfilePage() {
             disabled={form.displayName.trim().length === 0}
             onPress={() => {
               save.mutate(
-                { displayName: form.displayName.trim(), nickname: form.nickname.trim() },
+                {
+                  displayName: form.displayName.trim(),
+                  nickname: form.nickname.trim(),
+                  homeCity: form.homeCity.trim() === "" ? null : form.homeCity.trim(),
+                },
                 {
                   onSuccess: () => {
                     setDraft(null);
@@ -148,29 +234,33 @@ function ago(at: string, now: Temporal.Instant): string {
   return `Active ${String(Math.floor(hours / 24))} days ago`;
 }
 
-/** SET-12 · Devices and password (multi-device is open: U-19, U-27; simulated here). */
+/** SET-12 · Devices and password (ADR-0006). What a signed-out device keeps stays open (U-27). */
 export function DevicesPage() {
   const { spacing, radii } = useTheme();
   const toast = useToast();
   const onError = useOnError();
-  const data = useSettings().data;
+  const devices = useDevices().data;
+  const methods = useAccountMethods().data;
   const signOut = useSignOutDevice();
   const signOutOthers = useSignOutOthers();
+  const change = useChangePassword();
+  const sendLink = useSendPasswordLink();
   const [confirm, setConfirm] = useState<string | null>(null);
   const [pw, setPw] = useState({ current: "", next: "" });
   const [pwError, setPwError] = useState<string | null>(null);
-  if (data === undefined)
+  if (devices === undefined)
     return (
       <SettingsPage title="Devices & password">
         <ActivityIndicator accessibilityLabel="Loading" />
       </SettingsPage>
     );
   const now = Temporal.Now.instant();
-  const others = data.devices.filter((d) => !d.current);
+  const others = devices.filter((d) => !d.current);
+  const checks = passwordChecks(pw.next, pw.next, PASSWORD_POLICY_P78);
   return (
     <SettingsPage title="Devices & password">
       <SettingsSection title="Signed in">
-        {data.devices.map((d) => (
+        {devices.map((d) => (
           <SettingsRow
             key={d.id}
             icon="devices"
@@ -204,43 +294,99 @@ export function DevicesPage() {
         />
       ) : null}
 
-      <AppText variant="headline">Change password</AppText>
-      <Glass radius={radii.xl} contentStyle={{ padding: spacing.lg, gap: spacing.md }}>
-        <TextField
-          label="Current password"
-          icon="lock"
-          secure
-          value={pw.current}
-          onChangeText={(t) => {
-            setPw({ ...pw, current: t });
-          }}
-        />
-        <TextField
-          label="New password"
-          icon="key"
-          secure
-          value={pw.next}
-          helper="At least 8 characters."
-          onChangeText={(t) => {
-            setPw({ ...pw, next: t });
-            setPwError(null);
-          }}
-          {...(pwError === null ? {} : { error: pwError })}
-        />
-        <Button
-          label="Change password"
-          variant="primary"
-          disabled={pw.current.length === 0 || pw.next.length === 0}
-          onPress={() => {
-            if (pw.next.length < 8) {
-              setPwError("Use at least 8 characters.");
-              return;
-            }
-            setPw({ current: "", next: "" });
-            toast.show("Password changed.");
-          }}
-        />
-      </Glass>
+      {methods?.password === false ? (
+        <Glass radius={radii.xl} contentStyle={{ padding: spacing.lg, gap: spacing.md }}>
+          <AppText variant="headline">No password yet</AppText>
+          <AppText variant="footnote" color="textSecondary">
+            You sign in with Google or Apple. Add a password as another way in.
+          </AppText>
+          <Button
+            label="Email me a link to set one"
+            variant="secondary"
+            loading={sendLink.isPending}
+            onPress={() => {
+              sendLink.mutate(undefined, {
+                onSuccess: () => {
+                  toast.show("We've emailed you a link to set a password.");
+                },
+                onError,
+              });
+            }}
+          />
+        </Glass>
+      ) : (
+        <>
+          <AppText variant="headline">Change password</AppText>
+          <Glass radius={radii.xl} contentStyle={{ padding: spacing.lg, gap: spacing.md }}>
+            <TextField
+              label="Current password"
+              icon="lock"
+              secure
+              value={pw.current}
+              autoComplete="current-password"
+              textContentType="password"
+              onChangeText={(t) => {
+                setPw({ ...pw, current: t });
+                setPwError(null);
+              }}
+            />
+            <TextField
+              label="New password"
+              icon="key"
+              secure
+              value={pw.next}
+              autoComplete="new-password"
+              textContentType="newPassword"
+              onChangeText={(t) => {
+                setPw({ ...pw, next: t });
+                setPwError(null);
+              }}
+              {...(pwError === null ? {} : { error: pwError })}
+            />
+            <Checklist
+              items={[
+                {
+                  label: `At least ${String(PASSWORD_POLICY_P78.minLength)} characters`,
+                  met: checks.longEnough,
+                },
+                { label: "Not easy to guess", met: checks.hardToGuess },
+              ]}
+            />
+            <AppText variant="footnote" color="textSecondary">
+              Changing it signs you out of your other devices.
+            </AppText>
+            <Button
+              label="Change password"
+              variant="primary"
+              loading={change.isPending}
+              disabled={pw.current.length === 0 || pw.next.length === 0}
+              onPress={() => {
+                const problem = passwordError(pw.next, PASSWORD_POLICY_P78);
+                if (problem !== null) {
+                  setPwError(fieldErrorMessage(problem, PASSWORD_POLICY_P78));
+                  return;
+                }
+                change.mutate(
+                  { current: pw.current, next: pw.next },
+                  {
+                    onSuccess: (r) => {
+                      if (r.ok) {
+                        setPw({ current: "", next: "" });
+                        toast.show("Password changed.");
+                      } else if (r.reason === "wrong-password")
+                        setPwError("That didn't match your current password.");
+                      else if (r.reason === "rate-limited")
+                        setPwError("That's a lot of tries. Please wait a moment.");
+                      else setPwError("That didn't work. Please try again.");
+                    },
+                    onError,
+                  },
+                );
+              }}
+            />
+          </Glass>
+        </>
+      )}
       <SettingsSection title="Coming later">
         <SettingsRow
           icon="shield"
@@ -296,6 +442,12 @@ export function ExportPage() {
   const expire = useExpireExport();
   const partner = data?.partner.name ?? "your partner";
   const state = data?.settings.export.state ?? "none";
+  if (data?.dataRights === false)
+    return (
+      <SettingsPage title="Export my data">
+        <NotYet text="Exporting your data isn't available yet. Everything stays safe in the meantime." />
+      </SettingsPage>
+    );
   return (
     <SettingsPage title="Export my data" intro="A copy of what's yours, to keep somewhere safe.">
       <InfoList
@@ -454,12 +606,24 @@ function CarefulFlow({
   );
 }
 
+/** Export, ending the space and deleting the account wait on U-20 and U-23 (phase B9). */
+function NotYet({ text }: { text: string }) {
+  return <Notice tone="info" icon="clock" text={text} />;
+}
+
 /** SET-14 · End our space (direction P-37: export first; what happens to shared content is U-20). */
 export function EndSpacePage() {
   const toast = useToast();
   const onError = useOnError();
   const end = useEndSpace();
-  const partner = useSettings().data?.partner.name ?? "your partner";
+  const data = useSettings().data;
+  const partner = data?.partner.name ?? "your partner";
+  if (data?.dataRights === false)
+    return (
+      <SettingsPage title="End our space">
+        <NotYet text="Ending your space isn't available yet: what happens to what you've shared is still being decided." />
+      </SettingsPage>
+    );
   return (
     <CarefulFlow
       title="End our space"
@@ -498,6 +662,12 @@ export function DeleteAccountPage() {
   const toast = useToast();
   const onError = useOnError();
   const remove = useDeleteAccount();
+  if (useSettings().data?.dataRights === false)
+    return (
+      <SettingsPage title="Delete my account">
+        <NotYet text="Deleting your account from the app isn't available yet: what happens to what you've shared is still being decided." />
+      </SettingsPage>
+    );
   return (
     <CarefulFlow
       title="Delete my account"

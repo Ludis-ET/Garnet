@@ -9,9 +9,27 @@ export interface DemoAccount {
   userId: string;
   displayName: string;
   email: string;
+  /** Empty for an account made with Google or Apple only. */
   password: string;
   verified: boolean;
+  /** Google and Apple ways in joined to this account (P-79). */
+  providers: ("google" | "apple")[];
+  /** Registration details (P-79); null until given. */
+  birthDate: string | null;
+  /** When the terms were accepted, for Settings. */
+  termsAcceptedAt?: string;
+  termsVersion: string | null;
 }
+
+/**
+ * What the simulated Google and Apple sign-ins return. Google's email is the demo account's,
+ * so it joins that account (no second account); Apple's is a private relay address, so it
+ * makes a new account that still needs its birthday and the terms.
+ */
+export const DEMO_PROVIDER_IDENTITIES = {
+  google: { email: "selam@example.test", name: "Selam" },
+  apple: { email: "x7k2m9qp@privaterelay.appleid.com", name: "" },
+} as const;
 
 export type DemoAuthStatus =
   | { kind: "signedOut" }
@@ -49,7 +67,7 @@ export const DEMO_RESET_TOKENS = {
   invalid: "demo-reset-unknown",
 } as const;
 
-export function createDemoAuth(meId: string): DemoAuthState {
+export function createDemoAuth(meId: string, termsVersion: string): DemoAuthState {
   return {
     accounts: [
       {
@@ -58,6 +76,9 @@ export function createDemoAuth(meId: string): DemoAuthState {
         email: DEMO_EMAIL,
         password: DEMO_PASSWORD,
         verified: true,
+        providers: [],
+        birthDate: "1998-03-12",
+        termsVersion,
       },
     ],
     status: { kind: "signedOut" },

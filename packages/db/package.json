@@ -2,7 +2,7 @@
   "name": "@garnet/db",
   "version": "0.0.0",
   "private": true,
-  "description": "PostgreSQL migrations, the migration runner, local seeds and test helpers (B-13, P-76).",
+  "description": "PostgreSQL migrations, the migration runner and test helpers (B-13, P-76).",
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
@@ -10,8 +10,6 @@
   },
   "scripts": {
     "migrate": "node src/cli.ts migrate",
-    "seed": "node src/cli.ts seed",
-    "dev-session": "node src/cli.ts dev-session",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json"
   },

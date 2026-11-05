@@ -18,12 +18,13 @@ import { TextField } from "@/components/ui/TextField";
 import { useToast } from "@/components/ui/Toast";
 import { Toggle } from "@/components/ui/Toggle";
 import { DEMO_EMAIL, DEMO_PASSWORD } from "@/data/fixtures/demoAuth";
-import { fieldErrorMessage, hasErrors, PASSWORD_POLICY_P25, signInErrors } from "@/domain/auth";
+import { fieldErrorMessage, hasErrors, PASSWORD_POLICY_P78, signInErrors } from "@/domain/auth";
 import { useTheme } from "@/theme/ThemeProvider";
 import { touchTarget } from "@/theme/tokens";
 import { formatSeconds, serviceErrorMessage, useCountdown } from "../authUi";
 import { GlassScreen } from "@/components/ui/GlassScreen";
 import { useSignIn } from "../useAuth";
+import { SocialButtons } from "../components/SocialButtons";
 import { goBack } from "@/navigation/goBack";
 
 type Problem =
@@ -44,7 +45,7 @@ export function SignInScreen() {
 
   const errors = submitted ? signInErrors(email, password) : {};
   const errorProp = (e: (typeof errors)["email"]) =>
-    e === undefined ? {} : { error: fieldErrorMessage(e, PASSWORD_POLICY_P25) };
+    e === undefined ? {} : { error: fieldErrorMessage(e, PASSWORD_POLICY_P78) };
   const waiting = problem?.kind === "rate-limited" && wait > 0;
 
   const submit = () => {
@@ -115,6 +116,7 @@ export function SignInScreen() {
       </View>
 
       <View style={{ gap: spacing.md }}>
+        <SocialButtons divider="below" />
         <FieldGroup shakeKey={problem?.at}>
           <TextField
             appearance="row"

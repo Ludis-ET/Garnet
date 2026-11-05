@@ -4,6 +4,7 @@
  * Open questions stay open: the quiet-hours window (U-21) has no default, only a labelled
  * suggestion; reminders start "not chosen" and send nothing (P-65).
  */
+import { defaultSettingsDoc } from "@garnet/contracts";
 import type { NotifyGroup, NotifyMode, PreviewMode } from "./notifications";
 
 export type ReminderLevel = "off" | "gentle" | "custom";
@@ -58,44 +59,9 @@ export interface UserSettings {
   location: { share: boolean };
 }
 
+/** The server's defaults, one definition for both (B2), plus the export state it keeps apart. */
 export function defaultSettings(): UserSettings {
-  return {
-    // Categories start on (P-52); each person can quieten or turn off any group.
-    notify: {
-      messages: "immediate",
-      signals: "immediate",
-      days: "immediate",
-      letters: "immediate",
-      events: "immediate",
-      account: "immediate",
-      reminders: "off",
-    },
-    sound: true,
-    vibration: true,
-    badge: true,
-    quiet: { on: false, start: null, end: null },
-    previews: "generic",
-    reminders: null,
-    partnerNickname: "",
-    greeting: "time",
-    customGreeting: "",
-    export: { state: "none", readyAt: null },
-    home: {
-      ring: true,
-      watchers: true,
-      cards: {
-        now: true,
-        messages: true,
-        upcoming: true,
-        letters: true,
-        memory: true,
-        today: true,
-      },
-    },
-    motion: "system",
-    haptics: true,
-    location: { share: true },
-  };
+  return { ...defaultSettingsDoc(), export: { state: "none", readyAt: null } };
 }
 
 /** Fills in anything missing (settings saved by an older prototype build). */

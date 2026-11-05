@@ -1,4 +1,4 @@
-# Garnet's local backend (P-76, phase B0). Local development only: never deploy this.
+# Garnet's local backend (P-76, phases B0 and B1). Local development only: never deploy this.
 # Bound to 127.0.0.1, so nothing outside this PC can reach it. Hosting waits on U-07.
 # The passwords below are local-only defaults, not secrets; override them in your shell.
 name: garnet
@@ -23,6 +23,14 @@ services:
       interval: 2s
       timeout: 3s
       retries: 30
+
+  # B1: every account email (verification, reset) lands here; nothing is ever sent outside.
+  # Inbox: http://127.0.0.1:8025 (on the phone too, after `adb reverse tcp:8025 tcp:8025`).
+  mailpit:
+    image: axllent/mailpit:v1.32.0@sha256:0790692be935ea4420d085694f7985b1f692ca6a8771ab0e0bd8ba75ac180498
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
 
 volumes:
   garnet-postgres:

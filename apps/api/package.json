@@ -5,19 +5,23 @@
   "description": "Garnet API: NestJS on Fastify, PostgreSQL through Kysely with row-level security (B0, P-76). Local only until U-07.",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/main.ts",
-    "start": "tsx src/main.ts",
+    "dev": "tsx watch --env-file-if-exists=.env src/main.ts",
+    "start": "tsx --env-file-if-exists=.env src/main.ts",
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "seed": "tsx --env-file-if-exists=.env src/dev/seed.ts"
   },
   "dependencies": {
+    "@better-auth/expo": "1.7.13",
     "@garnet/contracts": "workspace:*",
     "@garnet/db": "workspace:*",
     "@nestjs/common": "12.2.0",
     "@nestjs/core": "12.2.0",
     "@nestjs/platform-fastify": "12.2.0",
+    "better-auth": "1.7.13",
     "fastify": "5.12.7",
     "kysely": "0.29.7",
+    "nodemailer": "10.2.1",
     "pg": "8.23.1",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2",
@@ -26,7 +30,9 @@
   "devDependencies": {
     "@electric-sql/pglite": "catalog:",
     "@types/node": "^24.19.1",
+    "@types/nodemailer": "8.0.2",
     "@types/pg": "8.23.1",
+    "fast-check": "catalog:",
     "tsx": "4.23.15",
     "typescript": "catalog:",
     "vitest": "catalog:"

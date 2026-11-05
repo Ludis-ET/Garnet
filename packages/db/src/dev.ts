@@ -1,30 +1,44 @@
-import { randomUUID } from "node:crypto";
 import type { SqlClient } from "./migrate.ts";
-import { hashToken, newToken } from "./tokens.ts";
 
 /**
- * Local development only (P-76, phase B0): two fictional people in one relationship,
- * and a way to give one of them a session before sign-in exists (B1). Nothing here is reachable
- * through the API; the CLI refuses any database that isn't on this machine.
+ * Test helpers (B0, B1): two fictional people in one relationship, written straight into a
+ * database. Accounts for local use are created by the API's seed through Better Auth instead,
+ * so passwords are hashed the way sign-up hashes them; these people have no password.
  */
 export const DEV_PEOPLE = {
-  selam: { id: "0192f0a0-0000-7000-8000-00000000a001", email: "selam@example.test" },
-  noah: { id: "0192f0a0-0000-7000-8000-00000000a002", email: "noah@example.test" },
+  selam: {
+    id: "0192f0a0-0000-7000-8000-00000000a001",
+    email: "selam@example.test",
+    name: "Selam",
+    birthDate: "1998-03-12",
+  },
+  noah: {
+    id: "0192f0a0-0000-7000-8000-00000000a002",
+    email: "noah@example.test",
+    name: "Noah",
+    birthDate: "1997-09-03",
+  },
 } as const;
+
+/** The terms version the seeded people accepted (P-79; the API's TERMS_VERSION). */
+export const DEV_TERMS_VERSION = "2026-11-04";
 export type DevPerson = keyof typeof DEV_PEOPLE;
 
 export const DEV_RELATIONSHIP_ID = "0192f0a0-0000-7000-8000-00000000b001";
 
-/** A password hash no password can match (sign-in arrives in B1). */
-const NO_PASSWORD = "!dev-seed-no-password";
-
-/** Adds the two people and their relationship if they aren't there. Safe to run again. */
+/** Adds the two people, their profiles and their relationship if missing. Safe to run again. */
 export async function seedDev(db: SqlClient): Promise<void> {
   for (const p of Object.values(DEV_PEOPLE)) {
     await db.query(
-      `insert into app_user (id, email, password_hash, email_verified_at)
-       values ($1, $2, $3, now()) on conflict (id) do nothing`,
-      [p.id, p.email, NO_PASSWORD],
+      `insert into app_user (id, email, name, email_verified, birth_date, terms_version,
+                             terms_accepted_at)
+       values ($1, $2, $3, true, $4, $5, now()) on conflict (id) do nothing`,
+      [p.id, p.email, p.name, p.birthDate, DEV_TERMS_VERSION],
+    );
+    await db.query(
+      `insert into profile (user_id, display_name) values ($1, $2)
+       on conflict (user_id) do nothing`,
+      [p.id, p.name],
     );
   }
   await db.query("insert into relationship (id) values ($1) on conflict (id) do nothing", [
@@ -41,22 +55,6 @@ export async function seedDev(db: SqlClient): Promise<void> {
       [DEV_RELATIONSHIP_ID, p.id],
     );
   }
-}
-
-/** A new session for one of the seeded people; returns the token, which is never stored. */
-export async function createDevSession(
-  db: SqlClient,
-  person: DevPerson,
-  days = 30,
-): Promise<{ token: string; sessionId: string }> {
-  const token = newToken();
-  const sessionId = randomUUID();
-  await db.query(
-    `insert into session (id, user_id, token_hash, expires_at)
-     values ($1, $2, $3, now() + make_interval(days => $4))`,
-    [sessionId, DEV_PEOPLE[person].id, hashToken(token), days],
-  );
-  return { token, sessionId };
 }
 
 /** True only for a database on this machine. */

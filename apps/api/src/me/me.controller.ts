@@ -1,7 +1,7 @@
 import { Controller, Get, Inject } from "@nestjs/common";
 import type { Me } from "@garnet/contracts";
 import type { Kysely } from "kysely";
-import { CurrentViewer } from "../auth/session.guard";
+import { BeforeRegistration, CurrentViewer } from "../auth/session.guard";
 import { asViewer, KYSELY, type Database, type Viewer } from "../db/database";
 
 /**
@@ -13,6 +13,7 @@ export class MeController {
   constructor(@Inject(KYSELY) private readonly db: Kysely<Database>) {}
 
   @Get()
+  @BeforeRegistration()
   async me(@CurrentViewer() viewer: Viewer): Promise<Me> {
     const membership = await asViewer(this.db, viewer, (trx) =>
       trx

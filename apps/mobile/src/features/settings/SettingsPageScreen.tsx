@@ -1,3 +1,4 @@
+import { BirthdayPage, ChangeEmailPage, SignInMethodsPage } from "./pages/AccessPages";
 import { AppText } from "@/components/ui/AppText";
 import { SettingsPage } from "./components/SettingsList";
 import {
@@ -37,6 +38,12 @@ export function SettingsPageScreen({ page }: { page: string }) {
       return <ProfilePage />;
     case "devices":
       return <DevicesPage />;
+    case "sign-in-methods":
+      return <SignInMethodsPage />;
+    case "email":
+      return <ChangeEmailPage />;
+    case "birthday":
+      return <BirthdayPage />;
     case "export":
       return <ExportPage />;
     case "end-space":

@@ -52,6 +52,7 @@ function setupStore(profile: Partial<Profile> = {}, partnerSide: GemSide | null 
     profiles: {
       byUser: { [DEMO_ME_ID]: { ...newProfile("Selam"), ...profile } },
       partner: { ...s.profiles.partner, side: partnerSide },
+      togetherSince: null,
     },
   }));
   return store;
@@ -90,7 +91,7 @@ describe("SETUP-02 Your name", () => {
     expect(
       await screen.findByRole("header", { name: "What should Noah call you?" }, WAIT),
     ).toBeTruthy();
-    expect(screen.getByLabelText("Step 1 of 6, Name")).toBeTruthy();
+    expect(screen.getByLabelText("Step 1 of 7, Name")).toBeTruthy();
     expect(screen.getByText("A little thought from Selam.")).toBeTruthy();
     await fireEvent.changeText(screen.getByLabelText("Nickname (optional)"), "Sel");
     expect(await screen.findByText("A little thought from Sel.", {}, WAIT)).toBeTruthy();
@@ -183,11 +184,58 @@ describe("SETUP-04 to SETUP-07", () => {
     expect(screen.getByText("London's time changes with UK daylight saving.")).toBeTruthy();
   });
 
+  it("saves an optional home town with the time zone (P-79)", async () => {
+    const store = setupStore({
+      done: ["name", "side", "photo"],
+      side: "ruby",
+      timeZone: "Africa/Addis_Ababa",
+    });
+    await renderWith(<SetupScreen />, store);
+    await fireEvent.changeText(
+      await screen.findByLabelText("Home town (optional)", {}, WAIT),
+      "  Bahir Dar ",
+    );
+    await press("Continue");
+    expect(
+      await screen.findByRole("header", { name: "When did you and Noah get together?" }, WAIT),
+    ).toBeTruthy();
+    expect(mine(store)?.homeCity).toBe("Bahir Dar");
+  });
+
+  it("asks when the two got together, for both, and refuses a day still to come (P-79)", async () => {
+    const store = setupStore({
+      done: ["name", "side", "photo", "time"],
+      side: "ruby",
+      timeZone: "Africa/Addis_Ababa",
+    });
+    await renderWith(<SetupScreen />, store);
+    await screen.findByRole("header", { name: "When did you and Noah get together?" }, WAIT);
+    const type = async (label: string, text: string) => {
+      await fireEvent.changeText(await screen.findByLabelText(label, {}, WAIT), text);
+    };
+    await type("Together since, day", "02");
+    await type("Together since, month", "05");
+    await type("Together since, year", "2099");
+    await press("Continue");
+    expect(
+      await screen.findByText(
+        "That's still to come. Pick a day that's already happened.",
+        {},
+        WAIT,
+      ),
+    ).toBeTruthy();
+    await type("Together since, year", "2021");
+    await press("Continue");
+    expect(await screen.findByRole("header", { name: "Your look" }, WAIT)).toBeTruthy();
+    expect(store.read().profiles.togetherSince).toBe("2021-05-02");
+    expect(mine(store)?.done).toContain("together");
+  });
+
   it("keeps quiet hours on without inventing hours, and previews only the generic text", async () => {
     await renderWith(
       <SetupScreen />,
       setupStore({
-        done: ["name", "side", "photo", "time", "look"],
+        done: ["name", "side", "photo", "time", "together", "look"],
         side: "sapphire",
         timeZone: "Africa/Addis_Ababa",
       }),
@@ -213,7 +261,7 @@ describe("SETUP-08 You're all set", () => {
     const store = await renderWith(
       <SetupScreen />,
       setupStore({
-        done: ["name", "side", "photo", "time", "look", "alerts"],
+        done: ["name", "side", "photo", "time", "together", "look", "alerts"],
         side: "ruby",
         nickname: "Sel",
         timeZone: "Africa/Addis_Ababa",

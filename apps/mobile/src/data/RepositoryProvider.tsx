@@ -11,6 +11,8 @@ import { Temporal } from "temporal-polyfill";
 import { publishWidgets, widgetsSupported } from "@/widgets/publish";
 import { buildWidgetSnapshot } from "@/widgets/snapshot";
 import { MockStore } from "./mock/MockStore";
+import { withApiAreas } from "./http/apiRepositories";
+import { API_AREAS_ON } from "./http/config";
 import { createMockRepositories } from "./mock/mockRepositories";
 import type { Repositories } from "./repositories/types";
 
@@ -31,7 +33,8 @@ export function RepositoryProvider({
 }) {
   const value = useMemo<DataContextValue>(() => {
     const demo = store ?? new MockStore();
-    return { demo, repositories: createMockRepositories(demo) };
+    // Areas named in EXPO_PUBLIC_API_AREAS use the API; the rest stay on mock data (P-76).
+    return { demo, repositories: withApiAreas(createMockRepositories(demo), demo) };
   }, [store]);
   return (
     <DataContext.Provider value={value}>
@@ -42,16 +45,27 @@ export function RepositoryProvider({
   );
 }
 
+/** Query roots that belong to an area on the API: the mock store says nothing about them. */
+const API_ROOTS: ReadonlySet<unknown> = new Set<unknown>(API_AREAS_ON);
+
 /**
  * Prototype controls (SYS-06) change the mock store directly; refresh cached queries whenever
- * it changes so every screen reflects the new simulated state.
+ * it changes so every screen reflects the new simulated state. Queries on the API are left
+ * alone: sample chat moving along must not mean a round trip to the server.
  */
 function DemoQuerySync({ store }: { store: MockStore }) {
   const client = useQueryClient();
   // Never cancel a refetch already on its way: with simulated latency and frequent changes
   // (upload progress, P-61) cancelling would keep every screen from ever updating.
   useEffect(
-    () => store.subscribe(() => void client.invalidateQueries(undefined, { cancelRefetch: false })),
+    () =>
+      store.subscribe(
+        () =>
+          void client.invalidateQueries(
+            { predicate: (q) => !API_ROOTS.has(q.queryKey[0]) },
+            { cancelRefetch: false },
+          ),
+      ),
     [store, client],
   );
   return null;

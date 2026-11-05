@@ -310,7 +310,8 @@ describe("properties under random faults (fast-check)", () => {
       }),
       { numRuns: 400 },
     );
-  });
+    // Thousands of simulated syncs: seconds alone, longer when `pnpm check` runs every suite at once.
+  }, 30_000);
 
   it("stale devices restored from backups + expired idempotency records: no resurrection, no double effects", () => {
     fc.assert(

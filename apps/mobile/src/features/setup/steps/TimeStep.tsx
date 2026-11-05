@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
 import { Glass } from "@/components/ui/Glass";
+import { TextField } from "@/components/ui/TextField";
 import { Icon } from "@/components/ui/Icon";
 import {
   cityForZone,
@@ -26,12 +27,17 @@ export function TimeStep({
   partnerName,
   partnerZone,
   onZone,
+  homeCity,
+  onHomeCity,
 }: {
   zone: string;
   side: GemSide | null;
   partnerName: string;
   partnerZone: string | null;
   onZone: (zone: string) => void;
+  /** The home town as the person writes it (P-79): optional, shown to the partner. */
+  homeCity: string;
+  onHomeCity: (city: string) => void;
 }) {
   const { colors, radii, spacing } = useTheme();
   const now = useNow();
@@ -79,6 +85,23 @@ export function TimeStep({
           </AppText>
         </Pressable>
       </Glass>
+
+      <TextField
+        label="Home town (optional)"
+        placeholder={cityForZone(zone)}
+        value={homeCity}
+        onChangeText={onHomeCity}
+        icon="pin"
+        maxLength={80}
+        autoComplete="address-line2"
+        autoCapitalize="words"
+        returnKeyType="done"
+        helper={
+          partnerName === ""
+            ? "Where you really are, if it isn't the city above."
+            : `Where you really are, if it isn't the city above. ${partnerName} sees it.`
+        }
+      />
 
       <Glass radius={radii.xl} contentStyle={{ padding: spacing.lg, gap: spacing.lg }}>
         <View style={styles.row}>

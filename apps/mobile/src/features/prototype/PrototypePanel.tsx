@@ -324,6 +324,7 @@ export function PrototypePanel() {
                               side: "ruby",
                               avatar: { kind: "photo", photo: "sunrise" },
                               timeZone: "Africa/Addis_Ababa",
+                              homeCity: "Addis Ababa",
                               appearance: "system",
                               accent: "rich",
                               notifications: {
@@ -332,7 +333,7 @@ export function PrototypePanel() {
                                 support: true,
                                 days: true,
                               },
-                              done: ["name", "side", "photo", "time", "look", "alerts"],
+                              done: ["name", "side", "photo", "time", "together", "look", "alerts"],
                               complete: true,
                             },
                           },
@@ -340,8 +341,11 @@ export function PrototypePanel() {
                             name: "Noah",
                             side: "sapphire",
                             timeZone: "Europe/London",
+                            homeCity: "London",
+                            birthDate: "1997-09-03",
                             ready: true,
                           },
+                          togetherSince: "2021-05-02",
                         },
                       };
                     });

@@ -120,7 +120,7 @@ export function TextField({
           {...input}
           editable={!disabled}
           secureTextEntry={secure && !revealed}
-          accessibilityLabel={label}
+          accessibilityLabel={input.accessibilityLabel ?? label}
           accessibilityState={{ disabled }}
           {...(invalid
             ? { accessibilityHint: error }

@@ -1,6 +1,7 @@
 /**
  * AUTH-01 · Welcome (Daylight Glass, P-48). Two tilted glass windows, Ruby's and Sapphire's,
  * overlap around the floating Garnet crystal; "Two lives. One space."; one primary action.
+ * Google and Apple come first when the server offers them (P-79), then email.
  * Never: a "days apart" counter or sign-up pressure (docs/design/prompts/01).
  */
 import { useRouter } from "expo-router";
@@ -13,6 +14,7 @@ import { Icon } from "@/components/ui/Icon";
 import { useTheme } from "@/theme/ThemeProvider";
 import { GlassScreen } from "@/components/ui/GlassScreen";
 import { HeroWindows } from "../components/HeroWindows";
+import { SocialButtons } from "../components/SocialButtons";
 import { ENTER } from "@/theme/transitions";
 
 export function WelcomeScreen() {
@@ -27,8 +29,9 @@ export function WelcomeScreen() {
     <GlassScreen
       footer={
         <Animated.View {...enter()} style={{ gap: spacing.sm }}>
+          <SocialButtons divider="below" />
           <Button
-            label="Get started"
+            label="Continue with email"
             onPress={() => {
               router.push("/create-account");
             }}

@@ -37,3 +37,13 @@ export function useCompleteSetup() {
     onSettled: () => client.invalidateQueries({ queryKey: setupKeys.all }),
   });
 }
+
+/** "Together since", for both partners (P-79). */
+export function useSetTogetherSince() {
+  const { setup } = useRepositories();
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (date: string | null) => setup.setTogetherSince(date),
+    onSettled: () => client.invalidateQueries({ queryKey: setupKeys.all }),
+  });
+}

@@ -4,8 +4,8 @@
  * resent with cooldown, verified (sparkles), expired link, already verified.
  */
 import { Haptics } from "@/components/ui/haptics";
-import { Redirect, useRouter } from "expo-router";
-import { useState } from "react";
+import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { GarnetMark } from "@/components/brand/GarnetMark";
@@ -28,6 +28,7 @@ import {
   useResendVerification,
 } from "../useAuth";
 import { ENTER } from "@/theme/transitions";
+import { API_AREAS_ON } from "@/data/http/config";
 
 export function VerifyEmailScreen() {
   const router = useRouter();
@@ -41,6 +42,24 @@ export function VerifyEmailScreen() {
   const [expired, setExpired] = useState(false);
   const [cooldown, setCooldown] = useState({ seconds: 0, key: 0 });
   const wait = useCountdown(cooldown.seconds, cooldown.key);
+  // The email's link (garnet://verify-email?token=…) opens this screen with its token: verify
+  // once, straight away (B1).
+  const { token } = useLocalSearchParams<{ token?: string }>();
+  const linkToken = typeof token === "string" && token !== "" ? token : undefined;
+  const handled = useRef<string | null>(null);
+  const { mutate: openLink } = open;
+  useEffect(() => {
+    if (linkToken === undefined || handled.current === linkToken) return;
+    handled.current = linkToken;
+    openLink(linkToken, {
+      onSuccess: (result) => {
+        setExpired(!result.ok);
+      },
+      onError: (error) => {
+        toast.show(serviceErrorMessage(error), "error");
+      },
+    });
+  }, [linkToken, openLink, toast]);
 
   if (status.data === undefined) {
     return (
@@ -90,20 +109,23 @@ export function VerifyEmailScreen() {
     <GlassScreen
       footer={
         <>
-          <Button
-            label="Open email preview (demo)"
-            loading={open.isPending}
-            onPress={() => {
-              open.mutate(undefined, {
-                onSuccess: (result) => {
-                  setExpired(!result.ok);
-                  if (result.ok && Platform.OS !== "web")
-                    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                },
-                onError,
-              });
-            }}
-          />
+          {/* The email preview is a mock-data stand-in; with the API the real email has the link. */}
+          {API_AREAS_ON.has("auth") ? null : (
+            <Button
+              label="Open email preview (demo)"
+              loading={open.isPending}
+              onPress={() => {
+                open.mutate(undefined, {
+                  onSuccess: (result) => {
+                    setExpired(!result.ok);
+                    if (result.ok && Platform.OS !== "web")
+                      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  },
+                  onError,
+                });
+              }}
+            />
+          )}
           <Button
             label={wait > 0 ? `Resend in ${formatSeconds(wait)}` : "Resend email"}
             variant="secondary"

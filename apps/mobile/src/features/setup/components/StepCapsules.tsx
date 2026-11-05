@@ -8,7 +8,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useTheme } from "@/theme/ThemeProvider";
 
-const LABELS = ["Name", "Side", "Photo", "Time", "Look", "Alerts"] as const;
+const LABELS = ["Name", "Side", "Photo", "Time", "Together", "Look", "Alerts"] as const;
 
 function Capsule({ state }: { state: "done" | "current" | "next" }) {
   const { colors, motion, reduceMotion } = useTheme();
@@ -44,7 +44,7 @@ function Capsule({ state }: { state: "done" | "current" | "next" }) {
 /**
  * Setup progress (SETUP-01, P-51): six short liquid capsules. The current one stretches wider
  * with a spring and lights; finished ones fill with the side colour. Announced as
- * "Step 2 of 6, Side".
+ * "Step 2 of 7, Side".
  */
 export function StepCapsules({ index }: { index: number }) {
   const { spacing } = useTheme();

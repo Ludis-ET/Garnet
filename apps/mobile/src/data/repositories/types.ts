@@ -67,6 +67,11 @@ export type AuthStatus =
   /** Account created, waiting for the email link. Only a masked address is exposed. */
   | { kind: "verifying"; maskedEmail: string; verified: boolean }
   | { kind: "signedIn"; displayName: string }
+  /**
+   * Signed in, but the birthday or the current terms are still to come (AUTH-09, P-79): after a
+   * first Google or Apple sign-in, or when the terms change.
+   */
+  | { kind: "registering"; displayName: string; birthDate: string | null }
   /** Signed out for privacy; nothing private may render (AUTH-07). */
   | { kind: "expired" };
 
@@ -81,6 +86,27 @@ export type SignInResult =
   | { ok: false; reason: "mismatch" }
   | { ok: false; reason: "rate-limited"; retryAfterSeconds: number };
 
+export type SocialProvider = "google" | "apple";
+
+/** Which ways in are on (Google and Apple need the server set up for them). */
+export interface SignInMethods {
+  google: boolean;
+  apple: boolean;
+}
+
+export type SocialSignInResult =
+  | { ok: true }
+  /** The person closed the provider's page or chose not to share: no message needed. */
+  | { ok: false; reason: "cancelled" }
+  /** That way in isn't set up on this server. */
+  | { ok: false; reason: "unavailable" }
+  | { ok: false; reason: "failed" };
+
+export type CompleteRegistrationResult =
+  | { ok: true }
+  /** Under 16 (P-79): the new account was removed, nothing is kept. */
+  | { ok: false; reason: "too-young" };
+
 export type VerifyLinkResult = { ok: true } | { ok: false; reason: "expired" };
 export type ResetLinkStatus = "valid" | "expired" | "used" | "invalid";
 export type ResetPasswordResult =
@@ -92,12 +118,33 @@ export interface AuthRepository {
     displayName: string;
     email: string;
     password: string;
+    /** YYYY-MM-DD, 16 and over (P-79). */
+    birthDate: string;
+    /** The terms version the person accepted (TERMS_VERSION). */
+    termsVersion: string;
   }): Promise<CreateAccountResult>;
+  /** Which ways in this server offers. */
+  signInMethods(): Promise<SignInMethods>;
+  /**
+   * Continue with Google or Apple (P-79): signs in, or creates the account if the email is new.
+   * An account that already has the email gets this way in too: never a second account.
+   */
+  continueWith(provider: SocialProvider): Promise<SocialSignInResult>;
+  /** Step one of an email change: the current address said yes (P-80). */
+  confirmEmailChange(token: string): Promise<{ ok: boolean }>;
+  /** The birthday and the current terms, after a first Google or Apple sign-in (AUTH-09). */
+  completeRegistration(input: {
+    birthDate: string;
+    termsVersion: string;
+  }): Promise<CompleteRegistrationResult>;
   signIn(input: { email: string; password: string; keepSignedIn: boolean }): Promise<SignInResult>;
   /** Simulated resend; returns the cooldown before another resend is allowed. */
   resendVerification(): Promise<{ cooldownSeconds: number }>;
-  /** Simulates opening the verification link from the email preview (demo). */
-  openVerificationLink(): Promise<VerifyLinkResult>;
+  /**
+   * Opens the verification link: the token from the email's garnet://verify-email link (API),
+   * or none for the mock's email preview (demo).
+   */
+  openVerificationLink(token?: string): Promise<VerifyLinkResult>;
   /** After a successful verification, continues into the app signed in on this phone. */
   finishVerification(): Promise<void>;
   /** Leaves the verifying state (Change email). */
@@ -139,6 +186,8 @@ export interface PairingRepository {
 export interface SetupState {
   profile: Profile;
   partner: DemoPartnerProfile;
+  /** When the two got together (YYYY-MM-DD), shared by both; null until one says (P-79). */
+  togetherSince: string | null;
 }
 
 export type ChooseSideResult =
@@ -153,6 +202,8 @@ export interface SetupRepository {
   chooseSide(side: GemSide): Promise<ChooseSideResult>;
   /** Finishes setup once every required step is answered. */
   complete(): Promise<{ ok: true } | { ok: false; missing: SetupStep[] }>;
+  /** Sets (or clears) "together since" for both partners, and marks the step done (P-79). */
+  setTogetherSince(date: string | null): Promise<void>;
 }
 
 /** One of the viewer's own moments today (HOME-01). The partner's day stays hidden (U-02). */
@@ -502,12 +553,62 @@ export interface SettingsView {
   me: HomePerson;
   partner: HomePerson;
   email: string;
-  devices: { id: string; name: string; lastActive: string; current: boolean }[];
+  /** YYYY-MM-DD (P-79). */
+  birthDate: string | null;
+  termsVersion: string | null;
+  termsAcceptedAt: string | null;
+  /**
+   * Whether export, ending the space and deleting the account work here. On the real server
+   * they wait on U-20 and U-23 (phase B9), so the pages say so rather than pretend.
+   */
+  dataRights: boolean;
 }
+
+export interface DeviceView {
+  id: string;
+  name: string;
+  lastActive: string;
+  current: boolean;
+}
+
+/** The ways into this account (P-79, P-80). */
+export interface AccountMethods {
+  password: boolean;
+  google: { available: boolean; connected: boolean };
+  apple: { available: boolean; connected: boolean };
+}
+
+export type ChangePasswordResult =
+  { ok: true } | { ok: false; reason: "wrong-password" | "rate-limited" | "failed" };
+
+export type ConnectResult =
+  | { ok: true }
+  /** Another Garnet account already uses that Google or Apple account. */
+  | { ok: false; reason: "cancelled" | "unavailable" | "failed" | "taken" | "sign-in-again" };
+
+export type DisconnectResult = { ok: true } | { ok: false; reason: "last-one" | "sign-in-again" };
+
+export type ChangeEmailResult =
+  { ok: true } | { ok: false; reason: "same" | "sign-in-again" | "rate-limited" | "failed" };
 
 export interface SettingsRepository {
   get(): Promise<SettingsView>;
   update(patch: Partial<UserSettings>): Promise<void>;
+  /** SET-12: where this person is signed in, this device first. */
+  devices(): Promise<DeviceView[]>;
+  /** Ends every other session too (ADR-0006). */
+  changePassword(input: { current: string; next: string }): Promise<ChangePasswordResult>;
+  methods(): Promise<AccountMethods>;
+  /** Adds Google or Apple as a way into this account (needs a recent sign-in, P-80). */
+  connect(provider: SocialProvider): Promise<ConnectResult>;
+  /** Removes one, never the last (needs a recent sign-in, P-80). */
+  disconnect(provider: SocialProvider): Promise<DisconnectResult>;
+  /** Sends the email that sets a password, for an account made with Google or Apple. */
+  sendPasswordLink(): Promise<void>;
+  /** Asks the current address to confirm, then the new one (P-80). Same answer if it's taken. */
+  changeEmail(newEmail: string): Promise<ChangeEmailResult>;
+  /** A new birthday, still 16 and over (P-79). */
+  changeBirthDate(birthDate: string): Promise<{ ok: true } | { ok: false; reason: "too-young" }>;
   /** SET-13: simulated; becomes ready at once and expires after 7 days. */
   prepareExport(): Promise<void>;
   /** Prototype: shows the expired state. */

@@ -55,9 +55,17 @@ export default tseslint.config(
     },
   },
   {
-    // Node scripts (mutation checks, spike runners).
+    // Node scripts (mutation checks, spike runners, the local backend launcher).
     files: ["**/*.mjs"],
-    languageOptions: { globals: { process: "readonly" } },
+    languageOptions: {
+      globals: {
+        process: "readonly",
+        URL: "readonly",
+        fetch: "readonly",
+        AbortSignal: "readonly",
+        setTimeout: "readonly",
+      },
+    },
   },
   {
     files: ["**/*.js"],

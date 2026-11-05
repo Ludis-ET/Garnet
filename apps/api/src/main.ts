@@ -1,12 +1,17 @@
 import { Kysely, PostgresDialect } from "kysely";
 import pg from "pg";
 import { createApp } from "./app";
+import { createAuth } from "./auth/auth";
+import { createMailer } from "./auth/mailer";
 import { readConfig } from "./config";
 import type { Database } from "./db/database";
 
-// Starts the API (local only until U-07): `pnpm --filter @garnet/api dev`.
+// Starts the API (local only until U-07): `pnpm --filter @garnet/api dev`, settings from
+// apps/api/.env (see .env.example and infra/README.md).
 const config = readConfig(process.env);
 
+// One pool, as the API's own role: requests switch to garnet_app (RLS); Better Auth's queries
+// use garnet_auth's rights on its own tables.
 const pool = new pg.Pool({
   connectionString: config.databaseUrl,
   application_name: "garnet-api",
@@ -17,7 +22,31 @@ const pool = new pg.Pool({
 });
 const db = new Kysely<Database>({ dialect: new PostgresDialect({ pool }) });
 
-const app = await createApp({ db, logLevel: config.logLevel });
+// Better Auth logs through the API's logger once it exists: a level and a fixed event only.
+let log: (level: "error" | "warn" | "info" | "debug", event: string) => void = () => undefined;
+const auth = createAuth({
+  database: pool,
+  secret: config.auth.secret,
+  baseUrl: config.auth.baseUrl,
+  policy: config.auth.policy,
+  mailer: createMailer(config.mail.smtpUrl, config.mail.from),
+  social: config.auth.social,
+  log: (level, event) => {
+    log(level, event);
+  },
+});
+
+const app = await createApp({
+  db,
+  auth,
+  policy: config.auth.policy,
+  social: config.auth.social,
+  logLevel: config.logLevel,
+});
+const logger = app.getHttpAdapter().getInstance().log;
+log = (level, event) => {
+  logger[level]({ code: event }, "auth event");
+};
 await app.listen(config.port, config.host);
 
 let closing = false;

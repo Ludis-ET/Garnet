@@ -1,10 +1,10 @@
 # Garnet mobile
 
-Expo (SDK 57) + React Native 0.86 + TypeScript (strict) + Expo Router. **Phase 2 prototype: mock data only, no backend.** Rules: [AGENTS.md](./AGENTS.md). Designs and page prompts: [docs/design](../../docs/design/README.md).
+Expo (SDK 57) + React Native 0.86 + TypeScript (strict) + Expo Router. **Phase 2 prototype.** Accounts, pairing, setup and settings can run on the local API (`EXPO_PUBLIC_API_AREAS`, `src/data/http/`); everything else is sample data, told who is really signed in by `src/data/http/mirror.ts`. Rules: [AGENTS.md](./AGENTS.md). Designs and page prompts: [docs/design](../../docs/design/README.md).
 
 ## Run it
 
-**Windows, one click:** double-click [`apps/run-mobile.bat`](../run-mobile.bat). It installs dependencies on the first run, then offers: browser preview (default), Expo Go, or an Android phone over USB.
+**Windows, one click:** double-click [`apps/run-mobile.bat`](../run-mobile.bat). It installs dependencies and starts the local backend (Docker, migrations, the API; see [infra/README.md](../../infra/README.md)), then offers: an Android phone over USB with real accounts, pairing and setup on that backend, the browser preview or Expo Go (both on sample data), or backend only.
 
 From the repository root:
 

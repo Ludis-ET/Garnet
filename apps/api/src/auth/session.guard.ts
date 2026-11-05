@@ -6,12 +6,17 @@ import {
   type CanActivate,
   type ExecutionContext,
 } from "@nestjs/common";
+import { isRegistrationComplete } from "@garnet/contracts";
 import { Reflector } from "@nestjs/core";
-import { hashToken, TOKEN_PATTERN } from "@garnet/db";
 import type { FastifyRequest } from "fastify";
-import { sql, type Kysely } from "kysely";
-import { KYSELY, type Database, type Viewer } from "../db/database";
+import type { AuthPolicy } from "../config";
+import { AUTH, POLICY, type Viewer } from "../db/database";
 import { ApiProblem } from "../errors/problem";
+import { sessionDeadline, type Auth } from "./auth";
+import { authHeaders } from "./bridge";
+import { CLIENT_HEADER } from "./client-header";
+
+export { CLIENT_HEADER };
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -21,8 +26,16 @@ declare module "fastify" {
 }
 
 const PUBLIC = "garnet:public";
+const BEFORE_REGISTRATION = "garnet:before-registration";
+
+const SAFE_METHODS = new Set(["GET", "HEAD"]);
 /** Marks a route that needs no session (health only, so far). Everything else is private. */
 export const Public = () => SetMetadata(PUBLIC, true);
+/**
+ * Marks a route a signed-in person may use before registration is complete (P-79): finishing
+ * registration itself, and /v1/me. Every other route answers registration_required until then.
+ */
+export const BeforeRegistration = () => SetMetadata(BEFORE_REGISTRATION, true);
 
 /** The session's viewer in a route handler. Only reachable on routes the guard protected. */
 export const CurrentViewer = createParamDecorator((_: unknown, ctx: ExecutionContext): Viewer => {
@@ -31,18 +44,19 @@ export const CurrentViewer = createParamDecorator((_: unknown, ctx: ExecutionCon
   return viewer;
 });
 
-const BEARER = /^Bearer (\S+)$/;
-
 /**
- * Every route needs a live session unless marked @Public() (default deny). The token comes from
- * `Authorization: Bearer …`; only its SHA-256 goes to the database, through auth_session(). A
- * missing, malformed, unknown, revoked or expired token all get the same 401 (ADR-0006).
+ * Every route needs a live, verified session unless marked @Public() (default deny). Better Auth
+ * reads the session cookie the app's Expo client sends and checks it against the session table;
+ * a missing, forged, expired or revoked session, one older than sessionMaxDays (P-78), or an
+ * unverified email, all get the same 401 (ADR-0006). The user is never taken from anything else in the request (ADR-0004). Requests
+ * that change something must also carry CLIENT_HEADER (CSRF).
  */
 @Injectable()
 export class SessionGuard implements CanActivate {
   constructor(
     @Inject(Reflector) private readonly reflector: Reflector,
-    @Inject(KYSELY) private readonly db: Kysely<Database>,
+    @Inject(AUTH) private readonly auth: Auth,
+    @Inject(POLICY) private readonly policy: AuthPolicy,
   ) {}
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
@@ -52,19 +66,32 @@ export class SessionGuard implements CanActivate {
     ]);
     if (isPublic === true) return true;
     const request = ctx.switchToHttp().getRequest<FastifyRequest>();
-    const token = BEARER.exec(request.headers.authorization ?? "")?.[1];
-    if (token === undefined || !TOKEN_PATTERN.test(token)) throw new ApiProblem("unauthorized");
-    const rows = await this.db.transaction().execute(async (trx) => {
-      await sql`set local role garnet_app`.execute(trx);
-      const result = await sql<{
-        session_id: string;
-        user_id: string;
-      }>`select session_id, user_id from auth_session(${hashToken(token)})`.execute(trx);
-      return result.rows;
-    });
-    const row = rows[0];
-    if (row === undefined) throw new ApiProblem("unauthorized");
-    request.viewer = { userId: row.user_id, sessionId: row.session_id };
+    if (
+      !SAFE_METHODS.has(request.method) &&
+      request.headers[CLIENT_HEADER.name] !== CLIENT_HEADER.value
+    )
+      throw new ApiProblem("bad_request");
+    const found = await this.auth.api
+      .getSession({ headers: authHeaders(request) })
+      .catch(() => null);
+    if (!found?.user.emailVerified) throw new ApiProblem("unauthorized");
+    // Better Auth never extends a session past this (auth.ts); checked here too, in depth.
+    if (
+      sessionDeadline(new Date(found.session.createdAt), this.policy.sessionMaxDays) <= new Date()
+    )
+      throw new ApiProblem("unauthorized");
+    // A birthday and the current terms before anything else (P-79).
+    const early = this.reflector.getAllAndOverride<boolean | undefined>(BEFORE_REGISTRATION, [
+      ctx.getHandler(),
+      ctx.getClass(),
+    ]);
+    if (early !== true && !isRegistrationComplete(found.user.birthDate, found.user.termsVersion))
+      throw new ApiProblem("registration_required");
+    request.viewer = {
+      userId: found.user.id,
+      sessionId: found.session.id,
+      name: found.user.name,
+    };
     return true;
   }
 }

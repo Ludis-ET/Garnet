@@ -33,7 +33,7 @@ Never report a task as done if `pnpm check` fails. Report failures with their ou
 | `docs/design/`                              | Phase 2 specs (Markdown transcriptions of the owner's two `.docx` files) and the page design prompts with page IDs.                              |
 | `packages/domain/`                          | `@garnet/domain`: pure, platform-neutral business rules (shared day, Shared Spark, signals). Has its own [AGENTS.md](packages/domain/AGENTS.md). |
 | `apps/api/`                                 | `@garnet/api`: NestJS 12 on Fastify, Kysely on PostgreSQL with RLS ([backend plan](docs/architecture/backend-plan.md), P-76). Local only.        |
-| `packages/db/`                              | `@garnet/db`: SQL migrations, the runner, local seeds and `dev-session`, PGlite test helpers.                                                    |
+| `packages/db/`                              | `@garnet/db`: SQL migrations, the runner and PGlite test helpers.                                                                                |
 | `packages/contracts/`                       | `@garnet/contracts`: zod request/response schemas shared by the API and the app.                                                                 |
 | `infra/`                                    | Local backend: Postgres in Docker on 127.0.0.1 ([infra/README.md](infra/README.md)). Never deployed.                                             |
 | `spikes/offline-sync/`                      | F-04 evidence: sync protocol simulation with fault injection and property tests.                                                                 |

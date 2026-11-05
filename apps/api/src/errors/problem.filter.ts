@@ -1,6 +1,6 @@
 import { Catch, type ArgumentsHost, type ExceptionFilter } from "@nestjs/common";
 import type { FastifyReply, FastifyRequest } from "fastify";
-import { problemBody, problemCodeOf } from "./problem";
+import { ApiProblem, problemBody, problemCodeOf } from "./problem";
 
 /**
  * What may be logged about an unexpected error: its type and, for database errors, the
@@ -22,7 +22,11 @@ export function sendProblem(error: unknown, request: FastifyRequest, reply: Fast
   const code = problemCodeOf(error);
   if (code === "internal")
     request.log.error({ requestId: request.id, code, ...safeErrorFields(error) }, "request failed");
-  const body = problemBody(code, request.id);
+  const body = problemBody(
+    code,
+    request.id,
+    error instanceof ApiProblem ? error.issues : undefined,
+  );
   void reply.status(body.status).header("content-type", "application/problem+json").send(body);
 }
 

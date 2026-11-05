@@ -203,6 +203,15 @@ describe("US-05 support from Noah", () => {
 });
 
 describe("US-10 history", () => {
+  // The demo signals are minutes old, so just after midnight in Addis Ababa the newest one is
+  // "Yesterday". A fixed midday clock (still running) keeps "Today" true at any hour.
+  beforeEach(() => {
+    jest.useFakeTimers({ now: Date.parse("2026-10-21T09:00:00Z"), advanceTimers: true });
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   it("lists signals by day with no totals, and says who can see them", async () => {
     await renderWith(<HistoryScreen />, usStore());
     expect(await screen.findByText("Today", {}, WAIT)).toBeTruthy();

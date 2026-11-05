@@ -129,7 +129,7 @@ export function SettingsScreen() {
           label: "Profile",
           icon: "user",
           tint: palette.ruby700,
-          words: "name nickname email",
+          words: "name nickname email birthday home town city terms",
         },
         {
           page: "devices",
@@ -137,6 +137,13 @@ export function SettingsScreen() {
           icon: "key",
           tint: palette.violet500,
           words: "sign out sessions security",
+        },
+        {
+          page: "sign-in-methods",
+          label: "Sign-in methods",
+          icon: "shield",
+          tint: palette.sapphire500,
+          words: "google apple connect password account",
         },
       ],
     },

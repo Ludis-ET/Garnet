@@ -30,7 +30,11 @@ export function createMockSetup(store: MockStore): SetupRepository {
     get: () =>
       store.simulate(() => {
         const who = me();
-        return { profile: profileOf(who.userId, who.name), partner: partner() };
+        return {
+          profile: profileOf(who.userId, who.name),
+          partner: partner(),
+          togetherSince: store.read().profiles.togetherSince,
+        };
       }),
 
     save: (patch) =>
@@ -56,6 +60,17 @@ export function createMockSetup(store: MockStore): SetupRepository {
           done: [...new Set([...current.done, "side" as const])],
         });
         return { ok: true as const };
+      }),
+
+    setTogetherSince: (date) =>
+      store.simulate(() => {
+        const who = me();
+        const current = profileOf(who.userId, who.name);
+        write(who.userId, {
+          ...current,
+          done: [...new Set([...current.done, "together" as const])],
+        });
+        store.update((s) => ({ ...s, profiles: { ...s.profiles, togetherSince: date } }));
       }),
 
     complete: () =>

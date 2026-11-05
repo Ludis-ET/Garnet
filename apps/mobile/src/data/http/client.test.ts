@@ -27,7 +27,7 @@ describe("API client", () => {
     const calls: { url: string; init: RequestInit | undefined }[] = [];
     const client = createApiClient({
       baseUrl: "http://127.0.0.1:3000/",
-      token: () => "t".repeat(43),
+      headers: () => Promise.resolve({ cookie: `garnet.session_token=${"t".repeat(43)}` }),
       fetch: (url, init) => {
         calls.push({
           url: typeof url === "string" ? url : url instanceof URL ? url.href : url.url,
@@ -41,7 +41,9 @@ describe("API client", () => {
       database: "ok",
     });
     expect(calls[0]?.url).toBe("http://127.0.0.1:3000/v1/health");
-    expect(calls[0]?.init?.headers).toMatchObject({ authorization: `Bearer ${"t".repeat(43)}` });
+    expect(calls[0]?.init?.headers).toMatchObject({
+      cookie: `garnet.session_token=${"t".repeat(43)}`,
+    });
   });
 
   it("turns an RFC 9457 answer into a problem error", async () => {

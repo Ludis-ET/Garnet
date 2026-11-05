@@ -1,3 +1,4 @@
+import { TERMS_VERSION } from "@garnet/contracts";
 import { Temporal } from "temporal-polyfill";
 import { DEMO_EMAIL, DEMO_PASSWORD, DEMO_RESET_TOKENS } from "@/data/fixtures/demoAuth";
 import { DEMO_LOCK_SECONDS, DEMO_MAX_ATTEMPTS } from "./mockAuth";
@@ -79,6 +80,8 @@ describe("mock auth (AUTH-01 to AUTH-08)", () => {
       displayName: " Noah ",
       email: "Noah@Example.test",
       password: "a long passphrase",
+      birthDate: "2000-01-15",
+      termsVersion: TERMS_VERSION,
     });
     expect(result).toEqual({ ok: true, maskedEmail: "n***@example.test" });
     const status = await auth.status();
@@ -97,6 +100,8 @@ describe("mock auth (AUTH-01 to AUTH-08)", () => {
         displayName: "X",
         email: DEMO_EMAIL,
         password: "a long passphrase",
+        birthDate: "2000-01-15",
+        termsVersion: TERMS_VERSION,
       }),
     ).toEqual({
       ok: false,
@@ -110,6 +115,8 @@ describe("mock auth (AUTH-01 to AUTH-08)", () => {
       displayName: "Noah",
       email: "noah@example.test",
       password: "a long passphrase",
+      birthDate: "2000-01-15",
+      termsVersion: TERMS_VERSION,
     });
     store.update((s) => ({ ...s, auth: { ...s.auth, nextVerificationLink: "expired" } }));
     expect(await auth.openVerificationLink()).toEqual({ ok: false, reason: "expired" });
@@ -126,6 +133,8 @@ describe("mock auth (AUTH-01 to AUTH-08)", () => {
       displayName: "Noah",
       email: "noah@example.test",
       password: "a long passphrase",
+      birthDate: "2000-01-15",
+      termsVersion: TERMS_VERSION,
     });
     await auth.cancelVerification();
     expect(
@@ -198,6 +207,58 @@ describe("mock auth (AUTH-01 to AUTH-08)", () => {
     store.configure({ offline: false });
     expect(await auth.status()).toMatchObject({ kind: "signedIn" });
     await auth.signOut();
+    expect(await auth.status()).toEqual({ kind: "signedOut" });
+  });
+
+  it("joins Google to the account that already has the email: one account per person (P-79)", async () => {
+    const { auth, store } = setup();
+    const before = store.read().auth.accounts.length;
+    expect(await auth.continueWith("google")).toEqual({ ok: true });
+    expect(await auth.status()).toEqual({ kind: "signedIn", displayName: "Selam" });
+    const accounts = store.read().auth.accounts;
+    expect(accounts).toHaveLength(before);
+    expect(accounts.find((a) => a.email === DEMO_EMAIL)?.providers).toEqual(["google"]);
+    // The password still works too: two ways into one account.
+    await auth.signOut();
+    expect(
+      await auth.signIn({ email: DEMO_EMAIL, password: DEMO_PASSWORD, keepSignedIn: false }),
+    ).toEqual({ ok: true, needsVerification: false });
+  });
+
+  it("removes a planted password when Google joins an unconfirmed account (P-79)", async () => {
+    const { auth, store } = setup();
+    store.update((s) => ({
+      ...s,
+      auth: {
+        ...s.auth,
+        accounts: s.auth.accounts.map((a) =>
+          a.email === DEMO_EMAIL ? { ...a, verified: false, password: "someone else's" } : a,
+        ),
+      },
+    }));
+    await auth.continueWith("google");
+    const account = store.read().auth.accounts.find((a) => a.email === DEMO_EMAIL);
+    expect(account).toMatchObject({ verified: true, password: "" });
+  });
+
+  it("makes a new Apple account that finishes registration before anything else", async () => {
+    const { auth } = setup();
+    expect(await auth.continueWith("apple")).toEqual({ ok: true });
+    expect(await auth.status()).toEqual({ kind: "registering", displayName: "", birthDate: null });
+    expect(
+      await auth.completeRegistration({ birthDate: "1999-04-20", termsVersion: TERMS_VERSION }),
+    ).toEqual({ ok: true });
+    expect((await auth.status()).kind).toBe("signedIn");
+  });
+
+  it("removes a new account that is under 16, keeping nothing (P-79)", async () => {
+    const { auth, store } = setup();
+    await auth.continueWith("apple");
+    const count = store.read().auth.accounts.length;
+    expect(
+      await auth.completeRegistration({ birthDate: "2015-01-01", termsVersion: TERMS_VERSION }),
+    ).toEqual({ ok: false, reason: "too-young" });
+    expect(store.read().auth.accounts).toHaveLength(count - 1);
     expect(await auth.status()).toEqual({ kind: "signedOut" });
   });
 });

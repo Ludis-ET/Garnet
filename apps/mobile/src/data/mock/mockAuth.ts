@@ -1,6 +1,7 @@
+import { AGE_CHECK_ZONE, isOldEnough, isRegistrationComplete } from "@garnet/contracts";
 import { Temporal } from "temporal-polyfill";
 import { maskEmail, normaliseEmail } from "@/domain/auth";
-import type { DemoAuthState } from "@/data/fixtures/demoAuth";
+import { DEMO_PROVIDER_IDENTITIES, type DemoAuthState } from "@/data/fixtures/demoAuth";
 import type { AuthRepository, AuthStatus } from "@/data/repositories/types";
 import type { MockStore } from "./MockStore";
 
@@ -23,7 +24,10 @@ function publicStatus(auth: DemoAuthState): AuthStatus {
       return { kind: "verifying", maskedEmail: maskEmail(s.email), verified: s.verified };
     case "signedIn": {
       const account = auth.accounts.find((a) => a.userId === s.userId);
-      return { kind: "signedIn", displayName: account?.displayName ?? "" };
+      const displayName = account?.displayName ?? "";
+      if (account !== undefined && !isRegistrationComplete(account.birthDate, account.termsVersion))
+        return { kind: "registering", displayName, birthDate: account.birthDate };
+      return { kind: "signedIn", displayName };
     }
   }
 }
@@ -38,7 +42,7 @@ export function createMockAuth(store: MockStore, now: () => Temporal.Instant): A
   return {
     status: () => store.simulate(() => publicStatus(auth())),
 
-    createAccount: ({ displayName, email, password }) =>
+    createAccount: ({ displayName, email, password, birthDate, termsVersion }) =>
       store.simulate(() => {
         const normal = normaliseEmail(email);
         if (auth().accounts.some((a) => a.email === normal)) {
@@ -54,6 +58,9 @@ export function createMockAuth(store: MockStore, now: () => Temporal.Instant): A
               email: normal,
               password,
               verified: false,
+              providers: [],
+              birthDate,
+              termsVersion,
             },
           ],
           status: { kind: "verifying", email: normal, verified: false },
@@ -163,6 +170,77 @@ export function createMockAuth(store: MockStore, now: () => Temporal.Instant): A
           resetLinks: { ...a.resetLinks, [token]: "used" },
           // A reset signs out every device (ADR-0006).
           status: { kind: "signedOut" },
+        }));
+        return { ok: true as const };
+      }),
+
+    signInMethods: () => store.simulate(() => ({ google: true, apple: true })),
+
+    confirmEmailChange: () => store.simulate(() => ({ ok: true })),
+
+    continueWith: (provider) =>
+      store.simulate(() => {
+        const identity = DEMO_PROVIDER_IDENTITIES[provider];
+        const existing = auth().accounts.find((a) => a.email === identity.email);
+        if (existing !== undefined) {
+          // One account per person: the provider joins it. An unconfirmed account keeps
+          // nothing someone else may have set up (its password), as on the server (P-79).
+          setAuth((a) => ({
+            ...a,
+            accounts: a.accounts.map((acc) =>
+              acc.userId !== existing.userId
+                ? acc
+                : {
+                    ...acc,
+                    verified: true,
+                    password: acc.verified ? acc.password : "",
+                    providers: [...new Set([...acc.providers, provider])],
+                  },
+            ),
+            status: { kind: "signedIn", userId: existing.userId, keepSignedIn: true },
+          }));
+          return { ok: true as const };
+        }
+        const userId = `demo-user-${String(auth().accounts.length + 1)}`;
+        setAuth((a) => ({
+          ...a,
+          accounts: [
+            ...a.accounts,
+            {
+              userId,
+              displayName: identity.name,
+              email: identity.email,
+              password: "",
+              verified: true,
+              providers: [provider],
+              birthDate: null,
+              termsVersion: null,
+            },
+          ],
+          status: { kind: "signedIn", userId, keepSignedIn: true },
+        }));
+        return { ok: true as const };
+      }),
+
+    completeRegistration: ({ birthDate, termsVersion }) =>
+      store.simulate(() => {
+        const s = auth().status;
+        if (s.kind !== "signedIn") throw new Error("Not signed in");
+        const today = now().toZonedDateTimeISO(AGE_CHECK_ZONE).toPlainDate().toString();
+        if (!isOldEnough(birthDate, today)) {
+          // Too young (P-79): the new account goes, nothing is kept.
+          setAuth((a) => ({
+            ...a,
+            accounts: a.accounts.filter((acc) => acc.userId !== s.userId),
+            status: { kind: "signedOut" },
+          }));
+          return { ok: false as const, reason: "too-young" as const };
+        }
+        setAuth((a) => ({
+          ...a,
+          accounts: a.accounts.map((acc) =>
+            acc.userId === s.userId ? { ...acc, birthDate, termsVersion } : acc,
+          ),
         }));
         return { ok: true as const };
       }),

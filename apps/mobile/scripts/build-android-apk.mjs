@@ -164,4 +164,9 @@ run(
 const apk = join(android, "app", "build", "outputs", "apk", "release", "app-release.apk");
 say(`\nAPK: ${apk}`);
 
-if (process.argv.includes("--install")) run("adb", ["install", "-r", apk], root);
+if (process.argv.includes("--install")) {
+  // Phones with a work profile or Samsung's Secure Folder refuse a plain install; then install
+  // for the main user only.
+  const plain = spawnSync("adb", ["install", "-r", `"${apk}"`], { stdio: "inherit", shell: win });
+  if (plain.status !== 0) run("adb", ["install", "--user", "0", "-r", apk], root);
+}

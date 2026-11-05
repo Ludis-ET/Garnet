@@ -1,7 +1,7 @@
 export {
-  createDevSession,
   DEV_PEOPLE,
   DEV_RELATIONSHIP_ID,
+  DEV_TERMS_VERSION,
   isLocalDatabase,
   seedDev,
   type DevPerson,
@@ -16,4 +16,4 @@ export {
   type Migration,
   type SqlClient,
 } from "./migrate.ts";
-export { hashToken, newToken, TOKEN_PATTERN } from "./tokens.ts";
+export { hashToken } from "./tokens.ts";

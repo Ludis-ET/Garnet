@@ -15,7 +15,7 @@ import { DEMO_RESET_TOKENS } from "@/data/fixtures/demoAuth";
 import {
   fieldErrorMessage,
   isEmailShaped,
-  PASSWORD_POLICY_P25,
+  PASSWORD_POLICY_P78,
   type FieldError,
 } from "@/domain/auth";
 import { useTheme } from "@/theme/ThemeProvider";
@@ -123,7 +123,7 @@ export function ForgotPasswordScreen() {
         returnKeyType="send"
         onSubmitEditing={submit}
         disabled={request.isPending}
-        {...(error === null ? {} : { error: fieldErrorMessage(error, PASSWORD_POLICY_P25) })}
+        {...(error === null ? {} : { error: fieldErrorMessage(error, PASSWORD_POLICY_P78) })}
       />
     </GlassScreen>
   );

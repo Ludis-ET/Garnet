@@ -27,6 +27,8 @@ export interface Profile {
   side: GemSide | null;
   avatar: AvatarChoice;
   timeZone: string | null;
+  /** The home town as the person writes it (P-79), optional; the partner sees it. */
+  homeCity: string | null;
   appearance: Appearance;
   accent: AccentIntensity;
   notifications: NotificationPrefs;
@@ -40,12 +42,17 @@ export interface DemoPartnerProfile {
   name: string;
   side: GemSide | null;
   timeZone: string;
+  homeCity: string | null;
+  /** The partner's full birthday, YYYY-MM-DD (P-79), or null before pairing. */
+  birthDate: string | null;
   ready: boolean;
 }
 
 export interface DemoProfilesState {
   byUser: Record<string, Profile>;
   partner: DemoPartnerProfile;
+  /** When the two got together (YYYY-MM-DD), shared by both (P-79). */
+  togetherSince: string | null;
 }
 
 /** A fresh profile: the account's display name, nothing else chosen. Categories start on (P-52). */
@@ -56,6 +63,7 @@ export function newProfile(displayName: string): Profile {
     side: null,
     avatar: { kind: "initials", swatch: 0 },
     timeZone: null,
+    homeCity: null,
     appearance: "light",
     accent: "subtle",
     notifications: { status: "unset", thoughts: true, support: true, days: true },
@@ -67,6 +75,14 @@ export function newProfile(displayName: string): Profile {
 export function createDemoProfiles(): DemoProfilesState {
   return {
     byUser: {},
-    partner: { name: "Noah", side: null, timeZone: "Europe/London", ready: false },
+    partner: {
+      name: "Noah",
+      side: null,
+      timeZone: "Europe/London",
+      homeCity: "London",
+      birthDate: "1997-09-03",
+      ready: false,
+    },
+    togetherSince: null,
   };
 }

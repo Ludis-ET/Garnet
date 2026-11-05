@@ -9,10 +9,13 @@ export const PROBLEM_CODES = [
   "bad_request",
   "validation_failed",
   "unauthorized",
+  "registration_required",
+  "recent_sign_in_required",
   "not_found",
   "method_not_allowed",
   "payload_too_large",
   "unsupported_media_type",
+  "rate_limited",
   "unavailable",
   "internal",
 ] as const;
@@ -24,11 +27,16 @@ export const PROBLEMS: Readonly<Record<ProblemCode, { status: number; title: str
   validation_failed: { status: 400, title: "Some details aren't valid." },
   // "Not signed in" and "session ended" read the same: no hint about which (enumeration safety).
   unauthorized: { status: 401, title: "Please sign in again." },
+  // Signed in, but the birthday or the current terms are still to come (P-79).
+  registration_required: { status: 403, title: "A couple of details are still needed." },
+  // Changing how someone gets in needs a recent sign-in, so a stolen phone can't do it (P-80).
+  recent_sign_in_required: { status: 403, title: "Please sign in again to do this." },
   // "Not yours" and "not found" are indistinguishable (ADR-0004).
   not_found: { status: 404, title: "That isn't here." },
   method_not_allowed: { status: 405, title: "That isn't allowed here." },
   payload_too_large: { status: 413, title: "That's too large to send." },
   unsupported_media_type: { status: 415, title: "That format isn't accepted." },
+  rate_limited: { status: 429, title: "That's a lot of tries. Please wait a moment." },
   unavailable: { status: 503, title: "Garnet is resting for a moment. Please try again." },
   internal: { status: 500, title: "Something went wrong on our side." },
 };

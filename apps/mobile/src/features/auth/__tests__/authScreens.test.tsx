@@ -22,6 +22,7 @@ import { SessionExpiredScreen } from "../screens/SessionExpiredScreen";
 import { SignInScreen } from "../screens/SignInScreen";
 import { VerifyEmailScreen } from "../screens/VerifyEmailScreen";
 import { WelcomeScreen } from "../screens/WelcomeScreen";
+import { FinishAccountScreen } from "../screens/FinishAccountScreen";
 import { SignOutDialog, signOutBody } from "../SignOutDialog";
 
 const mockRouter = {
@@ -92,7 +93,7 @@ describe("AUTH-01 Welcome", () => {
     expect(
       await screen.findByText("A private space for just the two of you.", {}, WAIT),
     ).toBeTruthy();
-    await press("Get started");
+    await press("Continue with email");
     expect(mockRouter.push).toHaveBeenCalledWith("/create-account");
     await press("I already have an account");
     expect(mockRouter.push).toHaveBeenCalledWith("/sign-in");
@@ -104,32 +105,50 @@ describe("AUTH-01 Welcome", () => {
   });
 });
 
-describe("AUTH-02 Create account (three steps, P-48)", () => {
+describe("AUTH-02 Create account (four steps, P-48, P-79)", () => {
+  async function birthday(day: string, month: string, year: string) {
+    await type("Your birthday, day", day);
+    await type("Your birthday, month", month);
+    await type("Your birthday, year", year);
+  }
+
   async function toPasswordStep(name = "Noah", email = "noah@example.test") {
     await type("Display name", name);
     await press("Continue");
     await type("Email", email);
     await press("Continue");
+    await birthday("03", "09", "1997");
+    await press("Continue");
     await screen.findByLabelText("Password", {}, WAIT);
   }
 
+  const agree = async () => {
+    await fireEvent.press(
+      await screen.findByRole(
+        "checkbox",
+        { name: "I agree to the Terms of use and the Privacy notice" },
+        WAIT,
+      ),
+    );
+  };
+
   it("waits for an answer before Continue, and announces the step", async () => {
     await renderWith(<CreateAccountScreen />);
-    expect(await screen.findByLabelText("Step 1 of 3", {}, WAIT)).toBeTruthy();
+    expect(await screen.findByLabelText("Step 1 of 4", {}, WAIT)).toBeTruthy();
     expect(
       await screen.findByRole("button", { name: "Continue", disabled: true }, WAIT),
     ).toBeTruthy();
     await type("Display name", "   ");
     await press("Continue");
     expect(await screen.findByText("Please fill this in.", {}, WAIT)).toBeTruthy();
-    expect(screen.getByLabelText("Step 1 of 3")).toBeTruthy();
+    expect(screen.getByLabelText("Step 1 of 4")).toBeTruthy();
   });
 
   it("explains a malformed email, short and mismatched passwords, and keeps what was typed", async () => {
     await renderWith(<CreateAccountScreen />);
     await type("Display name", "Noah");
     await press("Continue");
-    expect(await screen.findByLabelText("Step 2 of 3", {}, WAIT)).toBeTruthy();
+    expect(await screen.findByLabelText("Step 2 of 4", {}, WAIT)).toBeTruthy();
     await type("Email", "noah@");
     await press("Continue");
     expect(
@@ -137,13 +156,45 @@ describe("AUTH-02 Create account (three steps, P-48)", () => {
     ).toBeTruthy();
     await type("Email", "noah@example.test");
     await press("Continue");
+    // The birthday: a real date, 16 and over (P-79).
+    await birthday("31", "02", "2000");
+    await press("Continue");
+    expect(
+      await screen.findByText("That date doesn't exist. Check the day and month.", {}, WAIT),
+    ).toBeTruthy();
+    await birthday("01", "01", "2020");
+    await press("Continue");
+    expect(await screen.findByText("Garnet is for people 16 and over.", {}, WAIT)).toBeTruthy();
+    await birthday("03", "09", "1997");
+    await press("Continue");
+    expect(await screen.findByLabelText("Step 4 of 4", {}, WAIT)).toBeTruthy();
     await type("Password", "short");
     await type("Confirm password", "different");
     await press("Create account");
-    expect(await screen.findByText("Use at least 12 characters.", {}, WAIT)).toBeTruthy();
+    expect(await screen.findByText("Use at least 15 characters.", {}, WAIT)).toBeTruthy();
     expect(await screen.findByText("These passwords don't match.", {}, WAIT)).toBeTruthy();
-    expect(screen.getByLabelText("At least 12 characters, not met yet")).toBeTruthy();
+    expect(screen.getByLabelText("At least 15 characters, not met yet")).toBeTruthy();
+    // Long enough but easy to guess (the API's own blocklist, P-78).
+    await type("Password", "noahnoahnoahnoah");
+    await type("Confirm password", "noahnoahnoahnoah");
+    await press("Create account");
+    expect(
+      await screen.findByText(
+        "That one is easy to guess. A few words that mean something to you work well.",
+        {},
+        WAIT,
+      ),
+    ).toBeTruthy();
+    expect(screen.getByLabelText("Not easy to guess, not met yet")).toBeTruthy();
+    // The terms need an explicit tap: never agreed by carrying on.
+    expect(
+      await screen.findByText("Please agree to the terms to continue.", {}, WAIT),
+    ).toBeTruthy();
     // Back keeps every answer.
+    await press("Back");
+    expect((await screen.findByLabelText("Your birthday, year", {}, WAIT)).props.value).toBe(
+      "1997",
+    );
     await press("Back");
     expect((await screen.findByLabelText("Email", {}, WAIT)).props.value).toBe("noah@example.test");
     await press("Back");
@@ -155,8 +206,10 @@ describe("AUTH-02 Create account (three steps, P-48)", () => {
     await toPasswordStep();
     await type("Password", "a long passphrase");
     await type("Confirm password", "a long passphrase");
-    expect(await screen.findByLabelText("At least 12 characters, met", {}, WAIT)).toBeTruthy();
+    expect(await screen.findByLabelText("At least 15 characters, met", {}, WAIT)).toBeTruthy();
+    expect(screen.getByLabelText("Not easy to guess, met")).toBeTruthy();
     expect(screen.getByLabelText("Passwords match, met")).toBeTruthy();
+    await agree();
     await press("Create account");
     expect(mockRouter.replace).toHaveBeenCalledWith("/verify-email");
   });
@@ -166,6 +219,7 @@ describe("AUTH-02 Create account (three steps, P-48)", () => {
     await toPasswordStep("Someone", DEMO_EMAIL);
     await type("Password", "a long passphrase");
     await type("Confirm password", "a long passphrase");
+    await agree();
     await press("Create account");
     expect(
       await screen.findByText(
@@ -174,7 +228,7 @@ describe("AUTH-02 Create account (three steps, P-48)", () => {
         WAIT,
       ),
     ).toBeTruthy();
-    expect(screen.getByLabelText("Step 2 of 3")).toBeTruthy();
+    expect(screen.getByLabelText("Step 2 of 4")).toBeTruthy();
     expect((await screen.findByLabelText("Email", {}, WAIT)).props.value).toBe(DEMO_EMAIL);
     expect(screen.queryByText(/already registered|is taken|exists\./i)).toBeNull();
   });
@@ -185,6 +239,7 @@ describe("AUTH-02 Create account (three steps, P-48)", () => {
     await toPasswordStep();
     await type("Password", "a long passphrase");
     await type("Confirm password", "a long passphrase");
+    await agree();
     await press("Create account");
     expect(await screen.findByText("That didn't work. Try again.", {}, WAIT)).toBeTruthy();
     expect((await screen.findByLabelText("Password", {}, WAIT)).props.value).toBe(
@@ -239,6 +294,9 @@ describe("AUTH-04 Verify email", () => {
             email: "noah@example.test",
             password: "a long passphrase",
             verified: false,
+            providers: [],
+            birthDate: "2000-01-15",
+            termsVersion: "2026-11-04",
           },
         ],
         status: { kind: "verifying", email: "noah@example.test", verified: false },
@@ -346,5 +404,71 @@ describe("AUTH-08 Sign out", () => {
     await press("Sign out");
     expect(mockRouter.replace).toHaveBeenCalledWith("/welcome");
     expect(onClose).toHaveBeenCalled();
+  });
+});
+
+describe("AUTH-01 Continue with Google or Apple (P-79)", () => {
+  it("offers both, in the brands' own words, and signs in with Google", async () => {
+    await renderWith(<WelcomeScreen />);
+    expect(await screen.findByRole("button", { name: "Continue with Apple" }, WAIT)).toBeTruthy();
+    await press("Continue with Google");
+    expect(mockRouter.replace).toHaveBeenCalledWith("/");
+  });
+
+  it("are on the sign-in screen too", async () => {
+    await renderWith(<SignInScreen />);
+    expect(await screen.findByRole("button", { name: "Continue with Google" }, WAIT)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Continue with Apple" })).toBeTruthy();
+  });
+});
+
+describe("AUTH-09 Finish your account (P-79)", () => {
+  async function afterApple() {
+    const store = new MockStore({ latencyMs: 0 });
+    await renderWith(<WelcomeScreen />, store);
+    await press("Continue with Apple");
+    await screen.findByRole("button", { name: "Continue with Apple" }, WAIT);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    return store;
+  }
+  const typeBirthday = async (d: string, m: string, y: string) => {
+    await type("Your birthday, day", d);
+    await type("Your birthday, month", m);
+    await type("Your birthday, year", y);
+  };
+
+  it("asks for the birthday and an explicit yes to the terms, then goes on", async () => {
+    const store = await afterApple();
+    await renderWith(<FinishAccountScreen />, store);
+    expect(await screen.findByText("Just a couple of details", {}, WAIT)).toBeTruthy();
+    await press("Continue");
+    expect(
+      await screen.findByText("Please agree to the terms to continue.", {}, WAIT),
+    ).toBeTruthy();
+    await typeBirthday("20", "04", "1999");
+    await fireEvent.press(
+      await screen.findByRole(
+        "checkbox",
+        { name: "I agree to the Terms of use and the Privacy notice" },
+        WAIT,
+      ),
+    );
+    await press("Continue");
+    expect(mockRouter.replace).toHaveBeenCalledWith("/");
+  });
+
+  it("explains calmly when someone is under 16, and keeps nothing", async () => {
+    const store = await afterApple();
+    const accounts = store.read().auth.accounts.length;
+    await renderWith(<FinishAccountScreen />, store);
+    await typeBirthday("01", "01", "2015");
+    await press("Continue");
+    expect(
+      await screen.findByRole("header", { name: "Garnet is for people 16 and over" }, WAIT),
+    ).toBeTruthy();
+    expect(store.read().auth.accounts).toHaveLength(accounts - 1);
+    expect(store.read().auth.status).toEqual({ kind: "signedOut" });
   });
 });

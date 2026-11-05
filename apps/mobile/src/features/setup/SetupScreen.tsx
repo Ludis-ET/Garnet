@@ -44,7 +44,16 @@ import { PhotoStep } from "./steps/PhotoStep";
 import { SideStep } from "./steps/SideStep";
 import { SummaryStep } from "./steps/SummaryStep";
 import { TimeStep } from "./steps/TimeStep";
-import { useChooseSide, useCompleteSetup, useSaveSetup, useSetupState } from "./useSetup";
+import { TogetherStep } from "./steps/TogetherStep";
+import {
+  useChooseSide,
+  useCompleteSetup,
+  useSaveSetup,
+  useSetTogetherSince,
+  useSetupState,
+} from "./useSetup";
+import { ageCheckToday } from "@/domain/auth";
+import { ageOn, isValidIsoDate } from "@garnet/contracts";
 import { ENTER } from "@/theme/transitions";
 import { notificationsSupported, permission } from "@/notifications/system";
 
@@ -56,6 +65,7 @@ const STEP_POSE: Record<SetupStep, Pose | null> = {
   side: null,
   photo: "happy",
   time: "thinking",
+  together: "happy",
   look: "holdingCrystal",
   alerts: "listening",
 };
@@ -65,6 +75,8 @@ const QUESTIONS: Record<SetupStep, (partner: string) => string> = {
   side: () => "Choose your side",
   photo: () => "Your picture",
   time: () => "Where's home?",
+  together: (p) =>
+    p === "" ? "When did you get together?" : `When did you and ${p} get together?`,
   look: () => "Your look",
   alerts: () => "Stay close, gently",
 };
@@ -89,6 +101,7 @@ function SetupFlow({ initial }: { initial: SetupState }) {
   const save = useSaveSetup();
   const choose = useChooseSide();
   const complete = useCompleteSetup();
+  const together = useSetTogetherSince();
 
   const server = live.data ?? initial;
   const partner = server.partner;
@@ -98,6 +111,8 @@ function SetupFlow({ initial }: { initial: SetupState }) {
     timeZone: initial.profile.timeZone ?? detectedZone(),
   }));
   const [pick, setPick] = useState<GemSide | null>(initial.profile.side);
+  // Together since: the pair's answer so far (the partner's, if they gave it first).
+  const [since, setSince] = useState<string | null>(initial.togetherSince);
   const [tried, setTried] = useState(false);
   const [conflict, setConflict] = useState<GemSide | null>(null);
   const [alertSheet, setAlertSheet] = useState<"rationale" | "prompt" | null>(null);
@@ -157,9 +172,25 @@ function SetupFlow({ initial }: { initial: SetupState }) {
       case "photo":
         finishStep({ avatar: draft.avatar }, "photo");
         return;
-      case "time":
-        finishStep({ timeZone: draft.timeZone }, "time");
+      case "time": {
+        const homeCity = draft.homeCity?.trim() ?? "";
+        finishStep(
+          { timeZone: draft.timeZone, homeCity: homeCity === "" ? null : homeCity },
+          "time",
+        );
         return;
+      }
+      case "together": {
+        setTried(true);
+        if (since === null || !isValidIsoDate(since) || ageOn(since, ageCheckToday()) < 0) return;
+        together.mutate(since, {
+          onSuccess: () => {
+            go(step + 1);
+          },
+          onError,
+        });
+        return;
+      }
       case "look":
         finishStep({ appearance: draft.appearance, accent: draft.accent }, "look");
         return;
@@ -184,7 +215,17 @@ function SetupFlow({ initial }: { initial: SetupState }) {
     }
   };
 
-  const busy = save.isPending || choose.isPending || complete.isPending;
+  const busy = save.isPending || choose.isPending || complete.isPending || together.isPending;
+  const sinceError =
+    current === "together" && tried
+      ? since === null
+        ? "Please enter the whole date, or skip for now."
+        : !isValidIsoDate(since)
+          ? "That date doesn't exist. Check the day and month."
+          : ageOn(since, ageCheckToday()) < 0
+            ? "That's still to come. Pick a day that's already happened."
+            : undefined
+      : undefined;
   const q = current === undefined ? null : QUESTIONS[current](partner.name);
   // A quick fade between steps (P-74), not a slide.
   const enter = ENTER;
@@ -325,6 +366,19 @@ function SetupFlow({ initial }: { initial: SetupState }) {
             onZone={(timeZone) => {
               setDraft((d) => ({ ...d, timeZone }));
             }}
+            homeCity={draft.homeCity ?? ""}
+            onHomeCity={(homeCity) => {
+              setDraft((d) => ({ ...d, homeCity }));
+            }}
+          />
+        ) : null}
+        {current === "together" ? (
+          <TogetherStep
+            value={since}
+            partnerName={partner.name}
+            fromPartner={server.togetherSince !== null && server.togetherSince === since}
+            {...(sinceError === undefined ? {} : { error: sinceError })}
+            onChange={setSince}
           />
         ) : null}
         {current === "look" ? (

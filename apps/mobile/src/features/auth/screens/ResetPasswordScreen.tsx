@@ -18,7 +18,7 @@ import {
   fieldErrorMessage,
   hasErrors,
   passwordChecks,
-  PASSWORD_POLICY_P25,
+  PASSWORD_POLICY_P78,
   validateNewPassword,
 } from "@/domain/auth";
 import { useTheme } from "@/theme/ThemeProvider";
@@ -27,7 +27,7 @@ import { GlassScreen } from "@/components/ui/GlassScreen";
 import { StatusHero } from "@/components/ui/StatusHero";
 import { useResetLink, useResetPassword } from "../useAuth";
 
-const POLICY = PASSWORD_POLICY_P25;
+const POLICY = PASSWORD_POLICY_P78;
 
 type LinkProblem = Exclude<ResetLinkStatus, "valid">;
 
@@ -181,6 +181,7 @@ export function ResetPasswordScreen() {
         <Checklist
           items={[
             { label: `At least ${POLICY.minLength} characters`, met: checks.longEnough },
+            { label: "Not easy to guess", met: checks.hardToGuess },
             { label: "Passwords match", met: checks.matches },
           ]}
         />

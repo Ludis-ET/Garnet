@@ -24,28 +24,28 @@ this PC, with the phone talking to it over USB. Hosting waits on **U-07**.
 
 ## 2. Choices
 
-| Area            | Choice                                                                                                                                                                                                                                                           | Why                                                                         | Status                                                                                                                                                      |
-| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| API framework   | **NestJS 12** (the current major; ESM) on the **Fastify** adapter, TypeScript strict; dependencies always named with `@Inject(...)`                                                                                                                              | D-09; Fastify is lighter and faster than Express with the same Nest code    | D-09 baseline; Fastify: P-76                                                                                                                                |
-| Contracts       | **`packages/contracts`**: zod schemas for every request and response, shared by app and API                                                                                                                                                                      | One source of truth; the app's types come from it; validation on both sides | P-76                                                                                                                                                        |
-| Database        | **PostgreSQL 17**; schema from `spikes/data-model/schema.sql` as SQL migrations                                                                                                                                                                                  | F-05 proved the schema, RLS, tombstones and purge queue                     | D-09 baseline                                                                                                                                               |
-| Data access     | **Kysely** (typed SQL) on `pg`; every request in a transaction that sets `app.user_id` and `app.mutation_id`                                                                                                                                                     | Plain SQL keeps RLS and session settings visible; ORMs hide them            | P-76                                                                                                                                                        |
-| Migrations      | Plain `.sql` files run by a small Node runner (ordered, checksummed, in a table)                                                                                                                                                                                 | Reviewable SQL, no ORM lock-in                                              | P-76                                                                                                                                                        |
-| Sync            | ADR-0003: client UUIDv7 ids, `mutationId`, `baseVersion`, tombstones, `POST /v1/mutations`, `GET /v1/changes`                                                                                                                                                    | F-04 invariants                                                             | Planning baseline (ADR-0003)                                                                                                                                |
-| App local store | **expo-sqlite** for confirmed state and the outbox (B3), replacing the mock file store                                                                                                                                                                           | Survives restarts; offline drafts                                           | ADR-0003 / overview                                                                                                                                         |
-| Auth            | Email + password, verification, reset (D-09). Argon2id, opaque 256-bit tokens stored only as hashes, short access tokens with rotating refresh tokens (reuse revokes the family), rate limits without lockout                                                    | ADR-0006                                                                    | Method: baseline. **Policies stay Proposed (ADR-0006)**: built in B1 as required settings with no defaults in code; the owner accepts or changes the values |
-| Dev sessions    | **B0 only, local only**: `pnpm --filter @garnet/db dev-session` writes a session for a seeded test person straight into a database on this machine and prints the token. The API never creates sessions this way; the command is removed once sign-in works (B1) | Lets B0 test session-derived identity before sign-in exists                 | P-76                                                                                                                                                        |
-| Jobs            | In-process scheduler in the API (`@nestjs/schedule`), idempotent and resumable; a queue only if needed                                                                                                                                                           | Overview §Jobs                                                              | Planning baseline                                                                                                                                           |
-| Object storage  | S3-compatible; **SeaweedFS** locally (as F-07), the provider waits on U-07                                                                                                                                                                                       | F-07 evidence                                                               | Local: P-76; provider: **U-07 open**                                                                                                                        |
-| Email           | Local **Mailpit** catches every email; the real provider waits on U-07                                                                                                                                                                                           | Nothing is ever sent from development                                       | P-76                                                                                                                                                        |
-| Push            | **FCM HTTP v1** for Android, APNs later (U-01); payloads carry an opaque id and generic text only                                                                                                                                                                | AGENTS.md §6; no third-party relay sees anything                            | P-76; iPhone: **U-01 open**                                                                                                                                 |
-| Logging         | `pino` with an allow-list (route, status, latency, request id, error code); errors as RFC 9457 problem details                                                                                                                                                   | AGENTS.md §6                                                                | Baseline (B-12)                                                                                                                                             |
-| Tests           | Vitest + Fastify `inject` for the API on PGlite (PostgreSQL 17 in-process, the same migrations), so `pnpm check` needs no Docker; each phase also runs once against Postgres in Docker; `fast-check` for time and ordering; mutants in `pnpm mutation`           | AGENTS.md §7                                                                | P-76                                                                                                                                                        |
-| Local stack     | **Docker Compose**, one service per phase: Postgres from B0, Mailpit from B1, SeaweedFS from B7. The phone reaches the API through `adb reverse tcp:3000 tcp:3000`                                                                                               | No hosting, no cost; Docker already used for F-07                           | P-76                                                                                                                                                        |
-| Hosting         | Not chosen: **U-07** (P-35: UK residency preferred, EU fallback), compared in B-02 before B9                                                                                                                                                                     | —                                                                           | **Open**                                                                                                                                                    |
+| Area            | Choice                                                                                                                                                                                                                                                               | Why                                                                         | Status                                                                                                                                                                           |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| API framework   | **NestJS 12** (the current major; ESM) on the **Fastify** adapter, TypeScript strict; dependencies always named with `@Inject(...)`                                                                                                                                  | D-09; Fastify is lighter and faster than Express with the same Nest code    | D-09 baseline; Fastify: P-76                                                                                                                                                     |
+| Contracts       | **`packages/contracts`**: zod schemas for every request and response, shared by app and API                                                                                                                                                                          | One source of truth; the app's types come from it; validation on both sides | P-76                                                                                                                                                                             |
+| Database        | **PostgreSQL 17**; schema from `spikes/data-model/schema.sql` as SQL migrations                                                                                                                                                                                      | F-05 proved the schema, RLS, tombstones and purge queue                     | D-09 baseline                                                                                                                                                                    |
+| Data access     | **Kysely** (typed SQL) on `pg`; every request in a transaction that sets `app.user_id` and `app.mutation_id`                                                                                                                                                         | Plain SQL keeps RLS and session settings visible; ORMs hide them            | P-76                                                                                                                                                                             |
+| Migrations      | Plain `.sql` files run by a small Node runner (ordered, checksummed, in a table)                                                                                                                                                                                     | Reviewable SQL, no ORM lock-in                                              | P-76                                                                                                                                                                             |
+| Sync            | ADR-0003: client UUIDv7 ids, `mutationId`, `baseVersion`, tombstones, `POST /v1/mutations`, `GET /v1/changes`                                                                                                                                                        | F-04 invariants                                                             | Planning baseline (ADR-0003)                                                                                                                                                     |
+| App local store | **expo-sqlite** for confirmed state and the outbox (B3), replacing the mock file store                                                                                                                                                                               | Survives restarts; offline drafts                                           | ADR-0003 / overview                                                                                                                                                              |
+| Auth            | **Better Auth** (owner direction P-77): email + password, verification, reset, sessions and rate limits under `/v1/auth`; the Expo client keeps the session in the secure keystore                                                                                   | Owner direction; D-09's method                                              | P-77. ADR-0006's policy **values** stay required settings with no defaults; where Better Auth differs from ADR-0006 (token storage, scrypt, sliding sessions) the owner confirms |
+| Dev sessions    | **B0 only, local only**: `pnpm --filter @garnet/db dev-session` writes a session for a seeded test person straight into a database on this machine and prints the token. The API never creates sessions this way; removed in B1, where tests sign in through the API | Lets B0 test session-derived identity before sign-in exists                 | P-76                                                                                                                                                                             |
+| Jobs            | In-process scheduler in the API (`@nestjs/schedule`), idempotent and resumable; a queue only if needed                                                                                                                                                               | Overview §Jobs                                                              | Planning baseline                                                                                                                                                                |
+| Object storage  | S3-compatible; **SeaweedFS** locally (as F-07), the provider waits on U-07                                                                                                                                                                                           | F-07 evidence                                                               | Local: P-76; provider: **U-07 open**                                                                                                                                             |
+| Email           | Local **Mailpit** catches every email; the real provider waits on U-07                                                                                                                                                                                               | Nothing is ever sent from development                                       | P-76                                                                                                                                                                             |
+| Push            | **FCM HTTP v1** for Android, APNs later (U-01); payloads carry an opaque id and generic text only                                                                                                                                                                    | AGENTS.md §6; no third-party relay sees anything                            | P-76; iPhone: **U-01 open**                                                                                                                                                      |
+| Logging         | `pino` with an allow-list (route, status, latency, request id, error code); errors as RFC 9457 problem details                                                                                                                                                       | AGENTS.md §6                                                                | Baseline (B-12)                                                                                                                                                                  |
+| Tests           | Vitest + Fastify `inject` for the API on PGlite (PostgreSQL 17 in-process, the same migrations), so `pnpm check` needs no Docker; each phase also runs once against Postgres in Docker; `fast-check` for time and ordering; mutants in `pnpm mutation`               | AGENTS.md §7                                                                | P-76                                                                                                                                                                             |
+| Local stack     | **Docker Compose**, one service per phase: Postgres from B0, Mailpit from B1, SeaweedFS from B7. The phone reaches the API through `adb reverse tcp:3000 tcp:3000`                                                                                                   | No hosting, no cost; Docker already used for F-07                           | P-76                                                                                                                                                                             |
+| Hosting         | Not chosen: **U-07** (P-35: UK residency preferred, EU fallback), compared in B-02 before B9                                                                                                                                                                         | —                                                                           | **Open**                                                                                                                                                                         |
 
 New dependencies (each checked for licence and maintenance when added, pinned past the 7-day
-release age): `@nestjs/*`, `fastify`, `kysely`, `pg`, `zod`, `pino`, `argon2` and `expo-secure-store` (B1),
+release age): `@nestjs/*`, `fastify`, `kysely`, `pg`, `zod`, `pino` and `expo-secure-store` (B1; Argon2id comes from Node's own crypto, P-78),
 `expo-sqlite` (B3), a FCM client (B6). Docker images: `postgres:17`, `chrislusf/seaweedfs`,
 `axllent/mailpit`.
 
@@ -98,7 +98,9 @@ and the connected pages working against the local API.
   problems, the log lines, and the API role refused sessions, accounts, migration history and
   temporary tables. **Not yet on the phone** (B1 brings the first connected pages: sign-in).
 
-### B1 · Accounts, sessions, pairing, setup (B-20, B-21, B-22): first pages connected
+### B1 · Accounts, sessions, pairing, setup (B-20, B-21, B-22): first pages connected · **built 2026-11-02, tested 2026-11-04**
+
+Built with Better Auth (P-77): migration `0002`, `apps/api/src/auth` (Better Auth, the Fastify bridge, mail), `setup` and `pairing` controllers, the local seed (`pnpm --filter @garnet/api seed`), Mailpit in `infra/`; in the app, `src/data/http` (Better Auth's Expo client, HTTP adapters for auth, pairing and setup) and the verify screen reading its email link. Checked: migration applied to local Postgres, the API boots, `/v1/auth` answers, protected routes refuse without a session; typecheck and lint clean. **Tested (2026-11-04):** ADR-0006 met as recorded in P-78 (Argon2id, 15-character minimum with a shared blocklist, signed cookies, sessions ending 90 days after sign-in, per-account back-off, the auth route allow-list) and migration `0003`. API 92 tests on PGlite (`auth`, `pairing`, `probes` for every route, `password`, `throttle`, `config`, foundation), database 22, contracts 27, app 450; mutants: API-1 to API-18, DB-1 to DB-9, PW-1 to PW-4 and AUTH-PW-1 all behave as expected; the live walk against Postgres and Mailpit in Docker passed 44/44. **Not done yet:** a run on the phone, and the Settings › Devices and password page, which moves with B2.
 
 Auth comes first (owner direction 2026-11-02): every later phase then runs on real accounts and
 real sessions, and nothing is built on test sessions that would need redoing.
@@ -134,21 +136,57 @@ real sessions, and nothing is built on test sessions that would need redoing.
   **U-33** (invitation delivery and lifecycle). Until decided they are required options or stay
   conservative (no re-pairing, single-use invitations), never silent defaults.
 
-### B2 · Settings (SET-01 to SET-16)
+### B1.5 · Google and Apple sign-in, registration details · **built 2026-11-05 (P-79)**
 
-- **API:** `GET/PATCH /v1/me/settings` (one versioned settings document per person, validated by
-  the shared schema; only the person's own row, by session and RLS), `GET/PATCH /v1/me/profile`
-  (display name, nickname, picture choice, side, time zone), `GET/PATCH /v1/relationship`
-  (nicknames, shared settings).
-- **Data:** `user_settings` replaces the draft `user_preference` (the app's settings have
-  grown: preview modes generic/sender/full, per-group modes, home layout, motion, location
-  sharing). Quiet hours keep **no default window (U-21)**.
-- **Pages:** Settings root and search, Notifications, Quiet hours, Lock-screen previews,
-  Reminders, Home layout, Chat settings, Location, Motion and haptics, Appearance, Nicknames,
-  Time, Privacy, About.
+Owner direction P-79: Google, Apple and email + password are three ways into **one** account.
+
+- **Ways in:** "Continue with Google" and "Continue with Apple" on Welcome and Sign in, in each
+  brand's own colours and the app's pill shape, shown only when the server is configured for
+  them (`GET /v1/sign-in-methods`). Google, and Apple off iPhone, run in the phone's browser and
+  come back through the PKCE-bound hand-off (`apps/api/src/auth/handoff.ts`); on iPhone, Apple's
+  own sheet sends an ID token with a hashed nonce.
+- **One account per person:** a provider that vouches for the email joins the account that
+  has it; an unconfirmed account loses anything someone else set up before a verified provider
+  joins it; Apple's private-relay addresses stay separate until connected in Settings (B2).
+- **Registration (AUTH-09):** a birthday, 16 and over, and the current terms with the server's
+  time, given with an email sign-up or right after a first Google or Apple sign-in; until then
+  only registration and `/v1/me` answer. Under 16, a new account is removed with everything it
+  had. A new `TERMS_VERSION` asks everyone again. Terms and Privacy pages (AUTH-10) are drafts
+  (U-36).
+- **Setup:** an optional home town in "Where's home?" and an optional shared "Together since"
+  step. The partner sees the full birthday and the home town (P-79).
+- **Verified:** API 139 tests (social, registration, probes for every route), database 26,
+  contracts 49, app 462; mutants listed in `pnpm mutation`. **Not verified:** a real Google or
+  Apple sign-in (needs the owner's Google OAuth client, and for Apple the paid developer account
+  and an https domain, U-07); Apple on iPhone needs an iOS build (U-01).
+
+### B2 · Settings (SET-01 to SET-17) · **built 2026-11-05 (P-80)**
+
+- **Settings:** `GET/PATCH /v1/me/settings`: one versioned document per person (`user_settings`,
+  migration 0005), validated by the shared schema, only the person's own row (session and RLS).
+  A patch names what changed and merges under a row lock. It carries notifications, quiet hours,
+  previews, reminders, nicknames and greeting, Home layout, motion, haptics and location sharing.
+  Quiet hours keep **no default window (U-21)**; previews default to generic.
+- **Devices (SET-12):** `GET /v1/me/devices`, `DELETE /v1/me/devices/:id`,
+  `POST /v1/me/devices/sign-out-others`: real sessions, never a token. Open: U-27.
+- **Password:** the real change (P-78 rules), ending other sessions. Set a password by email
+  for an account made with Google or Apple.
+- **Sign-in methods (P-80):** `GET /v1/me/sign-in-methods`, `DELETE
+/v1/me/sign-in-methods/:provider` and Better Auth's `link-social` through the hand-off. Connect
+  and disconnect Google and Apple; never the last way in; needs a recent sign-in.
+- **Account details:** change the email (`change-email`: the current address confirms, then the
+  new one), change the birthday (`PATCH /v1/me/account`, still 16 and over), see the accepted terms.
+- **Not separate routes:** profile fields stay on `/v1/me/setup`; the partner's nickname is a
+  per-person setting; "together since" has its own route (see P-80).
+- **The mirror:** with the API on, answers are copied into the mock store, so areas still on
+  sample data work and use the real person (`mirror.ts`, a fix to B1).
+- **Waiting (B9):** export, ending the space and deleting the account (U-20, U-23); with the API on,
+  those pages say they aren't available yet. Location itself stays on the phone until B4.
 - **Guardrails tested:** a person can never read or change the partner's settings; previews
-  default to generic; the server never stores the location, only what the distance needs (P-66).
-- **Open items touched:** U-21 (quiet window), U-13 (cutoff changes: read-only until U-02/U-13).
+  default to generic; nothing saved reaches a log line.
+- **Verified:** live on Postgres and Mailpit, including twelve simultaneous saves (removing the
+  lock lost five of six, so the check can fail). **Not verified:** a real Google or Apple connect,
+  and the pages on a phone.
 
 ### B3 · Sync core and Days (B-30 to B-33)
 
@@ -193,6 +231,37 @@ real sessions, and nothing is built on test sessions that would need redoing.
 
 Spark, recap and the shared-day jobs (B-60 to B-71) wait on U-02 to U-06 and U-12; they slot in
 after B3 when those are decided.
+
+## 5a. Accounts and registration: what is still to do
+
+Researched for P-79; each item names what it waits on.
+
+1. **Account deletion in the app** (Apple App Review 5.1.1(v) requires it once accounts can
+   be created; for Sign in with Apple, the server also revokes Apple's tokens). Waits on U-20,
+   U-23 and P-37 (what happens to shared memories).
+2. **Sessions and devices**: seeing and signing out devices is done (B2); device identity, push
+   linkage and what a signed-out device keeps wait on U-27.
+3. **Re-authentication page**: a recent sign-in is required for sensitive changes (P-80); today
+   the app asks the person to sign out and back in. A password or provider prompt in place would
+   be kinder.
+4. **Apple token revocation** when Apple is disconnected or the account is deleted.
+5. **Legal texts**: final Terms of use and Privacy notice, who provides Garnet, governing law,
+   contact (U-36); a privacy-policy URL is also needed for Google's OAuth consent screen and for
+   the stores.
+6. **Google production setup**: OAuth consent screen with the app's name, logo, privacy URL and
+   authorised domain, and Google's brand verification before release.
+7. **Apple setup**: Apple Developer Program, a Services ID with an https return URL on Garnet's
+   domain, a key for the client secret (`apps/api/scripts/apple-client-secret.mjs`, renewed at
+   most every six months), and the Sign in with Apple capability on the iOS app (U-01, U-07).
+8. **Verified links**: Android App Links and iOS Universal Links on an https domain, so email and
+   sign-in links can't be claimed by another app (the hand-off already makes a caught sign-in link
+   useless; email links still use `garnet://`). Waits on U-07.
+9. **Shared rate-limit store** for the per-account back-off once more than one API process runs
+   (U-07).
+10. **Breached-password check** (NIST SP 800-63B-4): a k-anonymity range query (only a hash
+    prefix leaves the server) is the usual way; it is an outside service, so it needs the
+    owner's go.
+11. **Passkeys** as an extra way in later (ADR-0006: no schema change beyond a credentials table).
 
 ## 6. Order of work for B1
 
