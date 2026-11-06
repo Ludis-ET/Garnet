@@ -8,11 +8,11 @@ import type { ImageSource } from "expo-image";
 const files = require.context("../../../../assets/characters", false, /\.(png|webp|jpe?g|gif)$/i);
 
 export const artworkFiles: Readonly<Record<string, ImageSource | number>> = Object.fromEntries(
-  files.keys().map((key) => [
+  files.keys().map((key: string) => [
     key
       .replace(/^\.\//, "")
       .replace(/\.(png|webp|jpe?g|gif)$/i, "")
       .toLowerCase(),
-    files(key) as ImageSource | number,
+    files<ImageSource | number>(key),
   ]),
 );

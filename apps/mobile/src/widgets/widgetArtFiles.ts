@@ -6,11 +6,11 @@
 const files = require.context("../../assets/characters", true, /^\.\/widget\/[^/]+\.png$/i);
 
 export const widgetArtFiles: Readonly<Record<string, number>> = Object.fromEntries(
-  files.keys().map((key) => [
+  files.keys().map((key: string) => [
     key
       .replace(/^\.\/widget\//, "")
       .replace(/\.png$/i, "")
       .toLowerCase(),
-    files(key) as number,
+    files<number>(key),
   ]),
 );

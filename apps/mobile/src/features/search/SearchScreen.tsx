@@ -1,4 +1,4 @@
-import { router, type Href } from "expo-router";
+import { router } from "expo-router";
 import { useEffect, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
@@ -192,7 +192,7 @@ export function SearchScreen() {
 
   const open = (r: SearchResult) => {
     remember.mutate(query);
-    router.push(r.href as Href);
+    router.push(r.href as never);
   };
   const groups = KINDS.map((k) => ({
     ...k,

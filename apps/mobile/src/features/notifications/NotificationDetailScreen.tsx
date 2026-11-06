@@ -1,4 +1,4 @@
-import { router, type Href } from "expo-router";
+import { router } from "expo-router";
 import { useEffect, useEffectEvent, type ReactNode } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import Animated from "react-native-reanimated";
@@ -141,7 +141,7 @@ export function NotificationDetailScreen({ id }: { id: string }) {
           label="Open"
           variant="primary"
           onPress={() => {
-            router.push(item.href as Href);
+            router.push(item.href as never);
           }}
         />
         <Button

@@ -44,5 +44,10 @@ export function parseApiAreas(raw: string | undefined): ReadonlySet<ApiArea> {
 }
 
 // Expo inlines EXPO_PUBLIC_ variables at build time; they must be read with dot access.
-export const API_URL = parseApiUrl(process.env.EXPO_PUBLIC_API_URL);
-export const API_AREAS_ON = parseApiAreas(process.env.EXPO_PUBLIC_API_AREAS);
+const rawApiUrl: unknown = process.env.EXPO_PUBLIC_API_URL;
+export const API_URL = parseApiUrl(typeof rawApiUrl === "string" ? rawApiUrl : undefined);
+
+const rawApiAreas: unknown = process.env.EXPO_PUBLIC_API_AREAS;
+export const API_AREAS_ON = parseApiAreas(
+  typeof rawApiAreas === "string" ? rawApiAreas : undefined,
+);
