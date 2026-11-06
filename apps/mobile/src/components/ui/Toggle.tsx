@@ -23,6 +23,8 @@ export function Toggle({ value, onValueChange, accessibilityLabel }: ToggleProps
       value={value}
       onValueChange={onValueChange}
       accessibilityLabel={accessibilityLabel}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value }}
       trackColor={{ true: colors.accentStrong, false: colors.border }}
       thumbColor={colors.onAccent}
       ios_backgroundColor={colors.border}

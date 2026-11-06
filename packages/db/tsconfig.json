@@ -5,5 +5,5 @@
     // The CLI runs on Node 24 directly, which needs real file extensions in relative imports.
     "allowImportingTsExtensions": true
   },
-  "include": ["src"]
+  "include": ["src", "vitest.config.ts"]
 }

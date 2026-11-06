@@ -1,4 +1,4 @@
-import { type Href, router } from "expo-router";
+import { router, type Href } from "expo-router";
 import { useEffect, useEffectEvent, type ReactNode } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import Animated from "react-native-reanimated";

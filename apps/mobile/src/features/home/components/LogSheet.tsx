@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -192,8 +193,7 @@ export function LogSheet({
           />
           {/* box-none: this full-screen layer must let a tap above the sheet reach the scrim. */}
           <KeyboardAvoidingView
-            // Both platforms: Android draws edge to edge, so its window never shrinks (P-75).
-            behavior="padding"
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
             style={styles.end}
             pointerEvents="box-none"
           >

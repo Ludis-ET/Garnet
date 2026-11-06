@@ -15,8 +15,8 @@ export function deviceName(userAgent: string | null | undefined): string {
     if (model !== "" && SAFE_MODEL.test(model)) return model;
     return garnet[1]?.trim() === "iOS" ? "iPhone" : "Android phone";
   }
-  if (/iPhone/.test(ua)) return "iPhone";
-  if (/iPad/.test(ua)) return "iPad";
+  if (ua.includes("iPhone")) return "iPhone";
+  if (ua.includes("iPad")) return "iPad";
   if (/Android|okhttp/i.test(ua)) return "Android phone";
   if (/CFNetwork|Darwin/.test(ua)) return "iPhone";
   if (/Macintosh|Windows|Linux/.test(ua)) return "Computer";

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
+import { router } from "expo-router";
 import { Temporal } from "temporal-polyfill";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
@@ -259,11 +260,11 @@ export function AboutPage() {
           </AppText>
         </Pressable>
         {/* The one note that this build has no server (owner direction P-75, rule 4). */}
-        <AppText variant="caption" color="textTertiary" style={styles.center}>
-          Preview build: everything stays on this phone.
-        </AppText>
-        {/* Only in builds pointed at the local API (P-76, B0); never in the normal app. */}
-        {connection === "off" ? null : (
+        {connection === "off" ? (
+          <AppText variant="caption" color="textTertiary" style={styles.center}>
+            Preview build: everything stays on this phone.
+          </AppText>
+        ) : (
           <AppText variant="caption" color="textSecondary" style={styles.center}>
             {connection === "connected"
               ? "Connected to this PC"
@@ -284,7 +285,7 @@ export function AboutPage() {
           tint={palette.success}
           label="Privacy"
           onPress={() => {
-            toast.show("Comes with the real app.");
+            router.push("/privacy");
           }}
         />
         <SettingsRow
@@ -292,7 +293,7 @@ export function AboutPage() {
           tint={palette.sapphire500}
           label="Terms"
           onPress={() => {
-            toast.show("Comes with the real app.");
+            router.push("/terms");
           }}
         />
       </SettingsSection>

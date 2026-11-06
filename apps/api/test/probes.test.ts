@@ -11,7 +11,21 @@ import {
   pairingStatusSchema,
   settingsViewSchema,
   setupStateSchema,
+  type ChangeFeedResponse,
+  type DayDetailResponse,
+  type DaysOverviewResponse,
+  type EntryDto,
+  type SendSignalResponse,
+  type SignalHistoryResponse,
   type SetupStateDto,
+  type UsOverviewResponse,
+  type ChatMessageDto,
+  type ChatMessagesResponse,
+  type ChatPresenceResponse,
+  type ChatSettingsResponse,
+  type ConversationSummaryResponse,
+  type SearchChatResponse,
+  type NotificationsListResponse,
 } from "@garnet/contracts";
 import { DEV_RELATIONSHIP_ID } from "@garnet/db";
 import { Kysely, PostgresDialect, sql } from "kysely";
@@ -20,6 +34,7 @@ import { CLIENT_HEADER } from "../src/auth/client-header";
 import { asViewer, type Database } from "../src/db/database";
 import {
   DEV_PEOPLE,
+  PASSWORD,
   SESSION_COOKIE,
   startTestApi,
   STRANGER,
@@ -37,6 +52,7 @@ const PUBLIC_ROUTES = new Set([
   "GET /v1/sign-in-methods",
   "GET /v1/auth/*",
   "POST /v1/auth/*",
+  "GET /v1/me/export/download/:token",
 ]);
 
 async function setupOf(api: TestApi, cookie: string): Promise<SetupStateDto> {
@@ -388,6 +404,1424 @@ const PROBES: Record<string, (api: TestApi) => Promise<void>> = {
     });
     const status = await api.call("GET", "/v1/pairing", { cookie: inviter.cookie });
     expect(status.json()).toMatchObject({ partnerName: null });
+  },
+
+  "POST /v1/mutations": async (api) => {
+    // Stranger's mutation creates in their own relationship only
+    const entryId = "0192f0a0-0000-7000-8000-000000009001";
+    const mutationId = "0192f0a0-0000-7000-8000-000000009002";
+    const res = await api.call("POST", "/v1/mutations", {
+      cookie: api.cookies.stranger,
+      body: {
+        mutations: [
+          {
+            kind: "create",
+            mutationId,
+            entryId,
+            entryKind: "text",
+            body: "Stranger thought",
+            visibility: "shared",
+            occurredAt: "2026-11-05T12:00:00Z",
+            occurredTimeZone: "Europe/London",
+          },
+        ],
+      },
+    });
+    expect(res.statusCode).toBe(200);
+
+    // Neither Selam nor Noah can see this entry
+    const selamEntry = await api.call("GET", `/v1/entries/${entryId}`, {
+      cookie: api.cookies.selam,
+    });
+    expect(selamEntry.statusCode).toBe(404);
+    const noahEntry = await api.call("GET", `/v1/entries/${entryId}`, { cookie: api.cookies.noah });
+    expect(noahEntry.statusCode).toBe(404);
+  },
+
+  "GET /v1/changes": async (api) => {
+    const strangerChanges = await api.call("GET", "/v1/changes?since=0", {
+      cookie: api.cookies.stranger,
+    });
+    expect(strangerChanges.statusCode).toBe(200);
+    // Noah's or Selam's entries never enter stranger's change feed
+    const body = strangerChanges.json<ChangeFeedResponse>();
+    const items = body.changes;
+    for (const item of items) {
+      if (item.type === "upsert") {
+        expect(item.entry.authorId).toBe(STRANGER.id);
+      }
+    }
+  },
+
+  "GET /v1/days": async (api) => {
+    const strangerDays = await api.call("GET", "/v1/days", { cookie: api.cookies.stranger });
+    expect(strangerDays.statusCode).toBe(200);
+    // Overview has no partner for stranger
+    const body = strangerDays.json<DaysOverviewResponse>();
+    const days = body.days;
+    for (const d of days) {
+      expect(d.partner).toBe(false);
+    }
+  },
+
+  "GET /v1/days/:date": async (api) => {
+    const today = "2026-11-05";
+    const res = await api.call("GET", `/v1/days/${today}`, { cookie: api.cookies.stranger });
+    expect(res.statusCode).toBe(200);
+    const body = res.json<DayDetailResponse>();
+    expect(body.partner).toEqual([]);
+  },
+
+  "POST /v1/days/:date/finish": async (api) => {
+    const today = "2026-11-05";
+    const res = await api.call("POST", `/v1/days/${today}/finish`, {
+      cookie: api.cookies.stranger,
+      body: {},
+    });
+    expect(res.statusCode).toBe(200);
+    // Stranger finishing day does not mark partnerReady for Selam or Noah
+    const selamDay = await api.call("GET", `/v1/days/${today}`, { cookie: api.cookies.selam });
+    const selamBody = selamDay.json<DayDetailResponse>();
+    expect(selamBody.partnerReady).toBe(false);
+  },
+
+  "GET /v1/entries/:id": async (api) => {
+    // 1. Cross-relationship: stranger cannot access an entry of Selam
+    const entryId = "0192f0a0-0000-7000-8000-000000009003";
+    await api.call("POST", "/v1/mutations", {
+      cookie: api.cookies.selam,
+      body: {
+        mutations: [
+          {
+            kind: "create",
+            mutationId: "0192f0a0-0000-7000-8000-000000009004",
+            entryId,
+            entryKind: "text",
+            body: "Selam secret",
+            visibility: "private",
+            occurredAt: "2026-11-05T12:00:00Z",
+            occurredTimeZone: "Europe/London",
+          },
+        ],
+      },
+    });
+
+    const strangerGet = await api.call("GET", `/v1/entries/${entryId}`, {
+      cookie: api.cookies.stranger,
+    });
+    expect(strangerGet.statusCode).toBe(404);
+
+    // 2. Partner-private: Noah cannot access Selam's private draft
+    const noahGet = await api.call("GET", `/v1/entries/${entryId}`, {
+      cookie: api.cookies.noah,
+    });
+    expect(noahGet.statusCode).toBe(404);
+
+    // 3. Selam herself can access it
+    const selamGet = await api.call("GET", `/v1/entries/${entryId}`, {
+      cookie: api.cookies.selam,
+    });
+    expect(selamGet.statusCode).toBe(200);
+    const selamGetBody = selamGet.json<EntryDto>();
+    expect(selamGetBody.body).toBe("Selam secret");
+  },
+
+  "GET /v1/us/overview": async (api) => {
+    const strangerRes = await api.call("GET", "/v1/us/overview", { cookie: api.cookies.stranger });
+    expect(strangerRes.statusCode).toBe(200);
+    const strangerBody = strangerRes.json<UsOverviewResponse>();
+    expect(strangerBody.me.name).toBe("Not Noah");
+    expect(strangerBody.partner.name).toBe("Partner");
+    expect(strangerBody.distance).toBeNull();
+    expect(strangerBody.recent).toEqual([]);
+
+    const selamRes = await api.call("GET", "/v1/us/overview", { cookie: api.cookies.selam });
+    expect(selamRes.statusCode).toBe(200);
+    const selamBody = selamRes.json<UsOverviewResponse>();
+    expect(selamBody.me.name).toBe("Selam");
+    expect(selamBody.partner.name).toBe("Noah");
+  },
+
+  "GET /v1/signals": async (api) => {
+    // Selam sends a signal
+    await api.call("POST", "/v1/signals", {
+      cookie: api.cookies.selam,
+      body: { signal: "thought-of-you", payload: { note: "Hello Noah" } },
+    });
+
+    // Stranger cannot see Selam's signals
+    const strangerRes = await api.call("GET", "/v1/signals", { cookie: api.cookies.stranger });
+    expect(strangerRes.statusCode).toBe(200);
+    const strangerBody = strangerRes.json<SignalHistoryResponse>();
+    expect(strangerBody.signals).toEqual([]);
+
+    // Noah can see Selam's signal
+    const noahRes = await api.call("GET", "/v1/signals", { cookie: api.cookies.noah });
+    expect(noahRes.statusCode).toBe(200);
+    const noahBody = noahRes.json<SignalHistoryResponse>();
+    expect(noahBody.signals.length).toBeGreaterThan(0);
+    expect(noahBody.signals[0]?.mine).toBe(false);
+  },
+
+  "POST /v1/signals": async (api) => {
+    const res = await api.call("POST", "/v1/signals", {
+      cookie: api.cookies.selam,
+      body: { signal: "missing-you", payload: { level: "A little" } },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json<SendSignalResponse>();
+    expect(body.signal).toBe("missing-you");
+    expect(body.id).toBeTruthy();
+  },
+
+  "POST /v1/signals/:id/respond": async (api) => {
+    // Selam sends a support signal
+    const sendRes = await api.call("POST", "/v1/signals", {
+      cookie: api.cookies.selam,
+      body: { signal: "need-you", payload: { need: "comfort" } },
+    });
+    const signalId = sendRes.json<SendSignalResponse>().id;
+
+    // Stranger cannot respond to Selam's signal (cross-relationship isolation)
+    const strangerRes = await api.call("POST", `/v1/signals/${signalId}/respond`, {
+      cookie: api.cookies.stranger,
+      body: { response: "here" },
+    });
+    expect(strangerRes.statusCode).toBe(404);
+
+    // Noah (partner) can respond
+    const noahRes = await api.call("POST", `/v1/signals/${signalId}/respond`, {
+      cookie: api.cookies.noah,
+      body: { response: "comfort", body: "Here for you" },
+    });
+    expect(noahRes.statusCode).toBe(204);
+  },
+
+  "PUT /v1/me/location": async (api) => {
+    // Selam updates her coarse location
+    const putRes = await api.call("PUT", "/v1/me/location", {
+      cookie: api.cookies.selam,
+      body: { lat: 9.03, lon: 38.74 },
+    });
+    expect(putRes.statusCode).toBe(204);
+
+    // Stranger cannot see Selam's location (stranger distance remains null)
+    const strangerRes = await api.call("GET", "/v1/us/overview", { cookie: api.cookies.stranger });
+    const strangerBody = strangerRes.json<UsOverviewResponse>();
+    expect(strangerBody.distance).toBeNull();
+
+    // Clearing location
+    const clearRes = await api.call("PUT", "/v1/me/location", {
+      cookie: api.cookies.selam,
+      body: { lat: null, lon: null },
+    });
+    expect(clearRes.statusCode).toBe(204);
+  },
+
+  "GET /v1/chat/summary": async (api) => {
+    const stranger = await api.call("GET", "/v1/chat/summary", { cookie: api.cookies.stranger });
+    expect(stranger.statusCode).toBe(200);
+    const body = stranger.json<ConversationSummaryResponse>();
+    expect(body.partner.name).not.toBe("Noah");
+  },
+
+  "GET /v1/chat/messages": async (api) => {
+    const stranger = await api.call("GET", "/v1/chat/messages", { cookie: api.cookies.stranger });
+    expect(stranger.statusCode).toBe(200);
+    const body = stranger.json<ChatMessagesResponse>();
+    expect(body.messages).toEqual([]);
+  },
+
+  "POST /v1/chat/messages": async (api) => {
+    const res = await api.call("POST", "/v1/chat/messages", {
+      cookie: api.cookies.selam,
+      body: { text: "Probe message" },
+    });
+    expect(res.statusCode).toBe(200);
+    const msg = res.json<ChatMessageDto>();
+
+    // Stranger cannot see it
+    const stranger = await api.call("GET", "/v1/chat/messages", { cookie: api.cookies.stranger });
+    const strangerMsgs = stranger.json<ChatMessagesResponse>().messages;
+    expect(strangerMsgs.some((m) => m.id === msg.id)).toBe(false);
+  },
+
+  "PATCH /v1/chat/messages/:id": async (api) => {
+    const sendRes = await api.call("POST", "/v1/chat/messages", {
+      cookie: api.cookies.selam,
+      body: { text: "To be edited" },
+    });
+    const msg = sendRes.json<ChatMessageDto>();
+
+    // Stranger cannot edit
+    const strangerRes = await api.call("PATCH", `/v1/chat/messages/${msg.id}`, {
+      cookie: api.cookies.stranger,
+      body: { text: "Hacked" },
+    });
+    expect(strangerRes.statusCode).toBe(404);
+
+    // Author can edit
+    const editRes = await api.call("PATCH", `/v1/chat/messages/${msg.id}`, {
+      cookie: api.cookies.selam,
+      body: { text: "Edited safely" },
+    });
+    expect(editRes.statusCode).toBe(200);
+  },
+
+  "DELETE /v1/chat/messages/:id": async (api) => {
+    const sendRes = await api.call("POST", "/v1/chat/messages", {
+      cookie: api.cookies.selam,
+      body: { text: "To be deleted" },
+    });
+    const msg = sendRes.json<ChatMessageDto>();
+
+    // Stranger cannot delete
+    const strangerRes = await api.call("DELETE", `/v1/chat/messages/${msg.id}`, {
+      cookie: api.cookies.stranger,
+      body: { mode: "for-me" },
+    });
+    expect(strangerRes.statusCode).toBe(404);
+
+    // Selam deletes for-me
+    const delRes = await api.call("DELETE", `/v1/chat/messages/${msg.id}`, {
+      cookie: api.cookies.selam,
+      body: { mode: "for-me" },
+    });
+    expect(delRes.statusCode).toBe(204);
+  },
+
+  "POST /v1/chat/messages/:id/reactions": async (api) => {
+    const sendRes = await api.call("POST", "/v1/chat/messages", {
+      cookie: api.cookies.selam,
+      body: { text: "React here" },
+    });
+    const msg = sendRes.json<ChatMessageDto>();
+
+    // Stranger cannot react
+    const strangerRes = await api.call("POST", `/v1/chat/messages/${msg.id}/reactions`, {
+      cookie: api.cookies.stranger,
+      body: { emoji: "❤️" },
+    });
+    expect(strangerRes.statusCode).toBe(404);
+
+    // Partner can react
+    const noahRes = await api.call("POST", `/v1/chat/messages/${msg.id}/reactions`, {
+      cookie: api.cookies.noah,
+      body: { emoji: "❤️" },
+    });
+    expect(noahRes.statusCode).toBe(200);
+  },
+
+  "POST /v1/chat/messages/:id/pin": async (api) => {
+    const sendRes = await api.call("POST", "/v1/chat/messages", {
+      cookie: api.cookies.selam,
+      body: { text: "Pin here" },
+    });
+    const msg = sendRes.json<ChatMessageDto>();
+
+    // Stranger cannot pin
+    const strangerRes = await api.call("POST", `/v1/chat/messages/${msg.id}/pin`, {
+      cookie: api.cookies.stranger,
+    });
+    expect(strangerRes.statusCode).toBe(404);
+
+    // Partner can pin
+    const noahRes = await api.call("POST", `/v1/chat/messages/${msg.id}/pin`, {
+      cookie: api.cookies.noah,
+    });
+    expect(noahRes.statusCode).toBe(200);
+  },
+
+  "POST /v1/chat/messages/:id/save-memory": async (api) => {
+    const sendRes = await api.call("POST", "/v1/chat/messages", {
+      cookie: api.cookies.selam,
+      body: { text: "Save memory" },
+    });
+    const msg = sendRes.json<ChatMessageDto>();
+
+    // Stranger cannot save
+    const strangerRes = await api.call("POST", `/v1/chat/messages/${msg.id}/save-memory`, {
+      cookie: api.cookies.stranger,
+    });
+    expect(strangerRes.statusCode).toBe(404);
+
+    // Selam can save
+    const selamRes = await api.call("POST", `/v1/chat/messages/${msg.id}/save-memory`, {
+      cookie: api.cookies.selam,
+    });
+    expect(selamRes.statusCode).toBe(204);
+  },
+
+  "POST /v1/chat/read": async (api) => {
+    const res = await api.call("POST", "/v1/chat/read", {
+      cookie: api.cookies.selam,
+    });
+    expect(res.statusCode).toBe(204);
+  },
+
+  "GET /v1/chat/presence": async (api) => {
+    const stranger = await api.call("GET", "/v1/chat/presence", { cookie: api.cookies.stranger });
+    expect(stranger.statusCode).toBe(200);
+    const body = stranger.json<ChatPresenceResponse>();
+    expect(body.partnerHere).toBe(false);
+  },
+
+  "POST /v1/chat/presence/typing": async (api) => {
+    const res = await api.call("POST", "/v1/chat/presence/typing", {
+      cookie: api.cookies.selam,
+      body: { typing: true },
+    });
+    expect(res.statusCode).toBe(204);
+  },
+
+  "POST /v1/chat/presence/watching": async (api) => {
+    const res = await api.call("POST", "/v1/chat/presence/watching", {
+      cookie: api.cookies.selam,
+      body: { watching: true },
+    });
+    expect(res.statusCode).toBe(204);
+  },
+
+  "GET /v1/chat/settings": async (api) => {
+    const res = await api.call("GET", "/v1/chat/settings", { cookie: api.cookies.selam });
+    expect(res.statusCode).toBe(200);
+    const body = res.json<ChatSettingsResponse>();
+    expect(body).toHaveProperty("readReceipts");
+    expect(body).toHaveProperty("typingIndicators");
+  },
+
+  "PATCH /v1/chat/settings": async (api) => {
+    const res = await api.call("PATCH", "/v1/chat/settings", {
+      cookie: api.cookies.selam,
+      body: { typingIndicators: true },
+    });
+    expect(res.statusCode).toBe(200);
+  },
+
+  "GET /v1/chat/pinned": async (api) => {
+    const stranger = await api.call("GET", "/v1/chat/pinned", { cookie: api.cookies.stranger });
+    expect(stranger.statusCode).toBe(200);
+    expect(stranger.json<ChatMessagesResponse>().messages).toEqual([]);
+  },
+
+  "GET /v1/chat/shared-media": async (api) => {
+    const stranger = await api.call("GET", "/v1/chat/shared-media", {
+      cookie: api.cookies.stranger,
+    });
+    expect(stranger.statusCode).toBe(200);
+    expect(stranger.json<ChatMessagesResponse>().messages).toEqual([]);
+  },
+
+  "GET /v1/chat/search": async (api) => {
+    const stranger = await api.call("GET", "/v1/chat/search?q=test", {
+      cookie: api.cookies.stranger,
+    });
+    expect(stranger.statusCode).toBe(200);
+    expect(stranger.json<SearchChatResponse>().messages).toEqual([]);
+  },
+
+  "POST /v1/me/push-devices": async (api) => {
+    const res = await api.call("POST", "/v1/me/push-devices", {
+      cookie: api.cookies.stranger,
+      body: { token: "stranger-probe-token", platform: "android" },
+    });
+    expect(res.statusCode).toBe(204);
+  },
+
+  "DELETE /v1/me/push-devices/:token": async (api) => {
+    const res = await api.call("DELETE", "/v1/me/push-devices/stranger-probe-token", {
+      cookie: api.cookies.stranger,
+    });
+    expect(res.statusCode).toBe(204);
+  },
+
+  "GET /v1/notifications": async (api) => {
+    const res = await api.call("GET", "/v1/notifications", {
+      cookie: api.cookies.stranger,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json<NotificationsListResponse>().items).toEqual([]);
+  },
+
+  "PATCH /v1/notifications/:id/read": async (api) => {
+    const res = await api.call(
+      "PATCH",
+      "/v1/notifications/0192f0a0-0000-7000-8000-000000000001/read",
+      {
+        cookie: api.cookies.stranger,
+        body: {},
+      },
+    );
+    expect(res.statusCode).toBe(204);
+  },
+
+  "PATCH /v1/notifications/:id/unread": async (api) => {
+    const res = await api.call(
+      "PATCH",
+      "/v1/notifications/0192f0a0-0000-7000-8000-000000000001/unread",
+      {
+        cookie: api.cookies.stranger,
+        body: {},
+      },
+    );
+    expect(res.statusCode).toBe(204);
+  },
+
+  "POST /v1/notifications/read-all": async (api) => {
+    const res = await api.call("POST", "/v1/notifications/read-all", {
+      cookie: api.cookies.stranger,
+      body: {},
+    });
+    expect(res.statusCode).toBe(204);
+  },
+
+  "POST /v1/media/upload": async (api) => {
+    // Selam requests an upload URL for a chat message
+    const res = await api.call("POST", "/v1/media/upload", {
+      cookie: api.cookies.selam,
+      body: {
+        contentType: "image/jpeg",
+        byteSize: 1024,
+        sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        entityType: "chat_message",
+        entityId: "0192e2b3-5798-7521-8254-e6be95232a99",
+      },
+    });
+    expect(res.statusCode).toBe(201);
+    const body = res.json<{ id: string; uploadUrl: string }>();
+    expect(body.uploadUrl).toBeDefined();
+
+    // Stranger cannot use Selam's media ID with different parameters (GN400)
+    const strangerAttempt = await api.call("POST", "/v1/media/upload", {
+      cookie: api.cookies.stranger,
+      body: {
+        id: body.id,
+        contentType: "image/png",
+        byteSize: 2048,
+        sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        entityType: "chat_message",
+        entityId: "0192e2b3-5798-7521-8254-e6be95232a99",
+      },
+    });
+    expect(strangerAttempt.statusCode).toBe(400);
+  },
+
+  "POST /v1/media/:id/commit": async (api) => {
+    // Register media for Selam
+    const upRes = await api.call("POST", "/v1/media/upload", {
+      cookie: api.cookies.selam,
+      body: {
+        contentType: "image/jpeg",
+        byteSize: 1024,
+        sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        entityType: "chat_message",
+        entityId: "0192e2b3-5798-7521-8254-e6be95232a98",
+      },
+    });
+    const { id } = upRes.json<{ id: string }>();
+
+    // Stranger cannot commit Selam's media
+    const strangerCommit = await api.call("POST", `/v1/media/${id}/commit`, {
+      cookie: api.cookies.stranger,
+      body: { entityId: "0192e2b3-5798-7521-8254-e6be95232a98" },
+    });
+    expect(strangerCommit.json()).toMatchObject({ status: "rejected", reason: "not-found" });
+  },
+
+  "GET /v1/media/:id/url": async (api) => {
+    // Register and prepare media for Selam
+    const upRes = await api.call("POST", "/v1/media/upload", {
+      cookie: api.cookies.selam,
+      body: {
+        contentType: "image/jpeg",
+        byteSize: 1024,
+        sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        entityType: "chat_message",
+        entityId: "0192e2b3-5798-7521-8254-e6be95232a97",
+      },
+    });
+    const { id } = upRes.json<{ id: string }>();
+
+    // Selam can read her own URL even when pending
+    const selamUrl = await api.call("GET", `/v1/media/${id}/url`, {
+      cookie: api.cookies.selam,
+    });
+    expect(selamUrl.statusCode).toBe(200);
+
+    // Stranger cannot access Selam's media
+    const strangerUrl = await api.call("GET", `/v1/media/${id}/url`, {
+      cookie: api.cookies.stranger,
+    });
+    expect(strangerUrl.statusCode).toBe(404);
+  },
+
+  "DELETE /v1/media/:id": async (api) => {
+    const upRes = await api.call("POST", "/v1/media/upload", {
+      cookie: api.cookies.selam,
+      body: {
+        contentType: "image/jpeg",
+        byteSize: 1024,
+        sha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        entityType: "chat_message",
+        entityId: "0192e2b3-5798-7521-8254-e6be95232a96",
+      },
+    });
+    const { id } = upRes.json<{ id: string }>();
+
+    // Stranger trying to delete Selam's media affects nothing
+    const strangerDel = await api.call("DELETE", `/v1/media/${id}`, {
+      cookie: api.cookies.stranger,
+    });
+    expect(strangerDel.statusCode).toBe(204);
+
+    // Media still exists for Selam
+    const stillThere = await api.call("GET", `/v1/media/${id}/url`, {
+      cookie: api.cookies.selam,
+    });
+    expect(stillThere.statusCode).toBe(200);
+
+    // Selam deletes her media
+    const selamDel = await api.call("DELETE", `/v1/media/${id}`, {
+      cookie: api.cookies.selam,
+    });
+    expect(selamDel.statusCode).toBe(204);
+  },
+
+  "POST /v1/media/admin/purge": async (api) => {
+    const res = await api.call("POST", "/v1/media/admin/purge", {
+      cookie: api.cookies.selam,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toHaveProperty("purged");
+  },
+
+  // --- Moments: Open When Letters --------------------------------------------
+
+  "GET /v1/letters": async (api) => {
+    const strangerRes = await api.call("GET", "/v1/letters", { cookie: api.cookies.stranger });
+    expect(strangerRes.statusCode).toBe(404);
+
+    const selamRes = await api.call("GET", "/v1/letters", { cookie: api.cookies.selam });
+    expect(selamRes.statusCode).toBe(200);
+    expect(Array.isArray(selamRes.json())).toBe(true);
+  },
+
+  "POST /v1/letters/draft": async (api) => {
+    const strangerRes = await api.call("POST", "/v1/letters/draft", {
+      cookie: api.cookies.stranger,
+      body: { prompt: "Open when you miss me", body: "Thinking of you" },
+    });
+    expect(strangerRes.statusCode).toBe(404);
+
+    const selamRes = await api.call("POST", "/v1/letters/draft", {
+      cookie: api.cookies.selam,
+      body: { prompt: "Open when you miss me", body: "Thinking of you" },
+    });
+    expect(selamRes.statusCode).toBe(201);
+    expect(selamRes.json()).toHaveProperty("id");
+  },
+
+  "GET /v1/letters/:id": async (api) => {
+    const create = await api.call("POST", "/v1/letters/draft", {
+      cookie: api.cookies.selam,
+      body: { prompt: "Open when probe get", body: "Secret draft" },
+    });
+    const { id } = create.json<{ id: string }>();
+
+    // Stranger cannot read
+    const strangerRes = await api.call("GET", `/v1/letters/${id}`, {
+      cookie: api.cookies.stranger,
+    });
+    expect(strangerRes.statusCode).toBe(404);
+
+    // Partner Noah cannot read draft (drafts are private to author!)
+    const noahRes = await api.call("GET", `/v1/letters/${id}`, { cookie: api.cookies.noah });
+    expect(noahRes.statusCode).toBe(404);
+
+    // Author Selam can read
+    const selamRes = await api.call("GET", `/v1/letters/${id}`, { cookie: api.cookies.selam });
+    expect(selamRes.statusCode).toBe(200);
+  },
+
+  "PATCH /v1/letters/:id": async (api) => {
+    const create = await api.call("POST", "/v1/letters/draft", {
+      cookie: api.cookies.selam,
+      body: { prompt: "Open when probe patch", body: "Draft v1" },
+    });
+    const { id } = create.json<{ id: string }>();
+
+    const strangerRes = await api.call("PATCH", `/v1/letters/${id}`, {
+      cookie: api.cookies.stranger,
+      body: { body: "Hacked" },
+    });
+    expect(strangerRes.statusCode).toBe(404);
+
+    const selamRes = await api.call("PATCH", `/v1/letters/${id}`, {
+      cookie: api.cookies.selam,
+      body: { body: "Draft v2" },
+    });
+    expect(selamRes.statusCode).toBe(200);
+    expect(selamRes.json<{ body: string }>().body).toBe("Draft v2");
+  },
+
+  "POST /v1/letters/:id/seal": async (api) => {
+    const create = await api.call("POST", "/v1/letters/draft", {
+      cookie: api.cookies.selam,
+      body: { prompt: "Open when probe seal", body: "To be sealed" },
+    });
+    const { id } = create.json<{ id: string }>();
+
+    const strangerRes = await api.call("POST", `/v1/letters/${id}/seal`, {
+      cookie: api.cookies.stranger,
+      body: { unlockRule: { type: "manual" } },
+    });
+    expect(strangerRes.statusCode).toBe(404);
+
+    const sealRes = await api.call("POST", `/v1/letters/${id}/seal`, {
+      cookie: api.cookies.selam,
+      body: { unlockRule: { type: "manual" } },
+    });
+    expect(sealRes.statusCode).toBe(201);
+    expect(sealRes.json<{ status: string }>().status).toBe("sealed");
+  },
+
+  "POST /v1/letters/:id/open": async (api) => {
+    const create = await api.call("POST", "/v1/letters/draft", {
+      cookie: api.cookies.selam,
+      body: { prompt: "Open when probe open", body: "A gift of words" },
+    });
+    const { id } = create.json<{ id: string }>();
+    await api.call("POST", `/v1/letters/${id}/seal`, {
+      cookie: api.cookies.selam,
+      body: { unlockRule: { type: "manual" } },
+    });
+
+    // Stranger cannot open
+    const strangerRes = await api.call("POST", `/v1/letters/${id}/open`, {
+      cookie: api.cookies.stranger,
+    });
+    expect(strangerRes.statusCode).toBe(201);
+    expect(strangerRes.json<{ ok: boolean }>().ok).toBe(false);
+
+    // Recipient Noah opens it
+    const openRes = await api.call("POST", `/v1/letters/${id}/open`, {
+      cookie: api.cookies.noah,
+    });
+    expect(openRes.statusCode).toBe(201);
+    const openData = openRes.json<{ ok: boolean; view: { body: string } }>();
+    expect(openData.ok).toBe(true);
+    expect(openData.view.body).toBe("A gift of words");
+  },
+
+  "DELETE /v1/letters/:id": async (api) => {
+    const create = await api.call("POST", "/v1/letters/draft", {
+      cookie: api.cookies.selam,
+      body: { prompt: "Open when probe delete", body: "Will be deleted" },
+    });
+    const { id } = create.json<{ id: string }>();
+
+    const strangerRes = await api.call("DELETE", `/v1/letters/${id}`, {
+      cookie: api.cookies.stranger,
+    });
+    expect(strangerRes.statusCode).toBe(404);
+
+    const delRes = await api.call("DELETE", `/v1/letters/${id}`, {
+      cookie: api.cookies.selam,
+    });
+    expect(delRes.statusCode).toBe(200);
+  },
+
+  // --- Moments: Surprises ----------------------------------------------------
+
+  "GET /v1/surprises": async (api) => {
+    const strangerRes = await api.call("GET", "/v1/surprises", { cookie: api.cookies.stranger });
+    expect(strangerRes.statusCode).toBe(404);
+
+    const selamRes = await api.call("GET", "/v1/surprises", { cookie: api.cookies.selam });
+    expect(selamRes.statusCode).toBe(200);
+    expect(selamRes.json()).toHaveProperty("items");
+  },
+
+  "POST /v1/surprises": async (api) => {
+    const surpriseInput = {
+      content: { kind: "idea", textContent: "Sunset picnic" },
+      safeTitle: "Weekend surprise",
+      reveal: { kind: "now" },
+    };
+
+    const strangerRes = await api.call("POST", "/v1/surprises", {
+      cookie: api.cookies.stranger,
+      body: surpriseInput,
+    });
+    expect(strangerRes.statusCode).toBe(404);
+
+    const selamRes = await api.call("POST", "/v1/surprises", {
+      cookie: api.cookies.selam,
+      body: surpriseInput,
+    });
+    expect(selamRes.statusCode).toBe(201);
+    expect(selamRes.json()).toHaveProperty("id");
+  },
+
+  "GET /v1/surprises/:id": async (api) => {
+    const create = await api.call("POST", "/v1/surprises", {
+      cookie: api.cookies.selam,
+      body: {
+        content: { kind: "idea", textContent: "Stargazing trip" },
+        safeTitle: "Under the stars",
+        reveal: { kind: "now" },
+      },
+    });
+    const { id } = create.json<{ id: string }>();
+
+    const strangerRes = await api.call("GET", `/v1/surprises/${id}`, {
+      cookie: api.cookies.stranger,
+    });
+    expect(strangerRes.statusCode).toBe(404);
+
+    const selamRes = await api.call("GET", `/v1/surprises/${id}`, {
+      cookie: api.cookies.selam,
+    });
+    expect(selamRes.statusCode).toBe(200);
+  },
+
+  "POST /v1/surprises/:id/open": async (api) => {
+    const create = await api.call("POST", "/v1/surprises", {
+      cookie: api.cookies.selam,
+      body: {
+        content: { kind: "song", textContent: "A special melody" },
+        safeTitle: "Music for you",
+        reveal: { kind: "now" },
+      },
+    });
+    const { id } = create.json<{ id: string }>();
+
+    const strangerRes = await api.call("POST", `/v1/surprises/${id}/open`, {
+      cookie: api.cookies.stranger,
+    });
+    expect(strangerRes.statusCode).toBe(404);
+
+    // Recipient Noah opens it
+    const openRes = await api.call("POST", `/v1/surprises/${id}/open`, {
+      cookie: api.cookies.noah,
+    });
+    expect(openRes.statusCode).toBe(201);
+    const openSurprise = openRes.json<{ state: string; content: { textContent: string } }>();
+    expect(openSurprise.state).toBe("opened");
+    expect(openSurprise.content.textContent).toBe("A special melody");
+  },
+
+  "PATCH /v1/surprises/:id/retitle": async (api) => {
+    const create = await api.call("POST", "/v1/surprises", {
+      cookie: api.cookies.selam,
+      body: {
+        content: { kind: "idea", textContent: "Secret" },
+        safeTitle: "Old title",
+        reveal: { kind: "now" },
+      },
+    });
+    const { id } = create.json<{ id: string }>();
+
+    const strangerRes = await api.call("PATCH", `/v1/surprises/${id}/retitle`, {
+      cookie: api.cookies.stranger,
+      body: { safeTitle: "Hacked title" },
+    });
+    expect(strangerRes.statusCode).toBe(404);
+
+    const selamRes = await api.call("PATCH", `/v1/surprises/${id}/retitle`, {
+      cookie: api.cookies.selam,
+      body: { safeTitle: "New sweet title" },
+    });
+    expect(selamRes.statusCode).toBe(200);
+  },
+
+  "POST /v1/surprises/:id/cancel": async (api) => {
+    const create = await api.call("POST", "/v1/surprises", {
+      cookie: api.cookies.selam,
+      body: {
+        content: { kind: "idea", textContent: "Secret" },
+        safeTitle: "Cancel test",
+        reveal: { kind: "now" },
+      },
+    });
+    const { id } = create.json<{ id: string }>();
+
+    const strangerRes = await api.call("POST", `/v1/surprises/${id}/cancel`, {
+      cookie: api.cookies.stranger,
+    });
+    expect(strangerRes.statusCode).toBe(404);
+
+    const cancelRes = await api.call("POST", `/v1/surprises/${id}/cancel`, {
+      cookie: api.cookies.selam,
+    });
+    expect(cancelRes.statusCode).toBe(201);
+  },
+
+  "DELETE /v1/surprises/:id": async (api) => {
+    const create = await api.call("POST", "/v1/surprises", {
+      cookie: api.cookies.selam,
+      body: {
+        content: { kind: "idea", textContent: "Secret" },
+        safeTitle: "Delete test",
+        reveal: { kind: "now" },
+      },
+    });
+    const { id } = create.json<{ id: string }>();
+
+    const strangerRes = await api.call("DELETE", `/v1/surprises/${id}`, {
+      cookie: api.cookies.stranger,
+    });
+    expect(strangerRes.statusCode).toBe(404);
+
+    const delRes = await api.call("DELETE", `/v1/surprises/${id}`, {
+      cookie: api.cookies.selam,
+    });
+    expect(delRes.statusCode).toBe(200);
+  },
+
+  // --- Moments: Events & Chapters --------------------------------------------
+
+  "GET /v1/events": async (api) => {
+    const strangerRes = await api.call("GET", "/v1/events", { cookie: api.cookies.stranger });
+    expect(strangerRes.statusCode).toBe(404);
+
+    const selamRes = await api.call("GET", "/v1/events", { cookie: api.cookies.selam });
+    expect(selamRes.statusCode).toBe(200);
+    expect(selamRes.json()).toHaveProperty("events");
+  },
+
+  "POST /v1/events": async (api) => {
+    const eventInput = {
+      title: "Trip to Hawassa",
+      kind: "travel",
+      firstDate: "2026-12-20",
+      repeats: "none",
+    };
+
+    const strangerRes = await api.call("POST", "/v1/events", {
+      cookie: api.cookies.stranger,
+      body: eventInput,
+    });
+    expect(strangerRes.statusCode).toBe(404);
+
+    const selamRes = await api.call("POST", "/v1/events", {
+      cookie: api.cookies.selam,
+      body: eventInput,
+    });
+    expect(selamRes.statusCode).toBe(201);
+    expect(selamRes.json()).toHaveProperty("id");
+  },
+
+  "GET /v1/events/:id": async (api) => {
+    const create = await api.call("POST", "/v1/events", {
+      cookie: api.cookies.selam,
+      body: { title: "Get event probe", kind: "date", firstDate: "2026-11-25", repeats: "none" },
+    });
+    const { id } = create.json<{ id: string }>();
+
+    const strangerRes = await api.call("GET", `/v1/events/${id}`, { cookie: api.cookies.stranger });
+    expect(strangerRes.statusCode).toBe(200);
+    expect(strangerRes.json()).toBeNull();
+
+    const selamRes = await api.call("GET", `/v1/events/${id}`, { cookie: api.cookies.selam });
+    expect(selamRes.statusCode).toBe(200);
+    expect(selamRes.json<{ title: string }>().title).toBe("Get event probe");
+  },
+
+  "DELETE /v1/events/:id": async (api) => {
+    const create = await api.call("POST", "/v1/events", {
+      cookie: api.cookies.selam,
+      body: { title: "Delete event probe", kind: "date", firstDate: "2026-11-25", repeats: "none" },
+    });
+    const { id } = create.json<{ id: string }>();
+
+    const strangerRes = await api.call("DELETE", `/v1/events/${id}`, {
+      cookie: api.cookies.stranger,
+    });
+    expect(strangerRes.statusCode).toBe(200);
+
+    const selamRes = await api.call("DELETE", `/v1/events/${id}`, {
+      cookie: api.cookies.selam,
+    });
+    expect(selamRes.statusCode).toBe(200);
+  },
+
+  "GET /v1/events/chapters": async (api) => {
+    const strangerRes = await api.call("GET", "/v1/events/chapters", {
+      cookie: api.cookies.stranger,
+    });
+    expect(strangerRes.statusCode).toBe(404);
+
+    const selamRes = await api.call("GET", "/v1/events/chapters", {
+      cookie: api.cookies.selam,
+    });
+    expect(selamRes.statusCode).toBe(200);
+    expect(Array.isArray(selamRes.json())).toBe(true);
+  },
+
+  "GET /v1/events/chapters/:month": async (api) => {
+    const strangerRes = await api.call("GET", "/v1/events/chapters/2026-11", {
+      cookie: api.cookies.stranger,
+    });
+    expect(strangerRes.statusCode).toBe(404);
+
+    const selamRes = await api.call("GET", "/v1/events/chapters/2026-11", {
+      cookie: api.cookies.selam,
+    });
+    expect(selamRes.statusCode).toBe(200);
+    expect(selamRes.json()).toHaveProperty("reflections");
+  },
+
+  "POST /v1/events/chapters/:month/reflect/:promptId": async (api) => {
+    const strangerRes = await api.call("POST", "/v1/events/chapters/2026-11/reflect/prompt-1", {
+      cookie: api.cookies.stranger,
+      body: { reflection: "Our best walk" },
+    });
+    expect(strangerRes.statusCode).toBe(404);
+
+    const selamRes = await api.call("POST", "/v1/events/chapters/2026-11/reflect/prompt-1", {
+      cookie: api.cookies.selam,
+      body: { reflection: "Our best walk" },
+    });
+    expect(selamRes.statusCode).toBe(201);
+  },
+
+  "POST /v1/events/chapters/:month/rename": async (api) => {
+    const strangerRes = await api.call("POST", "/v1/events/chapters/2026-11/rename", {
+      cookie: api.cookies.stranger,
+      body: { title: "A November to Remember" },
+    });
+    expect(strangerRes.statusCode).toBe(404);
+
+    const selamRes = await api.call("POST", "/v1/events/chapters/2026-11/rename", {
+      cookie: api.cookies.selam,
+      body: { title: "A November to Remember" },
+    });
+    expect(selamRes.statusCode).toBe(201);
+  },
+
+  // --- Moments: Memories & Collections ---------------------------------------
+
+  "GET /v1/memories": async (api) => {
+    const create = await api.call("POST", "/v1/memories", {
+      cookie: api.cookies.selam,
+      body: { title: "Selam memory probe", date: "2026-10-15", tags: [] },
+    });
+    const { id } = create.json<{ id: string }>();
+
+    const strangerRes = await api.call("GET", "/v1/memories", { cookie: api.cookies.stranger });
+    expect(strangerRes.statusCode).toBe(200);
+    expect(strangerRes.json<{ id: string }[]>().some((m) => m.id === id)).toBe(false);
+
+    const selamRes = await api.call("GET", "/v1/memories", { cookie: api.cookies.selam });
+    expect(selamRes.statusCode).toBe(200);
+    expect(selamRes.json<{ id: string }[]>().some((m) => m.id === id)).toBe(true);
+  },
+
+  "POST /v1/memories": async (api) => {
+    const memoryInput = {
+      title: "Stranger memory",
+      date: "2026-10-15",
+      tags: [],
+    };
+
+    const strangerRes = await api.call("POST", "/v1/memories", {
+      cookie: api.cookies.stranger,
+      body: memoryInput,
+    });
+    expect(strangerRes.statusCode).toBe(201);
+    const { id: strangerMemId } = strangerRes.json<{ id: string }>();
+
+    // Selam cannot see stranger's memory
+    const selamRes = await api.call("GET", "/v1/memories", { cookie: api.cookies.selam });
+    expect(selamRes.json<{ id: string }[]>().some((m) => m.id === strangerMemId)).toBe(false);
+  },
+
+  "GET /v1/memories/:id": async (api) => {
+    const create = await api.call("POST", "/v1/memories", {
+      cookie: api.cookies.selam,
+      body: { title: "Memory get probe", date: "2026-10-15", tags: [] },
+    });
+    const { id } = create.json<{ id: string }>();
+
+    const strangerRes = await api.call("GET", `/v1/memories/${id}`, {
+      cookie: api.cookies.stranger,
+    });
+    expect(strangerRes.statusCode).toBe(200);
+    expect(strangerRes.json()).toBeNull();
+
+    const selamRes = await api.call("GET", `/v1/memories/${id}`, {
+      cookie: api.cookies.selam,
+    });
+    expect(selamRes.statusCode).toBe(200);
+    expect(selamRes.json<{ title: string }>().title).toBe("Memory get probe");
+  },
+
+  "DELETE /v1/memories/:id": async (api) => {
+    const create = await api.call("POST", "/v1/memories", {
+      cookie: api.cookies.selam,
+      body: { title: "Memory delete probe", date: "2026-10-15", tags: [] },
+    });
+    const { id } = create.json<{ id: string }>();
+
+    const strangerRes = await api.call("DELETE", `/v1/memories/${id}`, {
+      cookie: api.cookies.stranger,
+    });
+    expect(strangerRes.statusCode).toBe(200);
+
+    const selamRes = await api.call("DELETE", `/v1/memories/${id}`, {
+      cookie: api.cookies.selam,
+    });
+    expect(selamRes.statusCode).toBe(200);
+  },
+
+  "GET /v1/memories/collections": async (api) => {
+    const create = await api.call("POST", "/v1/memories/collections", {
+      cookie: api.cookies.selam,
+      body: { title: "Selam Collection", description: "" },
+    });
+    const { id: colId } = create.json<{ id: string }>();
+
+    const strangerRes = await api.call("GET", "/v1/memories/collections", {
+      cookie: api.cookies.stranger,
+    });
+    expect(strangerRes.statusCode).toBe(200);
+    expect(strangerRes.json<{ id: string }[]>().some((c) => c.id === colId)).toBe(false);
+
+    const selamRes = await api.call("GET", "/v1/memories/collections", {
+      cookie: api.cookies.selam,
+    });
+    expect(selamRes.statusCode).toBe(200);
+    expect(selamRes.json<{ id: string }[]>().some((c) => c.id === colId)).toBe(true);
+  },
+
+  "POST /v1/memories/collections": async (api) => {
+    const colInput = { title: "Stranger Collection", description: "", art: "plane" };
+
+    const strangerRes = await api.call("POST", "/v1/memories/collections", {
+      cookie: api.cookies.stranger,
+      body: colInput,
+    });
+    expect(strangerRes.statusCode).toBe(201);
+    const { id: strangerColId } = strangerRes.json<{ id: string }>();
+
+    const selamRes = await api.call("GET", "/v1/memories/collections", {
+      cookie: api.cookies.selam,
+    });
+    expect(selamRes.json<{ id: string }[]>().some((c) => c.id === strangerColId)).toBe(false);
+  },
+
+  "DELETE /v1/memories/collections/:id": async (api) => {
+    const create = await api.call("POST", "/v1/memories/collections", {
+      cookie: api.cookies.selam,
+      body: { title: "Col to delete", description: "" },
+    });
+    const { id } = create.json<{ id: string }>();
+
+    const strangerRes = await api.call("DELETE", `/v1/memories/collections/${id}`, {
+      cookie: api.cookies.stranger,
+    });
+    expect(strangerRes.statusCode).toBe(200);
+
+    const selamRes = await api.call("DELETE", `/v1/memories/collections/${id}`, {
+      cookie: api.cookies.selam,
+    });
+    expect(selamRes.statusCode).toBe(200);
+  },
+
+  "POST /v1/memories/:id/collections/:colId": async (api) => {
+    const mem = await api.call("POST", "/v1/memories", {
+      cookie: api.cookies.selam,
+      body: { title: "Item in col", date: "2026-10-15", tags: [] },
+    });
+    const col = await api.call("POST", "/v1/memories/collections", {
+      cookie: api.cookies.selam,
+      body: { title: "Col target", description: "" },
+    });
+    const { id: memId } = mem.json<{ id: string }>();
+    const { id: colId } = col.json<{ id: string }>();
+
+    const strangerRes = await api.call("POST", `/v1/memories/${memId}/collections/${colId}`, {
+      cookie: api.cookies.stranger,
+      body: { inIt: true },
+    });
+    expect(strangerRes.statusCode).toBe(404);
+
+    const selamRes = await api.call("POST", `/v1/memories/${memId}/collections/${colId}`, {
+      cookie: api.cookies.selam,
+      body: { inIt: true },
+    });
+    expect(selamRes.statusCode).toBe(201);
+  },
+
+  // --- Moments: Together (Our World) -----------------------------------------
+
+  "GET /v1/together/plans": async (api) => {
+    const create = await api.call("POST", "/v1/together/plans", {
+      cookie: api.cookies.selam,
+      body: { title: "Selam Plan", theme: "date", place: "" },
+    });
+    const { id } = create.json<{ id: string }>();
+
+    const strangerRes = await api.call("GET", "/v1/together/plans", {
+      cookie: api.cookies.stranger,
+    });
+    expect(strangerRes.statusCode).toBe(200);
+    expect(strangerRes.json<{ id: string }[]>().some((p) => p.id === id)).toBe(false);
+
+    const selamRes = await api.call("GET", "/v1/together/plans", {
+      cookie: api.cookies.selam,
+    });
+    expect(selamRes.statusCode).toBe(200);
+    expect(selamRes.json<{ id: string }[]>().some((p) => p.id === id)).toBe(true);
+  },
+
+  "POST /v1/together/plans": async (api) => {
+    const planInput = {
+      title: "Stranger Plan",
+      theme: "date",
+      place: "Entoto",
+      when: { kind: "soon" },
+    };
+
+    const strangerRes = await api.call("POST", "/v1/together/plans", {
+      cookie: api.cookies.stranger,
+      body: planInput,
+    });
+    expect(strangerRes.statusCode).toBe(201);
+    const { id: strangerPlanId } = strangerRes.json<{ id: string }>();
+
+    const selamRes = await api.call("GET", "/v1/together/plans", {
+      cookie: api.cookies.selam,
+    });
+    expect(selamRes.json<{ id: string }[]>().some((p) => p.id === strangerPlanId)).toBe(false);
+  },
+
+  "POST /v1/together/plans/:id/complete": async (api) => {
+    const create = await api.call("POST", "/v1/together/plans", {
+      cookie: api.cookies.selam,
+      body: { title: "Complete test", theme: "date", place: "" },
+    });
+    const { id } = create.json<{ id: string }>();
+
+    const strangerRes = await api.call("POST", `/v1/together/plans/${id}/complete`, {
+      cookie: api.cookies.stranger,
+    });
+    expect(strangerRes.statusCode).toBe(201);
+
+    const completeRes = await api.call("POST", `/v1/together/plans/${id}/complete`, {
+      cookie: api.cookies.selam,
+    });
+    expect(completeRes.statusCode).toBe(201);
+  },
+
+  "DELETE /v1/together/plans/:id": async (api) => {
+    const create = await api.call("POST", "/v1/together/plans", {
+      cookie: api.cookies.selam,
+      body: { title: "Delete plan test", theme: "date", place: "" },
+    });
+    const { id } = create.json<{ id: string }>();
+
+    const strangerRes = await api.call("DELETE", `/v1/together/plans/${id}`, {
+      cookie: api.cookies.stranger,
+    });
+    expect(strangerRes.statusCode).toBe(200);
+
+    const delRes = await api.call("DELETE", `/v1/together/plans/${id}`, {
+      cookie: api.cookies.selam,
+    });
+    expect(delRes.statusCode).toBe(200);
+  },
+
+  "GET /v1/together/places": async (api) => {
+    const create = await api.call("POST", "/v1/together/places", {
+      cookie: api.cookies.selam,
+      body: { name: "Selam Place", note: "" },
+    });
+    const { id } = create.json<{ id: string }>();
+
+    const strangerRes = await api.call("GET", "/v1/together/places", {
+      cookie: api.cookies.stranger,
+    });
+    expect(strangerRes.statusCode).toBe(200);
+    expect(strangerRes.json<{ id: string }[]>().some((p) => p.id === id)).toBe(false);
+
+    const selamRes = await api.call("GET", "/v1/together/places", {
+      cookie: api.cookies.selam,
+    });
+    expect(selamRes.statusCode).toBe(200);
+    expect(selamRes.json<{ id: string }[]>().some((p) => p.id === id)).toBe(true);
+  },
+
+  "POST /v1/together/places": async (api) => {
+    const placeInput = { name: "Stranger Place", note: "" };
+
+    const strangerRes = await api.call("POST", "/v1/together/places", {
+      cookie: api.cookies.stranger,
+      body: placeInput,
+    });
+    expect(strangerRes.statusCode).toBe(201);
+    const { id: strangerPlaceId } = strangerRes.json<{ id: string }>();
+
+    const selamRes = await api.call("GET", "/v1/together/places", {
+      cookie: api.cookies.selam,
+    });
+    expect(selamRes.json<{ id: string }[]>().some((p) => p.id === strangerPlaceId)).toBe(false);
+  },
+
+  "DELETE /v1/together/places/:id": async (api) => {
+    const create = await api.call("POST", "/v1/together/places", {
+      cookie: api.cookies.selam,
+      body: { name: "Place to delete", note: "" },
+    });
+    const { id } = create.json<{ id: string }>();
+
+    const strangerRes = await api.call("DELETE", `/v1/together/places/${id}`, {
+      cookie: api.cookies.stranger,
+    });
+    expect(strangerRes.statusCode).toBe(200);
+
+    const delRes = await api.call("DELETE", `/v1/together/places/${id}`, {
+      cookie: api.cookies.selam,
+    });
+    expect(delRes.statusCode).toBe(200);
+  },
+
+  "GET /v1/together/songs": async (api) => {
+    const create = await api.call("POST", "/v1/together/songs", {
+      cookie: api.cookies.selam,
+      body: { title: "Selam Song", artist: "Artist", link: "https://example.com/s", note: "" },
+    });
+    const { id } = create.json<{ id: string }>();
+
+    const strangerRes = await api.call("GET", "/v1/together/songs", {
+      cookie: api.cookies.stranger,
+    });
+    expect(strangerRes.statusCode).toBe(200);
+    expect(strangerRes.json<{ id: string }[]>().some((s) => s.id === id)).toBe(false);
+
+    const selamRes = await api.call("GET", "/v1/together/songs", {
+      cookie: api.cookies.selam,
+    });
+    expect(selamRes.statusCode).toBe(200);
+    expect(selamRes.json<{ id: string }[]>().some((s) => s.id === id)).toBe(true);
+  },
+
+  "POST /v1/together/songs": async (api) => {
+    const songInput = {
+      title: "Stranger Song",
+      artist: "Ethiopian Jazz",
+      link: "https://example.com/song",
+      note: "",
+    };
+
+    const strangerRes = await api.call("POST", "/v1/together/songs", {
+      cookie: api.cookies.stranger,
+      body: songInput,
+    });
+    expect(strangerRes.statusCode).toBe(201);
+    const { id: strangerSongId } = strangerRes.json<{ id: string }>();
+
+    const selamRes = await api.call("GET", "/v1/together/songs", {
+      cookie: api.cookies.selam,
+    });
+    expect(selamRes.json<{ id: string }[]>().some((s) => s.id === strangerSongId)).toBe(false);
+  },
+
+  "DELETE /v1/together/songs/:id": async (api) => {
+    const create = await api.call("POST", "/v1/together/songs", {
+      cookie: api.cookies.selam,
+      body: {
+        title: "Song to delete",
+        artist: "Artist",
+        link: "https://example.com/song",
+        note: "",
+      },
+    });
+    const { id } = create.json<{ id: string }>();
+
+    const strangerRes = await api.call("DELETE", `/v1/together/songs/${id}`, {
+      cookie: api.cookies.stranger,
+    });
+    expect(strangerRes.statusCode).toBe(200);
+
+    const delRes = await api.call("DELETE", `/v1/together/songs/${id}`, {
+      cookie: api.cookies.selam,
+    });
+    expect(delRes.statusCode).toBe(200);
+  },
+
+  "GET /v1/me/export": async (api) => {
+    const res = await api.call("GET", "/v1/me/export", {
+      cookie: api.cookies.stranger,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json<{ state: string }>().state).toBeDefined();
+  },
+
+  "POST /v1/me/export": async (api) => {
+    const res = await api.call("POST", "/v1/me/export", {
+      cookie: api.cookies.stranger,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json<{ state: string }>().state).toBe("ready");
+  },
+
+  "POST /v1/me/export/expire": async (api) => {
+    const res = await api.call("POST", "/v1/me/export/expire", {
+      cookie: api.cookies.stranger,
+    });
+    expect(res.statusCode).toBe(204);
+  },
+
+  "POST /v1/me/reauth": async (api) => {
+    const refused = await api.call("POST", "/v1/me/reauth", {
+      cookie: api.cookies.stranger,
+      body: { password: "bad-password" },
+    });
+    expect(refused.statusCode).toBe(400);
+
+    const ok = await api.call("POST", "/v1/me/reauth", {
+      cookie: api.cookies.stranger,
+      body: { password: PASSWORD },
+    });
+    expect(ok.statusCode).toBe(200);
+  },
+
+  "POST /v1/me/end-space": async (api) => {
+    const refused = await api.call("POST", "/v1/me/end-space", {
+      cookie: api.cookies.stranger,
+      body: { confirmWord: "NO" },
+    });
+    expect(refused.statusCode).toBe(400);
+  },
+
+  "DELETE /v1/me/account": async (api) => {
+    const refused = await api.call("DELETE", "/v1/me/account", {
+      cookie: api.cookies.stranger,
+      body: { confirmWord: "NO" },
+    });
+    expect(refused.statusCode).toBe(400);
+  },
+
+  "GET /v1/search": async (api) => {
+    // 1. Stranger search sees only stranger's content (0 results from Noah/Selam)
+    const stranger = await api.call("GET", "/v1/search?q=London", {
+      cookie: api.cookies.stranger,
+    });
+    expect(stranger.statusCode).toBe(200);
+    expect(stranger.json()).toMatchObject({
+      results: [],
+      totalEstimated: 0,
+    });
+
+    // 2. Partner search responds cleanly
+    const partner = await api.call("GET", "/v1/search?q=London", {
+      cookie: api.cookies.noah,
+    });
+    expect(partner.statusCode).toBe(200);
+    const data = partner.json<{ results: unknown[] }>();
+    expect(Array.isArray(data.results)).toBe(true);
   },
 };
 

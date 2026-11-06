@@ -2,6 +2,7 @@ import {
   accountMethodsSchema,
   devicesSchema,
   disconnectResultSchema,
+  exportStatusSchema,
   settingsViewSchema,
   type SettingsPatchDto,
 } from "@garnet/contracts";
@@ -26,7 +27,8 @@ function toAvatar(a: { kind: "initials"; swatch: number } | { kind: "photo"; pho
 
 /** What the server stores: the export state is its own, never a setting (B9). */
 function toPatch(patch: Partial<UserSettings>): SettingsPatchDto {
-  const { export: _export, ...rest } = patch;
+  const rest: Partial<UserSettings> = { ...patch };
+  delete rest.export;
   return rest;
 }
 
@@ -34,17 +36,15 @@ const needsRecentSignIn = (e: unknown) =>
   e instanceof ApiError && e.problem?.code === "recent_sign_in_required";
 
 /**
- * SettingsRepository over the real API (B2, SET-01 to SET-17). Settings are saved a piece at a
+ * SettingsRepository over the real API (B2, SET-01 to SET-17, B9). Settings are saved a piece at a
  * time, so two devices never undo each other. Export, ending the space and deleting the account
- * wait on U-20 and U-23 (phase B9): `dataRights` is false and the pages say so; calling them
- * is a programming error, never a pretend success.
+ * run against the real API with strict RLS and P-37 safeguards (`dataRights: true`).
  */
 export function createHttpSettings(
   api: ApiClient,
   client: GarnetAuthClient,
   baseUrl: string,
 ): SettingsRepository {
-  const notYet = () => Promise.reject(new Error("Waits on U-20 and U-23 (phase B9)"));
   const email = async () => (await api.get("/v1/me/settings", settingsViewSchema)).account.email;
 
   return {
@@ -61,7 +61,7 @@ export function createHttpSettings(
         birthDate: v.account.birthDate,
         termsVersion: v.account.termsVersion,
         termsAcceptedAt: v.account.termsAcceptedAt,
-        dataRights: false,
+        dataRights: true,
       };
     },
 
@@ -125,9 +125,11 @@ export function createHttpSettings(
       }
     },
 
-    prepareExport: notYet,
-    expireExport: notYet,
-    endSpace: notYet,
-    deleteAccount: notYet,
+    prepareExport: async () => {
+      await api.post("/v1/me/export", exportStatusSchema, {});
+    },
+    expireExport: () => api.postNoContent("/v1/me/export/expire", {}),
+    endSpace: () => api.postNoContent("/v1/me/end-space", { confirmWord: "END" }),
+    deleteAccount: () => api.delete("/v1/me/account", { confirmWord: "DELETE" }),
   };
 }

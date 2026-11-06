@@ -32,5 +32,21 @@ services:
       - "127.0.0.1:1025:1025"
       - "127.0.0.1:8025:8025"
 
+  # B7: local S3-compatible object storage (SeaweedFS 4.46, P-76, F-07).
+  # S3 endpoint: http://127.0.0.1:18333 (on the phone too, after `adb reverse tcp:18333 tcp:18333`).
+  s3:
+    image: chrislusf/seaweedfs:4.46@sha256:08d516132314207d10c8e37cbffc1f32b147d870169688734cc61c6231625b62
+    command:
+      - server
+      - -dir=/data
+      - -s3
+      - -s3.port=8333
+      - -master.volumeSizeLimitMB=64
+    ports:
+      - "127.0.0.1:18333:8333"
+    volumes:
+      - garnet-s3:/data
+
 volumes:
   garnet-postgres:
+  garnet-s3:

@@ -25,6 +25,7 @@ import {
 } from "@/domain/pairing";
 import { serviceErrorMessage } from "@/features/auth/authUi";
 import { DEMO_INVITE_CODES } from "@/features/prototype/demoActions";
+import { API_AREAS_ON } from "@/data/http/config";
 import { useTheme } from "@/theme/ThemeProvider";
 import { CodeTiles } from "../components/CodeTiles";
 import { useCheckCode, usePairingStatus } from "../usePairing";
@@ -159,13 +160,15 @@ export function JoinScreen() {
 
         {invalidAt === null ? null : <Notice tone="error" text={INVITE_NOT_VALID_MESSAGE} />}
 
-        <Button
-          label="Use the demo invitation from Noah (prototype)"
-          variant="subtle"
-          onPress={() => {
-            change(DEMO_INVITE_CODES.valid);
-          }}
-        />
+        {__DEV__ && !API_AREAS_ON.has("pairing") ? (
+          <Button
+            label="Use the demo invitation from Noah (prototype)"
+            variant="subtle"
+            onPress={() => {
+              change(DEMO_INVITE_CODES.valid);
+            }}
+          />
+        ) : null}
       </View>
     </GlassScreen>
   );

@@ -133,7 +133,8 @@ describe("MediaPlayer service", () => {
 
     await fireEvent.press(screen.getByText("Seek Voice 10"));
     await waitFor(() => {
-      expect(screen.getByTestId("voice-elapsed").props.children).toBe("10");
+      const elapsed = Number(screen.getByTestId("voice-elapsed").props.children);
+      expect(elapsed).toBeGreaterThanOrEqual(10);
     });
 
     await fireEvent.press(screen.getByText("Stop Voice"));

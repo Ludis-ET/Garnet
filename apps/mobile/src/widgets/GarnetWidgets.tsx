@@ -11,11 +11,11 @@ import {
 } from "react-native-android-widget";
 import type { FigureId } from "@/features/figures/types";
 import { widgetArt } from "./art";
-import { GREETING, widgetLook } from "./look";
+import { smartGreeting, smartWidgetLook, widgetLook } from "./look";
 import { dayPart, EMPTY_SNAPSHOT, type DayPart, type WidgetSnapshot } from "./snapshot";
 
 /**
- * The real Android home-screen widgets (widgets plan W1 to W6, P-72, P-73), drawn from the
+ * The real Android home-screen widgets (widgets plan W1 to W8, P-72, P-73, P-90), drawn from the
  * snapshot only. Each one is a single large character and very few words: no streaks, counts,
  * names, titles or content, and never a sad face (§5). Tapping opens the app; "Thinking of you"
  * opens a confirmation in the app and never sends from the home screen (§6).
@@ -27,6 +27,8 @@ export const WIDGET_NAMES = [
   "SomethingWaiting",
   "ComingUp",
   "FarApart",
+  "SmartGlance",
+  "EmotionsPulse",
 ] as const;
 export type WidgetName = (typeof WIDGET_NAMES)[number];
 
@@ -116,10 +118,7 @@ function Character({
   size: number;
   look?: ReturnType<typeof widgetLook>;
 }) {
-  const art = widgetArt(
-    id,
-    look ?? widgetLook(part, snap.special, snap.somethingNew, snap.waiting),
-  );
+  const art = widgetArt(id, look ?? smartWidgetLook(snap, part));
   if (art === undefined) {
     // No owner image on this build: the gem colour stands in (never a drawn character).
     const color = id === "sapphire" ? GEM.sapphire : GEM.ruby;
@@ -205,21 +204,26 @@ function draw(
   const theirs: FigureId = snap.partnerSide ?? "garnet";
   switch (name) {
     case "GarnetToday": {
-      const line = snap.special ? "A day that matters to you both 🎉" : "Garnet is with you both";
+      const greeting = smartGreeting(snap, now);
+      const line = snap.special
+        ? "A day that matters to you both 🎉"
+        : snap.togetherDays !== null
+          ? `${snap.togetherDays.toString()} days together 💜`
+          : "Garnet is with you both";
       return wide ? (
-        <Shell p={p} label={`Garnet. ${GREETING[part]}`} click={OPEN_APP} row>
+        <Shell p={p} label={`Garnet. ${greeting}`} click={OPEN_APP} row>
           <Character id="garnet" part={part} snap={snap} size={Math.min(size.height - 24, 160)} />
           <FlexWidget
             style={{ flex: 1, flexDirection: "column", alignItems: "center", flexGap: 4 }}
           >
-            <Text p={p} text={GREETING[part]} size={20} bold />
+            <Text p={p} text={greeting} size={20} bold />
             <Text p={p} text={line} soft />
           </FlexWidget>
         </Shell>
       ) : (
-        <Shell p={p} label={`Garnet. ${GREETING[part]}`} click={OPEN_APP}>
+        <Shell p={p} label={`Garnet. ${greeting}`} click={OPEN_APP}>
           <Character id="garnet" part={part} snap={snap} size={tall} />
-          <Text p={p} text={GREETING[part]} bold />
+          <Text p={p} text={greeting} bold />
         </Shell>
       );
     }
@@ -369,6 +373,74 @@ function draw(
             snap={snap}
             size={Math.min(size.height - 24, 110)}
           />
+        </Shell>
+      );
+    }
+    case "SmartGlance": {
+      const greeting = smartGreeting(snap, now);
+      return (
+        <Shell p={p} label={`Smart glance. ${greeting}`} click={OPEN_APP} row>
+          <Character id={mine} part={part} snap={snap} size={Math.min(size.height - 24, 110)} />
+          <FlexWidget
+            style={{
+              flex: 1,
+              flexDirection: "column",
+              alignItems: "center",
+              flexGap: 4,
+            }}
+          >
+            <FlexWidget
+              style={{
+                backgroundColor: p.pill,
+                borderRadius: 999,
+                paddingHorizontal: 8,
+                paddingVertical: 2,
+              }}
+            >
+              <Text p={p} text={greeting} size={11} bold />
+            </FlexWidget>
+            <Text
+              p={p}
+              text={
+                snap.partnerZone === null
+                  ? label(part)
+                  : `${cityOf(snap.myZone)} · ${cityOf(snap.partnerZone)}`
+              }
+              size={12}
+              soft
+            />
+          </FlexWidget>
+          <Character
+            id={theirs}
+            part={theirPart}
+            snap={snap}
+            size={Math.min(size.height - 24, 110)}
+          />
+        </Shell>
+      );
+    }
+    case "EmotionsPulse": {
+      const greeting = smartGreeting(snap, now);
+      return (
+        <Shell p={p} label={`Emotions pulse. ${greeting}`} click={openUri("send-thought")}>
+          <Character
+            id="garnet"
+            part={part}
+            snap={snap}
+            size={tall - 10}
+            look={smartWidgetLook(snap, part)}
+          />
+          <FlexWidget
+            {...openUri("send-thought")}
+            style={{
+              backgroundColor: mine === "sapphire" ? GEM.sapphire : GEM.ruby,
+              borderRadius: 999,
+              paddingHorizontal: 12,
+              paddingVertical: 6,
+            }}
+          >
+            <Text p={p} text={greeting} size={11} bold color="#FFFFFF" />
+          </FlexWidget>
         </Shell>
       );
     }

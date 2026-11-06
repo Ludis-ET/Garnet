@@ -20,7 +20,8 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "app.garnet.prototype"
+      "package": "app.garnet.prototype",
+      "usesCleartextTraffic": true
     },
     "plugins": [
       "expo-router",
@@ -109,6 +110,30 @@
               "minHeight": "110dp",
               "targetCellWidth": 4,
               "targetCellHeight": 2,
+              "resizeMode": "horizontal|vertical",
+              "updatePeriodMillis": 1800000
+            },
+            {
+              "name": "SmartGlance",
+              "label": "Smart glance",
+              "description": "Adaptive glance combining diurnal rhythm, shared emotions, and two worlds.",
+              "minWidth": "250dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 4,
+              "targetCellHeight": 2,
+              "resizeMode": "horizontal|vertical",
+              "updatePeriodMillis": 1800000
+            },
+            {
+              "name": "EmotionsPulse",
+              "label": "Emotions pulse",
+              "description": "Heart-to-heart pulse reflecting shared feelings and warmth.",
+              "minWidth": "110dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 2,
+              "targetCellHeight": 2,
+              "maxResizeWidth": "250dp",
+              "maxResizeHeight": "250dp",
               "resizeMode": "horizontal|vertical",
               "updatePeriodMillis": 1800000
             }

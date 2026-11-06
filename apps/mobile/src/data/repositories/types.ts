@@ -270,8 +270,13 @@ export interface CompanionSource {
 
 export interface HomeRepository {
   today(): Promise<HomeToday>;
-  /** Day-log rule 2: saved as a private draft unless `share` is explicitly true. */
-  logMoment(input: { text: string; emoji: string; share: boolean }): Promise<MomentView>;
+  /** Day-log rule 2: saved as a private draft unless `share` is explicitly true. Optional timestamp (P-81 / U-11). */
+  logMoment(input: {
+    text: string;
+    emoji: string;
+    share: boolean;
+    occurredAt?: string;
+  }): Promise<MomentView>;
   /** Sent, nothing more: no delivery or read state (§5). */
   sendSignal(signal: SignalId): Promise<{ sentAt: string }>;
   dismissIncoming(id: string): Promise<void>;
@@ -332,6 +337,8 @@ export interface EntryInput {
   mood?: FeelingId;
   activity?: ActivityId;
   place?: string;
+  /** Optional timestamp editing (P-81 / U-11). */
+  occurredAt?: string;
 }
 
 export type VisibilityResult =

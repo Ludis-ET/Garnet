@@ -107,9 +107,9 @@ Each item lists what it **depends on** (work or decisions) and what "done" means
 
 ## M12 — Hardening and private beta
 
-| ID    | Item                                                                                      | Depends on |
-| ----- | ----------------------------------------------------------------------------------------- | ---------- |
-| B-120 | Security review: IDOR suite, session tests, dependency audit, secrets scan                | M2–M10     |
-| B-121 | Accessibility audit: screen readers, contrast, Dynamic Type, reduced motion               | M3–M11     |
-| B-122 | Restore drill on production-like data (synthetic)                                         | B-14       |
-| B-123 | Private beta with the two partners; collect qualitative feedback (no engagement tracking) | all above  |
+| ID    | Item                                                                                      | Depends on | Done when                                                                                        |
+| ----- | ----------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------ |
+| B-120 | Security review: IDOR suite, session tests, dependency audit, secrets scan                | M2–M10     | **Done 2026-11-06 (P-88):** IDOR suite green, 0 secrets in git (`scan:secrets`), 0 tracking SDKs |
+| B-121 | Accessibility audit: screen readers, contrast, Dynamic Type, reduced motion               | M3–M11     | **Done 2026-11-06 (P-88):** WCAG 2.2 AA contrast verified, 48pt touch targets, reduceMotion safe |
+| B-122 | Restore drill on production-like data (synthetic)                                         | B-14       | **Done 2026-11-06 (B9, P-87):** `scripts/drill-restore.mjs` 100% row match parity verified       |
+| B-123 | Private beta with the two partners; collect qualitative feedback (no engagement tracking) | all above  |                                                                                                  |

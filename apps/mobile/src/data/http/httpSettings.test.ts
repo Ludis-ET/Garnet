@@ -39,7 +39,7 @@ function problem(code: string, issues?: { path: string[]; code: string }[]) {
 
 function setup() {
   const api = {
-    get: jest.fn((_path: string) => Promise.resolve(VIEW as unknown)),
+    get: jest.fn(() => Promise.resolve(VIEW as unknown)),
     post: jest.fn(),
     postNoContent: jest.fn(() => Promise.resolve()),
     patch: jest.fn(() => Promise.resolve()),
@@ -61,26 +61,27 @@ function setup() {
 
 describe("the app and the server agree on settings", () => {
   it("share one set of defaults", () => {
-    const { export: _export, ...rest } = defaultSettings();
+    const rest: Partial<UserSettings> = { ...defaultSettings() };
+    delete rest.export;
     expect(rest).toEqual(defaultSettingsDoc());
   });
 
   it("every setting a page can change is a patch the server accepts", () => {
-    const d = defaultSettings();
-    const { export: _export, ...settings } = d;
+    const settings: Partial<UserSettings> = { ...defaultSettings() };
+    delete settings.export;
     for (const [key, value] of Object.entries(settings))
       expect(settingsPatchSchema.safeParse({ [key]: value }).success).toBe(true);
   });
 });
 
 describe("reading", () => {
-  it("shapes the view for the pages, with data rights off until U-20 and U-23", async () => {
+  it("shapes the view for the pages, with data rights enabled (B9)", async () => {
     const view = await setup().repo.get();
     expect(view).toMatchObject({
       email: "ada@example.test",
       birthDate: "1999-04-20",
       termsVersion: TERMS_VERSION,
-      dataRights: false,
+      dataRights: true,
       me: { name: "Ada", side: "ruby", zone: "Europe/London" },
       partner: { name: "Ben", side: "sapphire" },
     });
@@ -181,11 +182,25 @@ describe("the birthday", () => {
   });
 });
 
-describe("what waits for U-20 and U-23 (phase B9)", () => {
-  it("never pretends: export, ending the space and deleting the account refuse", async () => {
+describe("data rights (Milestone B9, B-100, B-101, P-37)", () => {
+  it("enables dataRights flag in settings view", async () => {
     const { repo } = setup();
-    await expect(repo.prepareExport()).rejects.toThrow(/U-20/);
-    await expect(repo.endSpace()).rejects.toThrow(/U-20/);
-    await expect(repo.deleteAccount()).rejects.toThrow(/U-20/);
+    const v = await repo.get();
+    expect(v.dataRights).toBe(true);
+  });
+
+  it("calls prepareExport, expireExport, endSpace and deleteAccount endpoints", async () => {
+    const { api, repo } = setup();
+    await repo.prepareExport();
+    expect(api.post).toHaveBeenCalledWith("/v1/me/export", expect.anything(), {});
+
+    await repo.expireExport();
+    expect(api.postNoContent).toHaveBeenCalledWith("/v1/me/export/expire", {});
+
+    await repo.endSpace();
+    expect(api.postNoContent).toHaveBeenCalledWith("/v1/me/end-space", { confirmWord: "END" });
+
+    await repo.deleteAccount();
+    expect(api.delete).toHaveBeenCalledWith("/v1/me/account", { confirmWord: "DELETE" });
   });
 });

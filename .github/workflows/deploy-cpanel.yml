@@ -1,0 +1,111 @@
+name: Deploy Backend to cPanel
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/api/**"
+      - "packages/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - ".github/workflows/deploy-cpanel.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-cpanel-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    name: Build & Deploy API to cPanel
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Quality Checks & Typecheck
+        run: |
+          pnpm --filter @garnet/contracts typecheck
+          pnpm --filter @garnet/domain test
+          pnpm --filter @garnet/db typecheck
+          pnpm --filter @garnet/api typecheck
+
+      - name: Build Standalone API Package
+        run: |
+          # 1. Compile API and migration runner into apps/api/dist
+          pnpm --filter @garnet/api run build
+
+          # 2. Deploy isolated production node_modules for @garnet/api
+          pnpm --filter @garnet/api deploy --legacy --prod /tmp/deploy-api
+
+          # 3. Copy compiled dist artifacts & passenger app.js into the deployment bundle
+          cp -r apps/api/dist /tmp/deploy-api/dist
+          cp apps/api/app.js /tmp/deploy-api/app.js
+
+          # 4. Pack into a single compact archive
+          tar -czf /tmp/api-release.tar.gz -C /tmp/deploy-api .
+
+      - name: Upload Release to cPanel via SCP
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER }}
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
+          port: 22
+          source: "/tmp/api-release.tar.gz"
+          target: "/home/${{ secrets.USERNAME }}/"
+          strip_components: 1
+
+      - name: Extract, Migrate & Restart on cPanel via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SERVER }}
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
+          port: 22
+          script_stop: true
+          script: |
+            set -e
+            APP_DIR="/home/${{ secrets.USERNAME }}/garnet-api"
+            ARCHIVE="/home/${{ secrets.USERNAME }}/api-release.tar.gz"
+
+            echo "📦 Preparing application directory at $APP_DIR..."
+            mkdir -p "$APP_DIR"
+
+            echo "📂 Extracting release archive..."
+            tar -xzf "$ARCHIVE" -C "$APP_DIR"
+            rm -f "$ARCHIVE"
+
+            cd "$APP_DIR"
+
+            # Ensure Node is on PATH
+            export PATH="$HOME/.nvm/versions/node/$(nvm current 2>/dev/null || echo "")/bin:$PATH"
+
+            echo "🗄️ Running database migrations..."
+            if [ -f "$APP_DIR/.env" ]; then
+              set -a
+              . "$APP_DIR/.env"
+              set +a
+            fi
+            node dist/migrate.mjs migrate
+
+            echo "🔄 Restarting Phusion Passenger application..."
+            mkdir -p "$APP_DIR/tmp"
+            touch "$APP_DIR/tmp/restart.txt"
+
+            echo "✅ Garnet API deployed and restarted successfully!"

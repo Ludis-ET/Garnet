@@ -10,6 +10,8 @@ import { registerAuthRoutes } from "./auth/bridge";
 import { SessionGuard } from "./auth/session.guard";
 import type { AuthPolicy, SocialConfig } from "./config";
 import { AccountController, DevicesController } from "./account/account.controller";
+import { DataRightsController } from "./account/data-rights.controller";
+import { DataRightsService } from "./account/data-rights.service";
 import { AUTH, KYSELY, POLICY, SOCIAL, type Database } from "./db/database";
 import { ProblemFilter } from "./errors/problem.filter";
 import { HealthController } from "./health/health.controller";
@@ -22,6 +24,38 @@ import {
 } from "./registration/registration.controller";
 import { SettingsController } from "./settings/settings.controller";
 import { SetupController } from "./setup/setup.controller";
+import { SyncController } from "./sync/sync.controller";
+import { SyncService } from "./sync/sync.service";
+import { DaysController } from "./days/days.controller";
+import { DaysService } from "./days/days.service";
+import { SignalsController } from "./signals/signals.controller";
+import { SignalsService } from "./signals/signals.service";
+import { ChatController } from "./chat/chat.controller";
+import { ChatService } from "./chat/chat.service";
+import { ChatEventsService } from "./chat/chat-events.service";
+import { NotificationsController } from "./notifications/notifications.controller";
+import { NotificationsService } from "./notifications/notifications.service";
+import { InMemoryPushSender, PUSH_SENDER, type PushSender } from "./notifications/push-sender";
+import { MediaController } from "./media/media.controller";
+import { MediaService } from "./media/media.service";
+import { MediaPurgeService } from "./media/media-purge.service";
+import {
+  InMemoryObjectStorage,
+  OBJECT_STORAGE,
+  type ObjectStorage,
+} from "./media/storage/object-storage";
+import { OpenWhenController } from "./moments/open-when.controller";
+import { OpenWhenService } from "./moments/open-when.service";
+import { SurprisesController } from "./moments/surprises.controller";
+import { SurprisesService } from "./moments/surprises.service";
+import { EventsController } from "./moments/events.controller";
+import { EventsService } from "./moments/events.service";
+import { MemoriesController } from "./moments/memories.controller";
+import { MemoriesService } from "./moments/memories.service";
+import { TogetherController } from "./moments/together.controller";
+import { TogetherService } from "./moments/together.service";
+import { SearchController } from "./search/search.controller";
+import { SearchService } from "./search/search.service";
 
 /** Bodies above this are refused with 413 before any handler runs. */
 export const BODY_LIMIT_BYTES = 64 * 1024;
@@ -41,12 +75,42 @@ class AppModule {
         SettingsController,
         AccountController,
         DevicesController,
+        SyncController,
+        DaysController,
+        SignalsController,
+        ChatController,
+        NotificationsController,
+        MediaController,
+        OpenWhenController,
+        SurprisesController,
+        EventsController,
+        MemoriesController,
+        TogetherController,
+        DataRightsController,
+        SearchController,
       ],
       providers: [
+        SyncService,
+        DaysService,
+        SignalsService,
+        ChatService,
+        ChatEventsService,
+        NotificationsService,
+        MediaService,
+        MediaPurgeService,
+        OpenWhenService,
+        SurprisesService,
+        EventsService,
+        MemoriesService,
+        TogetherService,
+        DataRightsService,
+        SearchService,
         { provide: KYSELY, useValue: options.db },
         { provide: AUTH, useValue: options.auth },
         { provide: POLICY, useValue: options.policy },
         { provide: SOCIAL, useValue: options.social ?? {} },
+        { provide: PUSH_SENDER, useValue: options.pushSender ?? new InMemoryPushSender() },
+        { provide: OBJECT_STORAGE, useValue: options.objectStorage ?? new InMemoryObjectStorage() },
         { provide: APP_GUARD, useClass: SessionGuard },
         { provide: APP_FILTER, useClass: ProblemFilter },
       ],
@@ -61,6 +125,10 @@ export interface AppOptions {
   policy: AuthPolicy;
   /** Google and Apple, when configured (P-79); the same object Better Auth was given. */
   social?: SocialConfig;
+  /** Optional push sender provider (defaults to InMemoryPushSender). */
+  pushSender?: PushSender;
+  /** Optional object storage provider (defaults to InMemoryObjectStorage). */
+  objectStorage?: ObjectStorage;
   logLevel: string;
   /** Where log lines go (tests capture them); stdout by default. */
   logStream?: { write(line: string): void };

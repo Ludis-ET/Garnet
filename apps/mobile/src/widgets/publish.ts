@@ -1,14 +1,20 @@
+import { writeStored } from "@/data/mock/storage";
 import type { WidgetSnapshot } from "./snapshot";
 
+export const WIDGET_SNAPSHOT_KEY = "garnet_widget_snapshot_v1";
+
 /**
- * Home-screen widgets exist only in the Android build for now (P-73; iPhone waits on F-01 and
- * U-01). Elsewhere the snapshot is never built and publishing does nothing.
+ * Widget snapshot publishing (P-73, P-90):
+ * Stores the privacy-sanitized snapshot for native widget extensions (iOS WidgetKit & Android Glance).
+ * Only the snapshot crosses over: never user credentials, draft entries or relationship metrics (§5).
  */
 export function widgetsSupported(): boolean {
-  return false;
+  return true;
 }
 
-export const publishWidgets: (snapshot: WidgetSnapshot) => void = () => undefined;
+export function publishWidgets(snapshot: WidgetSnapshot): void {
+  writeStored(WIDGET_SNAPSHOT_KEY, JSON.stringify(snapshot));
+}
 
 /** Asks the launcher to add a widget; false where that isn't possible (P-75). */
 export const pinWidget: (name: string) => Promise<boolean> = () => Promise.resolve(false);

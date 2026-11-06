@@ -19,6 +19,36 @@ const snapshot = fc.record<WidgetSnapshot>({
   waiting: fc.boolean(),
   nextEventDays: fc.option(fc.integer({ min: 0, max: 400 })),
   km: fc.option(fc.integer({ min: 0, max: 200 }).map((h) => h * 100)),
+  partnerPart: fc.constantFrom(
+    "morning" as const,
+    "day" as const,
+    "evening" as const,
+    "night" as const,
+    null,
+  ),
+  partnerAwake: fc.constantFrom(true, false, null),
+  partnerMood: fc.constantFrom(
+    "calm" as const,
+    "happy" as const,
+    "loving" as const,
+    "sleepy" as const,
+    "hug" as const,
+    "thinking" as const,
+    "dancing" as const,
+    "celebrating" as const,
+    null,
+  ),
+  recentSignal: fc.constantFrom(
+    "thought" as const,
+    "missing" as const,
+    "hug" as const,
+    "listening" as const,
+    "talk" as const,
+    null,
+  ),
+  sparkActive: fc.boolean(),
+  dayRecapReady: fc.boolean(),
+  togetherDays: fc.option(fc.integer({ min: 1, max: 5000 })),
 });
 
 /** Every text and accessibility label in a built tree. */

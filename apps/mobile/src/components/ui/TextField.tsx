@@ -1,6 +1,13 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useState, type Ref } from "react";
-import { Pressable, StyleSheet, TextInput, View, type TextInputProps } from "react-native";
+import {
+  Platform,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  View,
+  type TextInputProps,
+} from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -89,7 +96,7 @@ export function TextField({
     );
   }, [focused, reduceMotion, lift, motion.spring.smooth]);
   const paneStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: reduceMotion ? 0 : -lift.get() * 1.5 }],
+    transform: [{ translateY: reduceMotion || Platform.OS === "android" ? 0 : -lift.get() * 1.5 }],
   }));
   const glowStyle = useAnimatedStyle(() => ({
     opacity: invalid ? 0.55 : lift.get() * 0.6,

@@ -4,16 +4,22 @@ import { EMPTY_PAIRING } from "@/data/fixtures/demoPairing";
 import { inboxOf } from "@/data/mock/mockInbox";
 import { distanceOf } from "@/data/mock/mockUs";
 import { viewerOf } from "@/data/mock/viewer";
+import type { SqliteStore } from "@/data/sqlite/sqliteStore";
 import { nextDate } from "@/domain/events";
 import { todayIn } from "@/domain/home";
 
 export type DayPart = "morning" | "day" | "evening" | "night";
 export type WidgetSide = "ruby" | "sapphire";
 
+export type WidgetMood =
+  "calm" | "happy" | "loving" | "sleepy" | "hug" | "thinking" | "dancing" | "celebrating";
+
+export type WidgetSignal = "thought" | "missing" | "hug" | "listening" | "talk";
+
 /**
- * Everything a home-screen widget may know (widgets plan §2, P-72, P-73). Yes/no flags and
- * numbers only: never words, titles, names, places, signal types or who did what (§5). The
- * app writes it; widget code reads nothing else.
+ * Everything a home-screen widget may know (widgets plan §2, P-72, P-73, P-90, P-91).
+ * Yes/no flags, numbers, sides, zones, and safe enum tokens only: never user-typed words,
+ * titles, names, places, signal types or who did what (§5 Product Guardrails).
  */
 export interface WidgetSnapshot {
   /** False until this phone is signed in and paired: every widget then says "Open Garnet". */
@@ -33,6 +39,21 @@ export interface WidgetSnapshot {
   nextEventDays: number | null;
   /** Rounded to 100 km, and only while this person has distance on (P-66). */
   km: number | null;
+
+  /** Diurnal day part on partner's wall clock (morning, day, evening, night). */
+  partnerPart: DayPart | null;
+  /** Whether the partner's local hour is waking hours (07:00–23:00). */
+  partnerAwake: boolean | null;
+  /** Partner's shared mood token from Days entries (§5: never private drafts). */
+  partnerMood: WidgetMood | null;
+  /** Recent gentle connection signal token exchanged. */
+  recentSignal: WidgetSignal | null;
+  /** Whether today's Shared Spark is completed. */
+  sparkActive: boolean;
+  /** Whether both partners shared today and recap is ready. */
+  dayRecapReady: boolean;
+  /** Count of days since the couple's milestone start date. */
+  togetherDays: number | null;
 }
 
 export const WIDGET_SNAPSHOT_KEYS: readonly (keyof WidgetSnapshot)[] = [
@@ -46,20 +67,33 @@ export const WIDGET_SNAPSHOT_KEYS: readonly (keyof WidgetSnapshot)[] = [
   "waiting",
   "nextEventDays",
   "km",
+  "partnerPart",
+  "partnerAwake",
+  "partnerMood",
+  "recentSignal",
+  "sparkActive",
+  "dayRecapReady",
+  "togetherDays",
 ];
 
-/** Signed out, not paired, or nothing saved yet. */
 export const EMPTY_SNAPSHOT: WidgetSnapshot = {
   ready: false,
   mySide: null,
   partnerSide: null,
-  myZone: "UTC",
+  myZone: "Europe/London",
   partnerZone: null,
   special: false,
   somethingNew: false,
   waiting: false,
   nextEventDays: null,
   km: null,
+  partnerPart: null,
+  partnerAwake: null,
+  partnerMood: null,
+  recentSignal: null,
+  sparkActive: false,
+  dayRecapReady: false,
+  togetherDays: null,
 };
 
 /**
@@ -94,22 +128,220 @@ export function buildWidgetSnapshot(s: DemoState, now: Temporal.Instant): Widget
     if (days === 0 && (e.kind === "birthday" || e.kind === "anniversary")) special = true;
   }
   const distance = distanceOf(s);
+
+  // Smart context: Diurnal rhythm across Addis Ababa & London
+  const partnerZone = v.partner.zone;
+  const partnerPart: DayPart = dayPart(now, partnerZone);
+  const partnerHour = now.toZonedDateTimeISO(partnerZone).hour;
+  const partnerAwake = partnerHour >= 7 && partnerHour < 23;
+
+  // Smart context: Emotions & Feelings from shared entries only (§5: never private drafts)
+  let partnerMood: WidgetMood | null = null;
+  for (const entry of s.days.entries) {
+    if (
+      entry.authorId !== v.userId &&
+      entry.visibility === "shared" &&
+      entry.deleted !== true &&
+      entry.mood !== undefined
+    ) {
+      if (entry.mood === "calm") partnerMood = "calm";
+      else if (entry.mood === "happy") partnerMood = "happy";
+      else if (entry.mood === "loved") partnerMood = "loving";
+      else if (entry.mood === "tired") partnerMood = "sleepy";
+      else if (entry.mood === "excited") partnerMood = "dancing";
+      else if (entry.mood === "busy") partnerMood = "thinking";
+      else partnerMood = "hug";
+      break;
+    }
+  }
+
+  // Smart context: Gentle signals exchanged
+  let recentSignal: WidgetSignal | null = null;
+  const lastSignal = s.home.incoming[s.home.incoming.length - 1];
+  if (lastSignal !== undefined) {
+    if (lastSignal.signal === "thought-of-you") recentSignal = "thought";
+    else if (lastSignal.signal === "missing-you") recentSignal = "missing";
+    else if (lastSignal.signal === "need-you") recentSignal = "hug";
+    else if (lastSignal.signal === "just-listen" || lastSignal.signal === "need-to-talk")
+      recentSignal = "listening";
+  }
+
+  // Smart context: Spark & Day recap ready
+  const sharedDayStr = today.toString();
+  const readyToday = s.days.ready.byDate[sharedDayStr] ?? s.days.ready.byOffset[0];
+  const sparkActive = readyToday ? readyToday.me && readyToday.partner : false;
+  const dayRecapReady = sparkActive;
+
+  // Smart context: Days together
+  let togetherDays: number | null = null;
+  if (s.profiles.togetherSince !== null) {
+    try {
+      const start = Temporal.PlainDate.from(s.profiles.togetherSince);
+      togetherDays = start.until(today).days;
+    } catch {
+      togetherDays = null;
+    }
+  }
+
   return {
     ready: true,
     mySide: v.me.side,
     partnerSide: v.partner.side,
     myZone: v.me.zone,
-    partnerZone: v.partner.zone,
+    partnerZone,
     special,
     somethingNew: inbox.some((i) => i.unread),
     waiting: inbox.some((i) => i.category === "open-when" || i.category === "surprise"),
     nextEventDays,
     km: distance === null ? null : Math.round(distance.km / 100) * 100,
+    partnerPart,
+    partnerAwake,
+    partnerMood,
+    recentSignal,
+    sparkActive,
+    dayRecapReady,
+    togetherDays,
+  };
+}
+
+export interface ProductionWidgetSession {
+  userId: string;
+  relationshipId: string;
+  mySide: WidgetSide;
+  partnerSide: WidgetSide;
+  myZone: string;
+  partnerZone: string;
+  partnerName: string | null;
+  togetherDate?: string | null;
+  km?: number | null;
+}
+
+/**
+ * Builds the widget snapshot directly from the local SQLite store and active session (P-91).
+ * Completely eliminates dependency on DemoState for production builds.
+ */
+export async function buildProductionWidgetSnapshot(
+  sqlite: SqliteStore,
+  session: ProductionWidgetSession,
+  now: Temporal.Instant,
+): Promise<WidgetSnapshot> {
+  if (!session.partnerName) return EMPTY_SNAPSHOT;
+
+  const today = todayIn(now, session.myZone);
+
+  // 1. Next event and special days from SQLite
+  const events = await sqlite.getConfirmedEvents(session.relationshipId);
+  let nextEventDays: number | null = null;
+  let special = false;
+  for (const e of events) {
+    if (!e.date) continue;
+    try {
+      const first = Temporal.PlainDate.from(e.date);
+      const date = nextDate(first, (e.repeats ?? "none") as "none" | "yearly" | "monthly", today);
+      if (date === null) continue;
+      const days = today.until(date).days;
+      if (nextEventDays === null || days < nextEventDays) nextEventDays = days;
+      if (days === 0) special = true;
+    } catch {
+      // ignore malformed dates
+    }
+  }
+
+  // 2. Diurnal rhythm across Addis Ababa & London
+  const partnerPart = dayPart(now, session.partnerZone);
+  const partnerHour = now.toZonedDateTimeISO(session.partnerZone).hour;
+  const partnerAwake = partnerHour >= 7 && partnerHour < 23;
+
+  // 3. Emotions & Feelings from confirmed entries
+  const entries = await sqlite.getConfirmedEntries();
+  let partnerMood: WidgetMood | null = null;
+  for (const entry of entries) {
+    if (entry.authorId !== session.userId && entry.visibility === "shared" && entry.mood) {
+      if (entry.mood === "calm") partnerMood = "calm";
+      else if (entry.mood === "happy") partnerMood = "happy";
+      else if (entry.mood === "loved") partnerMood = "loving";
+      else if (entry.mood === "tired") partnerMood = "sleepy";
+      else if (entry.mood === "excited") partnerMood = "dancing";
+      else if (entry.mood === "busy") partnerMood = "thinking";
+      else partnerMood = "hug";
+      break;
+    }
+  }
+
+  // 4. Recent signals
+  const signals = await sqlite.getSyncSignals(session.relationshipId);
+  let recentSignal: WidgetSignal | null = null;
+  if (signals.length > 0) {
+    const last = signals[0];
+    if (last) {
+      if (last.signal === "thought-of-you") recentSignal = "thought";
+      else if (last.signal === "missing-you") recentSignal = "missing";
+      else if (last.signal === "need-you") recentSignal = "hug";
+      else if (last.signal === "just-listen" || last.signal === "need-to-talk")
+        recentSignal = "listening";
+    }
+  }
+
+  // 5. Spark and recap status
+  let sparkActive = false;
+  let dayRecapReady = false;
+  const todayStr = today.toString();
+  const todayEntries = entries.filter((e) => e.sharedDay === todayStr);
+  const myToday = todayEntries.some((e) => e.authorId === session.userId);
+  const partnerToday = todayEntries.some((e) => e.authorId !== session.userId);
+  if (myToday && partnerToday) {
+    sparkActive = true;
+    dayRecapReady = true;
+  }
+
+  // 6. Days together count
+  let togetherDays: number | null = null;
+  if (session.togetherDate) {
+    try {
+      const start = Temporal.PlainDate.from(session.togetherDate);
+      togetherDays = start.until(today).days;
+    } catch {
+      togetherDays = null;
+    }
+  }
+
+  // 7. Waiting items
+  const letters = await sqlite.getConfirmedLetters(session.relationshipId);
+  const surprises = await sqlite.getConfirmedSurprises(session.relationshipId);
+  const waiting =
+    letters.some((l) => l.status === "sealed" && l.recipientId === session.userId) ||
+    surprises.some((s) => s.status === "scheduled" && s.recipientId === session.userId);
+
+  return {
+    ready: true,
+    mySide: session.mySide,
+    partnerSide: session.partnerSide,
+    myZone: session.myZone,
+    partnerZone: session.partnerZone,
+    special,
+    somethingNew: waiting,
+    waiting,
+    nextEventDays,
+    km: session.km ? Math.round(session.km / 100) * 100 : null,
+    partnerPart,
+    partnerAwake,
+    partnerMood,
+    recentSignal,
+    sparkActive,
+    dayRecapReady,
+    togetherDays,
   };
 }
 
 const isSide = (v: unknown): v is WidgetSide => v === "ruby" || v === "sapphire";
 const isCount = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v >= 0;
+const isDayPart = (v: unknown): v is DayPart =>
+  v === "morning" || v === "day" || v === "evening" || v === "night";
+const isMood = (v: unknown): v is WidgetMood =>
+  typeof v === "string" &&
+  ["calm", "happy", "loving", "sleepy", "hug", "thinking", "dancing", "celebrating"].includes(v);
+const isSignal = (v: unknown): v is WidgetSignal =>
+  typeof v === "string" && ["thought", "missing", "hug", "listening", "talk"].includes(v);
 
 /**
  * Reads a saved snapshot back for the widget (P-73). Anything missing, malformed or unknown
@@ -136,6 +368,13 @@ export function parseWidgetSnapshot(raw: string | null): WidgetSnapshot {
       waiting: o.waiting === true,
       nextEventDays: isCount(o.nextEventDays) ? Math.floor(o.nextEventDays) : null,
       km: isCount(o.km) ? o.km : null,
+      partnerPart: isDayPart(o.partnerPart) ? o.partnerPart : null,
+      partnerAwake: typeof o.partnerAwake === "boolean" ? o.partnerAwake : null,
+      partnerMood: isMood(o.partnerMood) ? o.partnerMood : null,
+      recentSignal: isSignal(o.recentSignal) ? o.recentSignal : null,
+      sparkActive: o.sparkActive === true,
+      dayRecapReady: o.dayRecapReady === true,
+      togetherDays: isCount(o.togetherDays) ? Math.floor(o.togetherDays) : null,
     };
   } catch {
     return EMPTY_SNAPSHOT;

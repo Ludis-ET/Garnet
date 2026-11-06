@@ -36,7 +36,10 @@ export interface ApiClient {
   /** A POST the API answers with 204 No Content. */
   postNoContent(path: string, body: unknown): Promise<void>;
   patch(path: string, body: unknown): Promise<void>;
-  delete(path: string): Promise<void>;
+  /** A PATCH the API answers with a body. */
+  patchWith<T>(path: string, schema: Schema<T>, body: unknown): Promise<T>;
+  put(path: string, body: unknown): Promise<void>;
+  delete(path: string, body?: unknown): Promise<void>;
   /** A DELETE the API answers with a body. */
   deleteWith<T>(path: string, schema: Schema<T>): Promise<T>;
 }
@@ -44,7 +47,7 @@ export interface ApiClient {
 /** No phone request should wait longer than this before telling the person. */
 export const DEFAULT_TIMEOUT_MS = 10_000;
 
-type Method = "GET" | "POST" | "PATCH" | "DELETE";
+type Method = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
 
 export function createApiClient(options: ApiClientOptions): ApiClient {
   const base = options.baseUrl.replace(/\/+$/, "");
@@ -113,8 +116,12 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     patch: async (path, body) => {
       await send("PATCH", path, body);
     },
-    delete: async (path) => {
-      await send("DELETE", path);
+    patchWith: async (path, schema, body) => parse(schema, await send("PATCH", path, body)),
+    put: async (path, body) => {
+      await send("PUT", path, body);
+    },
+    delete: async (path, body) => {
+      await send("DELETE", path, body);
     },
     deleteWith: async (path, schema) => parse(schema, await send("DELETE", path)),
   };

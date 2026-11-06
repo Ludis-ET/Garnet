@@ -3,14 +3,10 @@ import { createMockRepositories } from "@/data/mock/mockRepositories";
 import { MockStore } from "@/data/mock/MockStore";
 import { viewerOf } from "@/data/mock/viewer";
 import type {
-  AuthRepository,
   AuthStatus,
-  PairingRepository,
   PairingStatus,
   Repositories,
-  SettingsRepository,
   SettingsView,
-  SetupRepository,
   SetupState,
 } from "@/data/repositories/types";
 import { newProfile } from "@/data/fixtures/demoProfile";
@@ -50,9 +46,9 @@ function setup(status: AuthStatus = SIGNED_IN) {
   const update = jest.fn(() => Promise.resolve());
   const api = withMirror(
     {
-      auth: { ...mock.auth, status: () => Promise.resolve(current) } as AuthRepository,
-      pairing: { ...mock.pairing, status: () => Promise.resolve(PAIRED) } as PairingRepository,
-      setup: { ...mock.setup, get: () => Promise.resolve(SETUP) } as SetupRepository,
+      auth: { ...mock.auth, status: () => Promise.resolve(current) },
+      pairing: { ...mock.pairing, status: () => Promise.resolve(PAIRED) },
+      setup: { ...mock.setup, get: () => Promise.resolve(SETUP) },
       settings: {
         ...mock.settings,
         get: () =>
@@ -60,7 +56,7 @@ function setup(status: AuthStatus = SIGNED_IN) {
             settings: { ...defaultSettings(), previews: "sender", haptics: false },
           } as SettingsView),
         update,
-      } as SettingsRepository,
+      },
     },
     store,
   );

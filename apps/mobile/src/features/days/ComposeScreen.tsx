@@ -37,11 +37,14 @@ import {
   type FeelingId,
   type Visibility,
 } from "@/domain/days";
+import { localTimeLabel } from "@/domain/identity";
+import { Temporal } from "temporal-polyfill";
 import { serviceErrorMessage } from "@/features/auth/authUi";
 import { SideScope, useTheme } from "@/theme/ThemeProvider";
 import { FeelingSheet } from "./components/FeelingSheet";
 import { MediaArt } from "./components/MediaArt";
 import { MediaPickerSheet } from "./components/MediaPickerSheet";
+import { TimePickerSheet } from "./components/TimePickerSheet";
 import { VisibilityPicker } from "./components/VisibilityPicker";
 import { VoicePlayer } from "./components/VoicePlayer";
 import { VoiceRecorderSheet } from "./components/VoiceRecorderSheet";
@@ -59,6 +62,7 @@ interface Draft {
   activity: ActivityId | null;
   place: string;
   visibility: Visibility;
+  occurredAt?: string | undefined;
 }
 
 const EMPTY: Draft = {
@@ -80,6 +84,7 @@ function draftOf(e: EntryView): Draft {
     activity: e.activity ?? null,
     place: e.place ?? "",
     visibility: e.visibility,
+    occurredAt: e.at,
   };
 }
 
@@ -103,6 +108,7 @@ function toInput(d: Draft, id: string | undefined): EntryInput {
     ...(d.mood === null ? {} : { mood: d.mood }),
     ...(d.activity === null ? {} : { activity: d.activity }),
     ...(d.place.trim().length === 0 ? {} : { place: d.place.trim() }),
+    ...(d.occurredAt ? { occurredAt: d.occurredAt } : {}),
   };
 }
 
@@ -176,16 +182,18 @@ function ComposeForm({
   id,
   initial,
   partnerName,
+  viewerZone,
 }: {
   id: string | undefined;
   initial: Draft;
   partnerName: string;
+  viewerZone: string;
 }) {
   const toast = useToast();
   const { colors, radii, spacing, typography, reduceMotion } = useTheme();
   const save = useSaveEntry();
   const [d, setD] = useState<Draft>(initial);
-  const [sheet, setSheet] = useState<"media" | "voice" | "feeling" | "leave" | null>(null);
+  const [sheet, setSheet] = useState<"media" | "voice" | "feeling" | "leave" | "time" | null>(null);
   const [error, setError] = useState<{ n: number } | null>(null);
   const editing = id !== undefined;
   const set = (patch: Partial<Draft>) => {
@@ -231,6 +239,9 @@ function ComposeForm({
   };
   const mood = FEELINGS.find((f) => f.id === d.mood);
   const activity = ACTIVITIES.find((a) => a.id === d.activity);
+  const timeLabel = d.occurredAt
+    ? localTimeLabel(Temporal.Instant.from(d.occurredAt), viewerZone)
+    : "Now";
   const feelingValue =
     [mood, activity]
       .filter((x) => x !== undefined)
@@ -394,8 +405,15 @@ function ComposeForm({
               />
             </View>
             <View style={[styles.hairline, { backgroundColor: colors.glassHairline }]} />
-            {/* U-11: changing a moment's time is undecided, so the control is shown but locked. */}
-            <DetailRow icon="clock" label="Time" value="Now" disabled />
+            {/* U-11 / P-81: changing a moment's time is supported with optional timestamp */}
+            <DetailRow
+              icon="clock"
+              label="Time"
+              value={timeLabel}
+              onPress={() => {
+                setSheet("time");
+              }}
+            />
           </Glass>
         </Animated.View>
 
@@ -454,6 +472,19 @@ function ComposeForm({
           onDone={(picked) => {
             set(picked);
             setSheet(null);
+          }}
+          onClose={() => {
+            setSheet(null);
+          }}
+        />
+      ) : null}
+      {sheet === "time" ? (
+        <TimePickerSheet
+          visible
+          value={d.occurredAt}
+          zone={viewerZone}
+          onSelect={(occurredAt) => {
+            set({ occurredAt });
           }}
           onClose={() => {
             setSheet(null);
@@ -535,6 +566,7 @@ export function ComposeScreen({ id }: { id?: string }) {
           id={id}
           initial={entry === null ? EMPTY : draftOf(entry)}
           partnerName={people.partner.name}
+          viewerZone={people.me.zone}
         />
       </View>
     </SideScope>

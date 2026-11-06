@@ -229,9 +229,17 @@ function EventsSection() {
         onChange={setMode}
       />
       {data.events.length === 0 ? (
-        <AppText variant="callout" color="textSecondary" style={styles.textCenter}>
-          Dates that matter to you both will appear here.
-        </AppText>
+        <View style={[styles.center, { gap: spacing.md, paddingVertical: spacing.xl }]}>
+          <CharacterSlot
+            character="garnet"
+            look={{ mood: "calm", occasion: "everyday" }}
+            size={160}
+            aspectRatio={FRAME_ASPECT}
+          />
+          <AppText variant="callout" color="textSecondary" style={styles.textCenter}>
+            Dates that matter to you both will appear here.
+          </AppText>
+        </View>
       ) : mode === "calendar" ? (
         <EventCalendar events={data.events} today={today} me={data.me} partner={data.partner} />
       ) : (

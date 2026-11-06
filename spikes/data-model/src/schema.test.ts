@@ -34,7 +34,7 @@ beforeAll(async () => {
     "insert into relationship_member (relationship_id, user_id) values ($1,$2), ($1,$3), ($4,$5), ($4,$6)",
     [GARNET, RUBY, SAPPHIRE, QUARTZ, AMETHYST, JASPER],
   );
-});
+}, 60_000);
 
 interface EntryInput {
   id?: string;

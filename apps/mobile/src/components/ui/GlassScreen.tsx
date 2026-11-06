@@ -1,6 +1,6 @@
 import { StatusBar } from "expo-status-bar";
 import type { ReactNode } from "react";
-import { KeyboardAvoidingView, ScrollView, StyleSheet, View } from "react-native";
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Aurora } from "@/components/brand/Aurora";
 import { SideWash } from "@/components/brand/SideWash";
@@ -63,8 +63,7 @@ export function GlassScreen({
       <SafeAreaView style={styles.fill} edges={["top", "bottom"]}>
         <KeyboardAvoidingView
           style={styles.fill}
-          // Both platforms: Android draws edge to edge, so its window never shrinks (P-75).
-          behavior="padding"
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
           <ScrollView
             testID="glass-screen-scroll"
@@ -76,7 +75,7 @@ export function GlassScreen({
               },
             ]}
             keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="interactive"
+            keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
             showsVerticalScrollIndicator={false}
           >
             <View

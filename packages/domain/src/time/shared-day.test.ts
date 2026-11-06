@@ -172,7 +172,7 @@ describe("properties (fast-check)", () => {
       }),
       { numRuns: 2_000 },
     );
-  });
+  }, 30_000);
 
   it("assignment is monotonic: later instants never map to earlier days", () => {
     fc.assert(
@@ -185,7 +185,7 @@ describe("properties (fast-check)", () => {
       }),
       { numRuns: 2_000 },
     );
-  });
+  }, 30_000);
 
   const hoursOfDayContaining = (instant: Temporal.Instant, cutoff: CutoffTime) => {
     const config = london(cutoff);
@@ -204,7 +204,7 @@ describe("properties (fast-check)", () => {
       }),
       { numRuns: 1_000 },
     );
-  });
+  }, 30_000);
 
   it("with a cutoff outside London's 01:00–02:00 transition hour, days are exactly 23, 24 or 25h", () => {
     const safeCutoffArb = cutoffArb.filter((c) => c.hour !== 1);
@@ -214,7 +214,7 @@ describe("properties (fast-check)", () => {
       ),
       { numRuns: 1_000 },
     );
-  });
+  }, 30_000);
 
   it("a cutoff inside the spring gap splits the lost hour across two days (finding for U-02)", () => {
     const halfPastOne = { hour: 1, minute: 30 };

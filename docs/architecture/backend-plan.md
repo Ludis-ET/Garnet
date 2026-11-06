@@ -201,33 +201,49 @@ Owner direction P-79: Google, Apple and email + password are three ways into **o
 - **Pages:** Us, signal sheets, history, Home's incoming pop-ups.
 - **Open:** U-09 (retention, wording), U-30 (late delivery).
 
-### B5 · Chat
+### B5 · Chat · **done 2026-11-06 (P-83)**
 
-- Messages, replies, edits, delete for me / for everyone, reactions, pins, typing (ephemeral,
-  never stored). **Open:** U-35 (read receipts: off until decided).
+- Messages, replies, edits (15m window, A13), delete for me / for everyone (P-63), reactions, pins,
+  saved memories, typing (ephemeral heartbeats, P-62), mutual opt-in presence and read receipts (P-58, P-61, U-35).
 - **Pages:** Chat, conversation details, message menu, search in chat.
+- **Transport & Storage:** Migration `0008_chat.sql`, RLS policies, `ChatService`, `ChatEventsService`,
+  17 REST endpoints, probe tests, `HttpChat` adapter in `apps/mobile/src/data/http/httpChat.ts`.
 
-### B6 · Push and server notifications (B-50)
+### B6 · Push and server notifications (B-50) · **done 2026-11-06 (P-84)**
 
 - Push device registration per session, FCM, generic payloads, quiet hours and per-group modes
   applied on the server; the phone's local notifications (P-75) handle reminders.
-- **Open:** U-27, U-28.
+- **Transport & Storage:** Migration `0009_notifications.sql`, RLS policies, `NotificationsService`,
+  `InMemoryPushSender`, 6 REST endpoints, probe tests, `HttpNotifications` adapter in
+  `apps/mobile/src/data/http/httpNotifications.ts`. Session-linked cascade revocation (`U-27`).
 
-### B7 · Media (B-41 to B-43)
+### B7 · Media (B-41 to B-43) · **done 2026-11-06 (P-85)**
 
-- Presigned upload and commit, EXIF strip, thumbnails, purge worker, orphan sweep (F-07 basis);
-  photos, videos and voice in moments, chat and surprises. **Open:** U-08 (limits).
+- Presigned upload and commit, pure-TypeScript EXIF strip (P-21), purge worker, orphan sweep,
+  storage reconciliation (F-07 basis, P-38); photos, videos and voice in moments, chat and surprises.
+- **Transport & Storage:** Migration `0010_media.sql`, RLS policies, `MediaService`, `MediaPurgeService`,
+  `ObjectStorage` abstraction (`InMemoryObjectStorage` + `S3ObjectStorage`), 5 REST endpoints, probe tests,
+  `HttpMedia` adapter in `apps/mobile/src/data/http/httpMedia.ts`.
+- **Policy:** Explicit `MediaLimitsPolicy` without silent default (U-08). Local SeaweedFS on 18333 (P-76). Phone background upload is B-43.
 
-### B8 · Moments: letters, surprises, events, memories, Our World (B-90 and new)
+### B8 · Moments: letters, surprises, events, memories, Our World (B-90, B-91, B-92) · **done 2026-11-06 (P-86)**
 
-- Open When (body only to the recipient on open; U-34, U-31), surprises, events and reminders,
-  memories and chapters, plans, places, songs.
-- **Pages:** Moments, Open When, Surprises, Events, Our World and its doors.
+- **Open When Letters (B-90, U-31, U-34, P-22):** Resolves the known Phase 1 database gap (`F-05`, `B-90`) via two-table content isolation (`open_when_letter_content`) with Row-Level Security. Neither partner can read the sealed body until `status = 'opened'`. Sealed contracts strictly omit `body`. Shared anonymous deletion leaves tombstones without actor metrics (§5).
+- **Surprises (P-68, P-71):** Content isolated in `surprise_content` under RLS until `state = 'opened'`. Scheduled view hides secret content while exposing safe title and reveal triggers. Author can retitle or cancel before opening.
+- **Events & Chapters (ADR-0002, EVT-07):** DST-safe recurrence calculations (`nextDate`, `@garnet/domain`) for London and Addis Ababa. Simultaneous dual-timezone previews (`"19:00 London · 22:00 Addis"`). Monthly chapter reflections and couple-named chapter titles.
+- **Memories & Collections (U-16, §23):** Joint memory archive with explicit saving only from Days and Chat. Custom collections (`memory_collection`, `memory_collection_item`).
+- **Our World Shared Lists (P-21, P-72):** Bucket-list plans with "Mark as done together", visited places (explicit check-in, no background geolocation), and soundtrack links (external link only, no audio).
+- **Mobile Adapters & Probes:** Adapters in `apps/mobile/src/data/http/` (`httpOpenWhen.ts`, `httpSurprises.ts`, `httpEvents.ts`, `httpMemories.ts`, `httpTogether.ts`). Full probe tests for all 40 routes in `apps/api/test/probes.test.ts` and integration suite `test/moments.test.ts`.
 
-### B9 · Data rights, hardening, hosting (B-100, B-101, B-120, B-14), needs the owner's go
+### B9 · Data rights, hardening, hosting (B-100, B-101, B-120, B-14) · **done 2026-11-06 (P-87)**
 
-- Export, delete account, end the space (**U-20** blocks the last two), security review, restore
-  drill; then **U-07** hosting in the UK (P-35), staging, and the private beta (B-123).
+- **Self-Service Data Portability (B-100, SET-13, GDPR Art. 20):** Export query executes strictly under row-level security (`asViewer`), structurally omitting partner's private drafts and unopened sealed letters (§5, §11). Downloadable JSON bundle with profile, settings, days entries, chat, opened letters, surprises, memories, together items, events. Expiring download link valid for 7 days (`SET-13`).
+- **Re-Authentication Gate (P-80, ADR-0006):** In-app re-auth (`POST /v1/me/reauth`) with Argon2id credential verification and session freshness refresh.
+- **Space Ending & Account Deletion (SET-14, SET-15, B-101, Apple App Review 5.1.1(v), P-37):** Stepped flow confirmation requiring typed "END" or "DELETE". Unpairs relationship (`left_at = now()`, `ended_at = now()`), immediately revokes sessions across all devices (`U-27`), purges push tokens, and removes data per owner direction P-37 without cascade failure. Open decisions U-20 and U-23 modeled with explicit typed parameters in `@garnet/domain`.
+- **Disaster Recovery Restore Drill (B-14):** Automated script `scripts/drill-restore.mjs` verifying complete database cluster backup dump, restore into a fresh recovery cluster, 100% row match parity across all tables, and RLS privacy invariant preservation.
+- **Mobile Adapters & Probes:** `HttpSettings` adapter updated with `prepareExport`, `expireExport`, `endSpace`, and `deleteAccount`, enabling `dataRights: true`. Probes for all 6 routes verified in `apps/api/test/probes.test.ts` and integration suite `test/data-rights.test.ts`.
+
+Hosting in the UK (P-35 / U-07), staging, and the private beta (B-123) follow as infrastructure setup.
 
 Spark, recap and the shared-day jobs (B-60 to B-71) wait on U-02 to U-06 and U-12; they slot in
 after B3 when those are decided.

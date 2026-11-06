@@ -15,6 +15,7 @@ import {
   ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
+  Platform,
   Pressable,
   StyleSheet,
   TextInput,
@@ -592,8 +593,7 @@ function Conversation() {
       </SafeAreaView>
 
       <KeyboardAvoidingView
-        // Both platforms: Android draws edge to edge, so its window never shrinks (P-75).
-        behavior="padding"
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.fill}
       >
         <View style={styles.fill}>
@@ -632,9 +632,50 @@ function Conversation() {
               </View>
             }
             ListEmptyComponent={
-              <AppText variant="callout" color="textSecondary" style={styles.textCenter}>
-                Say hello 💜
-              </AppText>
+              <View style={[styles.center, { gap: spacing.md, paddingVertical: spacing.xl }]}>
+                <CharacterSlot
+                  character="garnet"
+                  look={{ mood: "happy", occasion: "everyday" }}
+                  size={140}
+                  aspectRatio={FRAME_ASPECT}
+                />
+                <AppText variant="callout" color="textSecondary" style={styles.textCenter}>
+                  Say hello to {partner.name} 💜
+                </AppText>
+                <View
+                  style={[
+                    styles.row,
+                    { gap: spacing.sm, flexWrap: "wrap", justifyContent: "center" },
+                  ]}
+                >
+                  {["Say good morning ☀️", "Thinking of you ✨", "Send a warm hug 🤗"].map(
+                    (starter) => (
+                      <Pressable
+                        key={starter}
+                        onPress={() => {
+                          setText(starter);
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Send starter: ${starter}`}
+                        style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+                      >
+                        <Glass
+                          radius={radii.pill}
+                          shadow={false}
+                          contentStyle={{
+                            paddingHorizontal: spacing.md,
+                            paddingVertical: spacing.xs,
+                          }}
+                        >
+                          <AppText variant="footnote" color="accent" weight="600">
+                            {starter}
+                          </AppText>
+                        </Glass>
+                      </Pressable>
+                    ),
+                  )}
+                </View>
+              </View>
             }
             renderItem={({ item }) =>
               item.kind === "date" ? (

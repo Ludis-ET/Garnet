@@ -38,17 +38,20 @@ export function createHttpAuth(
     registered: boolean;
     birthDate: string | null;
   } | null> {
-    const { data, error } = await client.getSession();
-    if (error !== null) throw new Error("session check failed");
-    if (data === null) return null;
-    // Better Auth's additional fields (P-79), not in its client's types.
-    const user = data.user as typeof data.user & { birthDate?: unknown; termsVersion?: unknown };
-    return {
-      name: data.user.name,
-      verified: data.user.emailVerified,
-      registered: isRegistrationComplete(user.birthDate, user.termsVersion),
-      birthDate: typeof user.birthDate === "string" ? user.birthDate : null,
-    };
+    try {
+      const { data, error } = await client.getSession();
+      if (error !== null || data === null) return null;
+      // Better Auth's additional fields (P-79), not in its client's types.
+      const user = data.user as typeof data.user & { birthDate?: unknown; termsVersion?: unknown };
+      return {
+        name: data.user.name,
+        verified: data.user.emailVerified,
+        registered: isRegistrationComplete(user.birthDate, user.termsVersion),
+        birthDate: typeof user.birthDate === "string" ? user.birthDate : null,
+      };
+    } catch {
+      return null;
+    }
   }
 
   return {

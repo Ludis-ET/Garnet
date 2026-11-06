@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -59,7 +59,11 @@ export function loadMigrations(dir: string): Migration[] {
 }
 
 /** This package's migrations folder. */
-export const MIGRATIONS_DIR = fileURLToPath(new URL("../migrations", import.meta.url));
+export const MIGRATIONS_DIR =
+  process.env["GARNET_MIGRATIONS_DIR"] ??
+  (existsSync(fileURLToPath(new URL("./migrations", import.meta.url)))
+    ? fileURLToPath(new URL("./migrations", import.meta.url))
+    : fileURLToPath(new URL("../migrations", import.meta.url)));
 
 export interface MigrateResult {
   applied: string[];

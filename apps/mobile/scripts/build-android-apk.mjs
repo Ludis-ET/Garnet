@@ -11,6 +11,8 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
+const envPath = join(root, ".env");
+if (existsSync(envPath)) process.loadEnvFile(envPath);
 const android = join(root, "android");
 const win = process.platform === "win32";
 const say = (text) => process.stdout.write(`${text}\n`);
@@ -153,6 +155,7 @@ run(
   join(android, win ? "gradlew.bat" : "gradlew"),
   [
     "assembleRelease",
+    "--no-daemon",
     "-PreactNativeArchitectures=arm64-v8a",
     ...(jdk17 === undefined ? [] : [`-Porg.gradle.java.installations.paths=${jdk17}`]),
     ...(cmake === null ? [] : [`-Pandroid.cmakeVersion=${cmake}`]),

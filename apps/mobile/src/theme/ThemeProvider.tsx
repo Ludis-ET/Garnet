@@ -102,15 +102,17 @@ export function ThemeProvider({
   initialSide = "garnet",
   // Daylight Glass opens in light (owner direction P-48); dark stays selectable.
   initialSchemePreference = "light",
+  initialForceReduceMotion = false,
 }: {
   children: ReactNode;
   initialSide?: Side;
   initialSchemePreference?: SchemePreference;
+  initialForceReduceMotion?: boolean;
 }) {
   const system = useColorScheme();
   const systemReduceMotion = useReducedMotion();
   // Settings › Motion can calm Garnet even when the phone doesn't ask to (P-66).
-  const [forceReduceMotion, setForceReduceMotion] = useState(false);
+  const [forceReduceMotion, setForceReduceMotion] = useState(initialForceReduceMotion);
   const reduceMotion = systemReduceMotion || forceReduceMotion;
   const reduceTransparency = useReduceTransparency();
   const [schemePreference, setSchemePreference] =

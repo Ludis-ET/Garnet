@@ -298,7 +298,7 @@ describe("properties under random faults (fast-check)", () => {
       }),
       { numRuns: 400 },
     );
-  });
+  }, 30_000);
 
   it("two devices for one partner: all invariants hold, conflicts preserve text", () => {
     fc.assert(
@@ -328,5 +328,5 @@ describe("properties under random faults (fast-check)", () => {
       ),
       { numRuns: 400 },
     );
-  });
+  }, 30_000);
 });

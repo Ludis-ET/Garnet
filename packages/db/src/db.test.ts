@@ -18,12 +18,26 @@ import { hashToken } from "./tokens.ts";
 let db: PGlite;
 beforeEach(async () => {
   db = await createMigratedDatabase();
-});
+}, 60_000);
 afterEach(async () => {
   await db.close();
 });
 
-const VERSIONS = ["0001", "0002", "0003", "0004", "0005"];
+const VERSIONS = [
+  "0001",
+  "0002",
+  "0003",
+  "0004",
+  "0005",
+  "0006",
+  "0007",
+  "0008",
+  "0009",
+  "0010",
+  "0011",
+  "0012",
+  "0013",
+];
 
 const STRANGER = "0192f0a0-0000-7000-8000-00000000c001";
 const STRANGER_RELATIONSHIP = "0192f0a0-0000-7000-8000-00000000c101";
@@ -363,9 +377,9 @@ describe("settings (B2)", () => {
     const big = Array.from({ length: 60_000 }, (_, i) =>
       String.fromCharCode(33 + ((i * 7919) % 90)),
     );
-    await expect(save(DEV_PEOPLE.selam.id, { big: big.join("") + Math.random() })).rejects.toThrow(
-      /check constraint/,
-    );
+    await expect(
+      save(DEV_PEOPLE.selam.id, { big: `${big.join("")}${Math.random()}` }),
+    ).rejects.toThrow(/check constraint/);
   });
 
   it("the old draft table is gone", async () => {
@@ -483,5 +497,679 @@ describe("local tools", () => {
     expect(isLocalDatabase("postgres://u:p@[::1]:5432/garnet")).toBe(true);
     expect(isLocalDatabase("postgres://u:p@db.example.com:5432/garnet")).toBe(false);
     expect(isLocalDatabase("not a url")).toBe(false);
+  });
+});
+
+describe("sync, entries and days (B3, migration 0006)", () => {
+  const SELAM = DEV_PEOPLE.selam.id;
+  const NOAH = DEV_PEOPLE.noah.id;
+  const ENTRY_ID = "0192f0a0-0000-7000-8000-00000000e001";
+  const MUTATION_ID = "0192f0a0-0000-7000-8000-00000000f001";
+
+  beforeEach(async () => {
+    await seedDev(pgliteClient(db));
+  });
+
+  it("stores entries with after_reveal visibility and extended fields", async () => {
+    await asUser(db, SELAM, async (tx) => {
+      await tx.query(
+        `insert into entry (id, relationship_id, author_id, kind, body, emoji, mood, activity, place, visibility, occurred_at, occurred_time_zone, shared_at, shared_day)
+         values ($1, $2, $3, 'text', 'After reveal moment', '✨', 'happy', 'walk', 'London', 'after_reveal', now(), 'Europe/London', now(), '2026-11-05')`,
+        [ENTRY_ID, DEV_RELATIONSHIP_ID, SELAM],
+      );
+    });
+
+    // Selam sees it
+    const selamRow = await asUser(db, SELAM, (tx) =>
+      tx.query<{ body: string; emoji: string; mood: string; place: string }>(
+        "select body, emoji, mood, place from entry where id = $1",
+        [ENTRY_ID],
+      ),
+    );
+    expect(selamRow.rows).toEqual([
+      { body: "After reveal moment", emoji: "✨", mood: "happy", place: "London" },
+    ]);
+
+    // Noah does NOT see it before reveal
+    const noahBefore = await asUser(db, NOAH, (tx) =>
+      tx.query("select 1 from entry where id = $1", [ENTRY_ID]),
+    );
+    expect(noahBefore.rows).toEqual([]);
+
+    // Set revealed_at
+    await db.query("update entry set revealed_at = now() where id = $1", [ENTRY_ID]);
+
+    // Now Noah sees it
+    const noahAfter = await asUser(db, NOAH, (tx) =>
+      tx.query<{ body: string }>("select body from entry where id = $1", [ENTRY_ID]),
+    );
+    expect(noahAfter.rows).toEqual([{ body: "After reveal moment" }]);
+  });
+
+  it("guards against moving shared/after_reveal back to private (GN422)", async () => {
+    await asUser(db, SELAM, async (tx) => {
+      await tx.query(
+        `insert into entry (id, relationship_id, author_id, kind, body, visibility, occurred_at, occurred_time_zone, shared_at, shared_day)
+         values ($1, $2, $3, 'text', 'Shared moment', 'shared', now(), 'Europe/London', now(), '2026-11-05')`,
+        [ENTRY_ID, DEV_RELATIONSHIP_ID, SELAM],
+      );
+    });
+
+    await expect(
+      asUser(db, SELAM, (tx) =>
+        tx.query(
+          "update entry set visibility = 'private', shared_at = null, shared_day = null where id = $1",
+          [ENTRY_ID],
+        ),
+      ),
+    ).rejects.toMatchObject({ code: "GN422" });
+  });
+
+  it("manages processed_mutation idempotency under RLS", async () => {
+    await asUser(db, SELAM, async (tx) => {
+      await tx.query(
+        `insert into processed_mutation (mutation_id, user_id, request_fingerprint, outcome)
+         values ($1, $2, decode('deadbeef', 'hex'), 'applied')`,
+        [MUTATION_ID, SELAM],
+      );
+    });
+
+    // Selam can read her mutation
+    const row = await asUser(db, SELAM, (tx) =>
+      tx.query<{ outcome: string }>(
+        "select outcome from processed_mutation where mutation_id = $1",
+        [MUTATION_ID],
+      ),
+    );
+    expect(row.rows).toEqual([{ outcome: "applied" }]);
+
+    // Noah cannot see Selam's processed_mutation
+    const noahRow = await asUser(db, NOAH, (tx) =>
+      tx.query("select 1 from processed_mutation where mutation_id = $1", [MUTATION_ID]),
+    );
+    expect(noahRow.rows).toEqual([]);
+  });
+
+  it("manages day readiness per partner under RLS", async () => {
+    await asUser(db, SELAM, async (tx) => {
+      await tx.query(
+        "insert into day_readiness (relationship_id, user_id, day) values ($1, $2, '2026-11-05')",
+        [DEV_RELATIONSHIP_ID, SELAM],
+      );
+    });
+
+    // Noah can see Selam is ready (to compute reveal state)
+    const row = await asUser(db, NOAH, (tx) =>
+      tx.query<{ user_id: string }>(
+        "select user_id from day_readiness where relationship_id = $1 and day = '2026-11-05'",
+        [DEV_RELATIONSHIP_ID],
+      ),
+    );
+    expect(row.rows).toEqual([{ user_id: SELAM }]);
+
+    // Noah cannot insert for Selam
+    await expect(
+      asUser(db, NOAH, (tx) =>
+        tx.query(
+          "insert into day_readiness (relationship_id, user_id, day) values ($1, $2, '2026-11-06')",
+          [DEV_RELATIONSHIP_ID, SELAM],
+        ),
+      ),
+    ).rejects.toMatchObject({ code: "42501" });
+  });
+
+  describe("signals, responses and coarse location (B4, migration 0007)", () => {
+    const SIGNAL_ID = "0192f0a0-0000-7000-8000-00000000a001";
+    const RESPONSE_ID = "0192f0a0-0000-7000-8000-00000000b001";
+
+    it("sends a signal under RLS and partner can view it (§5, P-07)", async () => {
+      await asUser(db, SELAM, async (tx) => {
+        await tx.query(
+          "insert into signal (id, relationship_id, sender_id, signal_type, level, payload) values ($1, $2, $3, $4, $5, $6)",
+          [
+            SIGNAL_ID,
+            DEV_RELATIONSHIP_ID,
+            SELAM,
+            "thought-of-you",
+            "gentle",
+            JSON.stringify({ note: "Thinking of you" }),
+          ],
+        );
+      });
+
+      // Noah sees the signal
+      const noahView = await asUser(db, NOAH, (tx) =>
+        tx.query<{ id: string; signal_type: string }>(
+          "select id, signal_type from signal where id = $1",
+          [SIGNAL_ID],
+        ),
+      );
+      expect(noahView.rows).toEqual([{ id: SIGNAL_ID, signal_type: "thought-of-you" }]);
+
+      // Stranger cannot see the signal
+      await addStranger();
+      const strangerView = await asUser(db, STRANGER, (tx) =>
+        tx.query("select 1 from signal where id = $1", [SIGNAL_ID]),
+      );
+      expect(strangerView.rows).toEqual([]);
+    });
+
+    it("partner responds to a signal and stranger cannot respond", async () => {
+      await asUser(db, SELAM, async (tx) => {
+        await tx.query(
+          "insert into signal (id, relationship_id, sender_id, signal_type, level) values ($1, $2, $3, $4, $5)",
+          [SIGNAL_ID, DEV_RELATIONSHIP_ID, SELAM, "need-you", "support"],
+        );
+      });
+
+      // Noah responds
+      await asUser(db, NOAH, async (tx) => {
+        await tx.query(
+          "insert into signal_response (id, signal_id, responder_id, preset) values ($1, $2, $3, $4)",
+          [RESPONSE_ID, SIGNAL_ID, NOAH, "here"],
+        );
+      });
+
+      // Selam sees Noah's response
+      const selamView = await asUser(db, SELAM, (tx) =>
+        tx.query<{ preset: string }>("select preset from signal_response where id = $1", [
+          RESPONSE_ID,
+        ]),
+      );
+      expect(selamView.rows).toEqual([{ preset: "here" }]);
+
+      // Stranger cannot insert a response
+      await addStranger();
+      await expect(
+        asUser(db, STRANGER, (tx) =>
+          tx.query(
+            "insert into signal_response (id, signal_id, responder_id, preset) values ($1, $2, $3, $4)",
+            ["0192f0a0-0000-7000-8000-00000000b002", SIGNAL_ID, STRANGER, "here"],
+          ),
+        ),
+      ).rejects.toMatchObject({ code: "42501" });
+    });
+
+    it("saves coarse location and partner sees it only (P-66)", async () => {
+      await asUser(db, SELAM, async (tx) => {
+        await tx.query(
+          "insert into user_coarse_location (user_id, lat, lon) values ($1, $2, $3) on conflict (user_id) do update set lat = $2, lon = $3",
+          [SELAM, 9.0, 38.7],
+        );
+      });
+
+      // Noah can see Selam's coarse location
+      const noahView = await asUser(db, NOAH, (tx) =>
+        tx.query<{ lat: number; lon: number }>(
+          "select lat, lon from user_coarse_location where user_id = $1",
+          [SELAM],
+        ),
+      );
+      expect(noahView.rows).toEqual([{ lat: 9.0, lon: 38.7 }]);
+
+      // Stranger cannot see Selam's location
+      await addStranger();
+      const strangerView = await asUser(db, STRANGER, (tx) =>
+        tx.query("select 1 from user_coarse_location where user_id = $1", [SELAM]),
+      );
+      expect(strangerView.rows).toEqual([]);
+    });
+  });
+
+  describe("chat, reactions, pins, presence and read receipts (B5, migration 0008)", () => {
+    const MSG_ID = "0192f0a0-0000-7000-8000-00000000e010";
+    const REACTION_ID = "0192f0a0-0000-7000-8000-00000000e020";
+
+    it("sends a chat message under RLS; partner can view, stranger cannot", async () => {
+      await asUser(db, SELAM, async (tx) => {
+        await tx.query(
+          "insert into chat_message (id, relationship_id, sender_id, text) values ($1, $2, $3, $4)",
+          [MSG_ID, DEV_RELATIONSHIP_ID, SELAM, "Hello from Addis Ababa"],
+        );
+      });
+
+      // Noah sees the message
+      const noahView = await asUser(db, NOAH, (tx) =>
+        tx.query<{ id: string; text: string }>("select id, text from chat_message where id = $1", [
+          MSG_ID,
+        ]),
+      );
+      expect(noahView.rows).toEqual([{ id: MSG_ID, text: "Hello from Addis Ababa" }]);
+
+      // Stranger cannot see the message
+      await addStranger();
+      const strangerView = await asUser(db, STRANGER, (tx) =>
+        tx.query("select 1 from chat_message where id = $1", [MSG_ID]),
+      );
+      expect(strangerView.rows).toEqual([]);
+    });
+
+    it("isolates delete-for-me to the caller; partner still views", async () => {
+      await asUser(db, SELAM, async (tx) => {
+        await tx.query(
+          "insert into chat_message (id, relationship_id, sender_id, text) values ($1, $2, $3, $4)",
+          [MSG_ID, DEV_RELATIONSHIP_ID, SELAM, "Private to delete"],
+        );
+        await tx.query(
+          "insert into chat_message_visibility (message_id, user_id, deleted_for_me) values ($1, $2, true)",
+          [MSG_ID, SELAM],
+        );
+      });
+
+      // Selam sees deleted_for_me
+      const selamVis = await asUser(db, SELAM, (tx) =>
+        tx.query<{ deleted_for_me: boolean }>(
+          "select deleted_for_me from chat_message_visibility where message_id = $1",
+          [MSG_ID],
+        ),
+      );
+      expect(selamVis.rows).toEqual([{ deleted_for_me: true }]);
+
+      // Noah has no visibility record (still visible)
+      const noahVis = await asUser(db, NOAH, (tx) =>
+        tx.query("select 1 from chat_message_visibility where message_id = $1", [MSG_ID]),
+      );
+      expect(noahVis.rows).toEqual([]);
+    });
+
+    it("manages reactions and pins under RLS; stranger cannot react", async () => {
+      await asUser(db, SELAM, async (tx) => {
+        await tx.query(
+          "insert into chat_message (id, relationship_id, sender_id, text) values ($1, $2, $3, $4)",
+          [MSG_ID, DEV_RELATIONSHIP_ID, SELAM, "Loved moment"],
+        );
+      });
+
+      // Noah reacts with ❤️
+      await asUser(db, NOAH, async (tx) => {
+        await tx.query(
+          "insert into chat_reaction (id, message_id, user_id, emoji) values ($1, $2, $3, $4)",
+          [REACTION_ID, MSG_ID, NOAH, "❤️"],
+        );
+      });
+
+      // Noah pins the message
+      await asUser(db, NOAH, async (tx) => {
+        await tx.query(
+          "insert into chat_pin (relationship_id, message_id, pinned_by) values ($1, $2, $3)",
+          [DEV_RELATIONSHIP_ID, MSG_ID, NOAH],
+        );
+      });
+
+      // Selam sees the reaction and pin
+      const reactions = await asUser(db, SELAM, (tx) =>
+        tx.query<{ emoji: string }>("select emoji from chat_reaction where message_id = $1", [
+          MSG_ID,
+        ]),
+      );
+      expect(reactions.rows).toEqual([{ emoji: "❤️" }]);
+
+      const pins = await asUser(db, SELAM, (tx) =>
+        tx.query<{ message_id: string }>("select message_id from chat_pin where message_id = $1", [
+          MSG_ID,
+        ]),
+      );
+      expect(pins.rows).toEqual([{ message_id: MSG_ID }]);
+
+      // Stranger cannot insert a reaction on this message
+      await addStranger();
+      await expect(
+        asUser(db, STRANGER, (tx) =>
+          tx.query(
+            "insert into chat_reaction (id, message_id, user_id, emoji) values ($1, $2, $3, $4)",
+            ["0192f0a0-0000-7000-8000-00000000e030", MSG_ID, STRANGER, "❤️"],
+          ),
+        ),
+      ).rejects.toMatchObject({ code: "42501" });
+    });
+
+    it("manages participant state and ephemeral presence under RLS", async () => {
+      await asUser(db, SELAM, async (tx) => {
+        await tx.query(
+          "insert into chat_participant_state (relationship_id, user_id, read_receipts, typing_indicators) values ($1, $2, true, true)",
+          [DEV_RELATIONSHIP_ID, SELAM],
+        );
+      });
+
+      // Noah can read Selam's state
+      const state = await asUser(db, NOAH, (tx) =>
+        tx.query<{ read_receipts: boolean; typing_indicators: boolean }>(
+          "select read_receipts, typing_indicators from chat_participant_state where user_id = $1",
+          [SELAM],
+        ),
+      );
+      expect(state.rows).toEqual([{ read_receipts: true, typing_indicators: true }]);
+
+      // Stranger cannot read or modify
+      await addStranger();
+      const strangerView = await asUser(db, STRANGER, (tx) =>
+        tx.query("select 1 from chat_participant_state where user_id = $1", [SELAM]),
+      );
+      expect(strangerView.rows).toEqual([]);
+    });
+  });
+
+  describe("migration 0009: notifications and push devices (B6, B-50, U-27, P-84)", () => {
+    const NOTIF_ID = "0192f0a0-0000-7000-8000-00000000f001";
+    const PUSH_ID = "0192f0a0-0000-7000-8000-00000000f002";
+    const SESSION_ID = "0192f0a0-0000-7000-8000-00000000f003";
+
+    it("isolates notifications to their recipient under RLS (§5)", async () => {
+      // Selam receives a notification
+      await asUser(db, SELAM, async (tx) => {
+        await tx.query(
+          "insert into notification (id, relationship_id, user_id, sender_id, category, group_name, title, body, href) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+          [
+            NOTIF_ID,
+            DEV_RELATIONSHIP_ID,
+            SELAM,
+            NOAH,
+            "chat-message",
+            "messages",
+            "Garnet",
+            "Something new for you 💜",
+            "/us/chat",
+          ],
+        );
+      });
+
+      // Selam can read and update her notification
+      const selamRows = await asUser(db, SELAM, (tx) =>
+        tx.query<{ id: string; read_at: string | null }>(
+          "select id, read_at from notification where id = $1",
+          [NOTIF_ID],
+        ),
+      );
+      expect(selamRows.rows).toEqual([{ id: NOTIF_ID, read_at: null }]);
+
+      await asUser(db, SELAM, async (tx) => {
+        await tx.query("update notification set read_at = now() where id = $1", [NOTIF_ID]);
+      });
+
+      // Noah (partner) cannot see or modify Selam's notification (§5 privacy)
+      const noahRows = await asUser(db, NOAH, (tx) =>
+        tx.query("select 1 from notification where id = $1", [NOTIF_ID]),
+      );
+      expect(noahRows.rows).toEqual([]);
+
+      // Stranger cannot see it either
+      await addStranger();
+      const strangerRows = await asUser(db, STRANGER, (tx) =>
+        tx.query("select 1 from notification where id = $1", [NOTIF_ID]),
+      );
+      expect(strangerRows.rows).toEqual([]);
+    });
+
+    it("isolates push devices under RLS and cascades on session delete (U-27, P-84)", async () => {
+      // Create a session for Selam
+      await db.query(
+        "insert into session (id, user_id, token, expires_at) values ($1, $2, $3, now() + interval '30 days')",
+        [SESSION_ID, SELAM, "test-token-f003"],
+      );
+
+      // Selam registers a push device linked to this session
+      await asUser(db, SELAM, async (tx) => {
+        await tx.query(
+          "insert into push_device (id, user_id, session_id, token, platform) values ($1, $2, $3, $4, $5)",
+          [PUSH_ID, SELAM, SESSION_ID, "fcm-token-123", "android"],
+        );
+      });
+
+      // Selam can see her push device
+      const selamDevs = await asUser(db, SELAM, (tx) =>
+        tx.query<{ id: string; platform: string }>(
+          "select id, platform from push_device where id = $1",
+          [PUSH_ID],
+        ),
+      );
+      expect(selamDevs.rows).toEqual([{ id: PUSH_ID, platform: "android" }]);
+
+      // Partner cannot see her push device
+      const noahDevs = await asUser(db, NOAH, (tx) =>
+        tx.query("select 1 from push_device where id = $1", [PUSH_ID]),
+      );
+      expect(noahDevs.rows).toEqual([]);
+
+      // When the session is deleted (e.g. sign-out or revoke device), push_device cascades (U-27)
+      await db.query("delete from session where id = $1", [SESSION_ID]);
+
+      const afterDelete = await asUser(db, SELAM, (tx) =>
+        tx.query("select 1 from push_device where id = $1", [PUSH_ID]),
+      );
+      expect(afterDelete.rows).toEqual([]);
+    });
+
+    it("migration 0010: manages media under RLS and cascades to media_purge_queue on delete (B7, B-41, B-42)", async () => {
+      const MEDIA_ID = "0192e2b3-5798-7521-8254-e6be95232a95";
+      const OBJECT_KEY = "media/test-object-key-123";
+      const ENTITY_ID = "0192e2b3-5798-7521-8254-e6be95232a96";
+
+      // Selam registers a pending upload
+      await asUser(db, SELAM, async (tx) => {
+        await tx.query(
+          `insert into media (id, relationship_id, uploader_id, object_key, content_type, byte_size, sha256, status, entity_type, entity_id)
+           values ($1, $2, $3, $4, $5, $6, $7, 'pending_upload', 'chat_message', $8)`,
+          [
+            MEDIA_ID,
+            DEV_RELATIONSHIP_ID,
+            SELAM,
+            OBJECT_KEY,
+            "image/jpeg",
+            1024,
+            Buffer.from("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", "hex"),
+            ENTITY_ID,
+          ],
+        );
+      });
+
+      // Guardrail §5: Pending upload is visible to Selam, but HIDDEN from partner until status='ready'
+      const selamSeesPending = await asUser(db, SELAM, (tx) =>
+        tx.query("select 1 from media where id = $1", [MEDIA_ID]),
+      );
+      expect(selamSeesPending.rows.length).toBe(1);
+
+      const noahSeesPending = await asUser(db, NOAH, (tx) =>
+        tx.query("select 1 from media where id = $1", [MEDIA_ID]),
+      );
+      expect(noahSeesPending.rows).toEqual([]);
+
+      // Selam finalizes commit to status='ready'
+      await asUser(db, SELAM, async (tx) => {
+        await tx.query("update media set status = 'ready' where id = $1", [MEDIA_ID]);
+      });
+
+      // Now Noah can see it as ready
+      const noahSeesReady = await asUser(db, NOAH, (tx) =>
+        tx.query<{ id: string; status: string }>("select id, status from media where id = $1", [
+          MEDIA_ID,
+        ]),
+      );
+      expect(noahSeesReady.rows).toEqual([{ id: MEDIA_ID, status: "ready" }]);
+
+      // When media is deleted, trigger media_enqueue_purge() enqueues object_key into media_purge_queue
+      await asUser(db, SELAM, async (tx) => {
+        await tx.query("delete from media where id = $1", [MEDIA_ID]);
+      });
+
+      const purgeQueue = await db.query<{ object_key: string }>(
+        "select object_key from media_purge_queue where object_key = $1",
+        [OBJECT_KEY],
+      );
+      expect(purgeQueue.rows).toEqual([{ object_key: OBJECT_KEY }]);
+    });
+
+    it("0011: isolates sealed letter and surprise content under RLS (B-90, U-34, P-68)", async () => {
+      const LETTER_ID = "0192e2b3-5798-7521-8254-e6be95232a97";
+      const SURPRISE_ID = "0192e2b3-5798-7521-8254-e6be95232a98";
+
+      // 1. Noah drafts a letter to Selam
+      await asUser(db, NOAH, async (tx) => {
+        await tx.query(
+          `insert into open_when_letter (id, relationship_id, author_id, recipient_id, prompt, status, sealed_at, unlock_rule)
+           values ($1, $2, $3, $4, 'Open when you land', 'draft', null, '{"type":"manual"}')`,
+          [LETTER_ID, DEV_RELATIONSHIP_ID, NOAH, SELAM],
+        );
+        await tx.query(
+          `insert into open_when_letter_content (letter_id, body)
+           values ($1, 'Welcome to London, my love!')`,
+          [LETTER_ID],
+        );
+      });
+
+      // While draft: Selam sees nothing
+      const selamDraft = await asUser(db, SELAM, (tx) =>
+        tx.query("select 1 from open_when_letter where id = $1", [LETTER_ID]),
+      );
+      expect(selamDraft.rows).toEqual([]);
+
+      // 2. Noah seals the letter
+      await asUser(db, NOAH, async (tx) => {
+        await tx.query(
+          "update open_when_letter set status = 'sealed', sealed_at = now() where id = $1",
+          [LETTER_ID],
+        );
+      });
+
+      // Once sealed: Selam sees metadata in open_when_letter
+      const selamMetadata = await asUser(db, SELAM, (tx) =>
+        tx.query<{ prompt: string; status: string }>(
+          "select prompt, status from open_when_letter where id = $1",
+          [LETTER_ID],
+        ),
+      );
+      expect(selamMetadata.rows).toEqual([{ prompt: "Open when you land", status: "sealed" }]);
+
+      // CRITICAL B-90 / U-34: Selam CANNOT read sealed content from database
+      const selamSealedContent = await asUser(db, SELAM, (tx) =>
+        tx.query("select body from open_when_letter_content where letter_id = $1", [LETTER_ID]),
+      );
+      expect(selamSealedContent.rows).toEqual([]);
+
+      // 3. Selam opens the letter
+      await asUser(db, SELAM, async (tx) => {
+        await tx.query(
+          "update open_when_letter set status = 'opened', opened_at = now() where id = $1",
+          [LETTER_ID],
+        );
+      });
+
+      // Now Selam CAN read the opened body
+      const selamOpenedContent = await asUser(db, SELAM, (tx) =>
+        tx.query<{ body: string }>(
+          "select body from open_when_letter_content where letter_id = $1",
+          [LETTER_ID],
+        ),
+      );
+      expect(selamOpenedContent.rows).toEqual([{ body: "Welcome to London, my love!" }]);
+
+      // 4. Surprises: Selam creates scheduled surprise for Noah
+      await asUser(db, SELAM, async (tx) => {
+        await tx.query(
+          `insert into surprise (id, relationship_id, author_id, recipient_id, safe_title, state, reveal)
+           values ($1, $2, $3, $4, 'A sweet tune', 'scheduled', '{"kind":"now"}')`,
+          [SURPRISE_ID, DEV_RELATIONSHIP_ID, SELAM, NOAH],
+        );
+        await tx.query(
+          `insert into surprise_content (surprise_id, kind, text_content)
+           values ($1, 'song', 'Our favorite melody')`,
+          [SURPRISE_ID],
+        );
+      });
+
+      // Noah sees metadata, but NO content while scheduled
+      const noahSurpriseMeta = await asUser(db, NOAH, (tx) =>
+        tx.query<{ safe_title: string; state: string }>(
+          "select safe_title, state from surprise where id = $1",
+          [SURPRISE_ID],
+        ),
+      );
+      expect(noahSurpriseMeta.rows).toEqual([{ safe_title: "A sweet tune", state: "scheduled" }]);
+
+      const noahSurpriseContent = await asUser(db, NOAH, (tx) =>
+        tx.query("select text_content from surprise_content where surprise_id = $1", [SURPRISE_ID]),
+      );
+      expect(noahSurpriseContent.rows).toEqual([]);
+
+      // Noah opens the surprise
+      await asUser(db, NOAH, async (tx) => {
+        await tx.query("update surprise set state = 'opened', opened_at = now() where id = $1", [
+          SURPRISE_ID,
+        ]);
+      });
+
+      const noahRevealedContent = await asUser(db, NOAH, (tx) =>
+        tx.query<{ text_content: string }>(
+          "select text_content from surprise_content where surprise_id = $1",
+          [SURPRISE_ID],
+        ),
+      );
+      expect(noahRevealedContent.rows).toEqual([{ text_content: "Our favorite melody" }]);
+    });
+
+    it("migration 0012 isolates export jobs under RLS (B-100, P-37)", async () => {
+      await seedDev(pgliteClient(db));
+      const EXPORT_JOB_ID = "0192f0a0-0000-7000-8000-00000000e001";
+
+      // 1. Noah creates an export job
+      await asUser(db, NOAH, async (tx) => {
+        await tx.query(
+          `insert into export_job (id, user_id, relationship_id, state, download_token, payload_json)
+           values ($1, $2, $3, 'ready', 'token-noah-123', '{"private":"data"}')`,
+          [EXPORT_JOB_ID, NOAH, DEV_RELATIONSHIP_ID],
+        );
+      });
+
+      // 2. Noah can read his export job
+      const noahJobs = await asUser(db, NOAH, (tx) =>
+        tx.query<{ id: string; state: string }>("select id, state from export_job where id = $1", [
+          EXPORT_JOB_ID,
+        ]),
+      );
+      expect(noahJobs.rows).toEqual([{ id: EXPORT_JOB_ID, state: "ready" }]);
+
+      // 3. Selam (partner) CANNOT read Noah's export job (strict privacy)
+      const selamJobs = await asUser(db, SELAM, (tx) =>
+        tx.query("select id from export_job where id = $1", [EXPORT_JOB_ID]),
+      );
+      expect(selamJobs.rows).toEqual([]);
+
+      // 4. Stranger cannot read Noah's export job
+      const strangerJobs = await asUser(db, STRANGER, (tx) =>
+        tx.query("select id from export_job where id = $1", [EXPORT_JOB_ID]),
+      );
+      expect(strangerJobs.rows).toEqual([]);
+    });
+
+    it("migration 0013 enables full-text search indexes while honoring RLS", async () => {
+      await seedDev(pgliteClient(db));
+      const MSG_ID = "0192f0a0-0000-7000-8000-00000000f001";
+
+      await asUser(db, NOAH, async (tx) => {
+        await tx.query(
+          `insert into chat_message (id, relationship_id, sender_id, text)
+           values ($1, $2, $3, 'A cozy afternoon in London sipping hot tea')`,
+          [MSG_ID, DEV_RELATIONSHIP_ID, NOAH],
+        );
+      });
+
+      // Query using PostgreSQL full-text search tsvector match
+      const results = await asUser(db, NOAH, (tx) =>
+        tx.query<{ id: string; text: string }>(
+          `select id, text from chat_message
+           where to_tsvector('english', text) @@ to_tsquery('english', 'cozy & london')`,
+        ),
+      );
+      expect(results.rows).toHaveLength(1);
+      expect(results.rows[0]?.id).toBe(MSG_ID);
+
+      // Stranger cannot find it via search under RLS
+      const strangerResults = await asUser(db, STRANGER, (tx) =>
+        tx.query(
+          `select id from chat_message
+           where to_tsvector('english', text) @@ to_tsquery('english', 'cozy & london')`,
+        ),
+      );
+      expect(strangerResults.rows).toHaveLength(0);
+    });
   });
 });

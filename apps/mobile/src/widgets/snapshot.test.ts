@@ -9,12 +9,15 @@ import { createDemoState, DEMO_ME_ID, type DemoState } from "@/data/fixtures/dem
 import { EMPTY_PAIRING } from "@/data/fixtures/demoPairing";
 import { newProfile } from "@/data/fixtures/demoProfile";
 import {
+  buildProductionWidgetSnapshot,
   buildWidgetSnapshot,
   dayPart,
   EMPTY_SNAPSHOT,
   parseWidgetSnapshot,
   WIDGET_SNAPSHOT_KEYS,
+  type ProductionWidgetSession,
 } from "./snapshot";
+import { InMemorySqliteDriver, SqliteStore } from "@/data/sqlite/sqliteStore";
 
 const NOW = Temporal.Instant.from("2026-10-28T17:30:00Z");
 
@@ -98,6 +101,69 @@ describe("widget snapshot (P-73)", () => {
     );
     const extra = parseWidgetSnapshot(JSON.stringify({ ...snap, letterBody: "secret" }));
     expect(JSON.stringify(extra)).not.toContain("secret");
+  });
+});
+
+describe("buildProductionWidgetSnapshot (P-91)", () => {
+  it("builds snapshot from local SQLite tables and active session", async () => {
+    const sqlite = new SqliteStore(new InMemorySqliteDriver());
+    await sqlite.clearAll();
+
+    const session: ProductionWidgetSession = {
+      userId: "usr_ruby",
+      relationshipId: "rel_garnet_0001",
+      mySide: "ruby",
+      partnerSide: "sapphire",
+      myZone: "Africa/Addis_Ababa",
+      partnerZone: "Europe/London",
+      partnerName: "Noah",
+      togetherDate: "2024-01-01",
+      km: 5900,
+    };
+
+    await sqlite.saveConfirmedEntry({
+      id: "entry_1",
+      authorId: "usr_sapphire",
+      kind: "text",
+      body: "Cozy quiet morning",
+      emoji: "☕",
+      mood: "calm",
+      activity: "coffee",
+      place: "London",
+      visibility: "shared",
+      occurredAt: "2026-10-28T08:00:00Z",
+      occurredTimeZone: "Europe/London",
+      sharedAt: "2026-10-28T08:05:00Z",
+      sharedDay: "2026-10-28",
+      version: 1,
+      revealedAt: null,
+      createdAt: "2026-10-28T08:00:00Z",
+      updatedAt: "2026-10-28T08:05:00Z",
+    });
+
+    await sqlite.saveSyncSignal({
+      id: "sig_1",
+      relationshipId: "rel_garnet_0001",
+      senderId: "usr_sapphire",
+      signal: "thought-of-you",
+      createdAt: "2026-10-28T16:00:00Z",
+      respondedAt: null,
+      response: null,
+    });
+
+    const snap = await buildProductionWidgetSnapshot(sqlite, session, NOW);
+    expect(snap.ready).toBe(true);
+    expect(snap.mySide).toBe("ruby");
+    expect(snap.partnerSide).toBe("sapphire");
+    expect(snap.partnerMood).toBe("calm");
+    expect(snap.recentSignal).toBe("thought");
+    expect(snap.km).toBe(5900);
+    expect(snap.togetherDays).toBeGreaterThan(0);
+
+    // Verify zero user free text or partner names leaked into JSON
+    const json = JSON.stringify(snap);
+    expect(json).not.toContain("Noah");
+    expect(json).not.toContain("Cozy quiet morning");
   });
 });
 

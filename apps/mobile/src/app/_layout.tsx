@@ -5,6 +5,7 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { Platform } from "react-native";
+import { API_AREAS_ON } from "@/data/http/config";
 import { useTestingTools } from "@/features/prototype/devTools";
 import { NotificationSync } from "@/notifications/NotificationSync";
 import { PrototypePanel } from "@/features/prototype/PrototypePanel";
@@ -55,7 +56,8 @@ export default function RootLayout() {
   );
 }
 
-/** The ✦ prototype panel, only once testing tools are on (P-75). */
+/** The ✦ prototype panel, only in development when not connected to real API (P-75). */
 function TestingPanel() {
-  return useTestingTools() ? <PrototypePanel /> : null;
+  const tools = useTestingTools();
+  return __DEV__ && !API_AREAS_ON.has("auth") && tools ? <PrototypePanel /> : null;
 }

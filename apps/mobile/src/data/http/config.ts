@@ -4,7 +4,24 @@
  *   EXPO_PUBLIC_API_AREAS=auth,pairing,setup,settings   (areas moved from mock data to the API)
  * Unset, the app runs on mock data only, exactly as before. Areas move one at a time (B1 on).
  */
-export const API_AREAS = ["auth", "pairing", "setup", "settings"] as const;
+export const API_AREAS = [
+  "auth",
+  "pairing",
+  "setup",
+  "settings",
+  "days",
+  "home",
+  "us",
+  "chat",
+  "notifications",
+  "media",
+  "openWhen",
+  "surprises",
+  "events",
+  "memories",
+  "together",
+  "search",
+] as const;
 export type ApiArea = (typeof API_AREAS)[number];
 
 /** A usable http(s) base URL, or null. */
@@ -19,8 +36,9 @@ export function parseApiUrl(raw: string | undefined): string | null {
   }
 }
 
-/** The known areas named in a comma-separated list; unknown names are ignored. */
+/** The known areas named in a comma-separated list, or "all" for every area. */
 export function parseApiAreas(raw: string | undefined): ReadonlySet<ApiArea> {
+  if (raw === "all" || raw === "*") return new Set(API_AREAS);
   const names = (raw ?? "").split(",").map((s) => s.trim());
   return new Set(API_AREAS.filter((a) => names.includes(a)));
 }

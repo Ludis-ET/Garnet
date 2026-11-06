@@ -3,6 +3,7 @@ import { useState } from "react";
 import {
   KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   TextInput,
@@ -56,8 +57,7 @@ export function MediaComposer({
         />
         <SafeAreaView style={styles.fill} edges={["top", "bottom"]}>
           <KeyboardAvoidingView
-            // Both platforms: Android draws edge to edge, so its window never shrinks (P-75).
-            behavior="padding"
+            behavior={Platform.OS === "ios" ? "padding" : undefined}
             style={styles.fill}
           >
             <View style={[styles.row, { padding: spacing.md, gap: spacing.sm }]}>

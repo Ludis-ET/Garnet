@@ -1,4 +1,4 @@
-import { type Href, router } from "expo-router";
+import { router, type Href } from "expo-router";
 import { useEffect, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,

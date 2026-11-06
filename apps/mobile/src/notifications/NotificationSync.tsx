@@ -1,4 +1,4 @@
-import { type Href, router, usePathname } from "expo-router";
+import { router, usePathname, type Href } from "expo-router";
 import { useEffect, useRef } from "react";
 import { AppState } from "react-native";
 import { Temporal } from "temporal-polyfill";

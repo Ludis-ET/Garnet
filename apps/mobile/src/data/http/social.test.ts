@@ -1,3 +1,4 @@
+import type { createHash as createHashFn } from "node:crypto";
 import * as WebBrowser from "expo-web-browser";
 import type { GarnetAuthClient } from "./authClient";
 import { connectProvider, continueWithProvider } from "./social";
@@ -7,7 +8,7 @@ jest.mock("expo-apple-authentication", () => ({
   isAvailableAsync: jest.fn(() => Promise.resolve(false)),
 }));
 jest.mock("expo-crypto", () => {
-  const { createHash } = jest.requireActual<typeof import("node:crypto")>("node:crypto");
+  const { createHash } = jest.requireActual<{ createHash: typeof createHashFn }>("node:crypto");
   return {
     CryptoDigestAlgorithm: { SHA256: "SHA-256" },
     getRandomBytes: (n: number) => new Uint8Array(n).fill(7),
@@ -30,7 +31,7 @@ function server(status: number, body: unknown = { url: "https://accounts.google.
   const fetchMock = jest.fn(() =>
     Promise.resolve({ status, json: () => Promise.resolve(body) } as Response),
   );
-  global.fetch = fetchMock as unknown as typeof fetch;
+  global.fetch = fetchMock;
   return fetchMock;
 }
 
@@ -40,7 +41,8 @@ function sent(fetchMock: jest.Mock): {
   body: Record<string, string>;
 } {
   const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-  return { url, init, body: JSON.parse(String(init.body)) as Record<string, string> };
+  const rawBody = typeof init.body === "string" ? init.body : "";
+  return { url, init, body: JSON.parse(rawBody) as Record<string, string> };
 }
 
 beforeEach(() => {
@@ -58,9 +60,9 @@ describe("continuing with Google in the browser (P-79)", () => {
     expect(url).toBe(`${BASE}/v1/auth/sign-in/social`);
     expect(init.credentials).toBe("omit");
     expect((init.headers as Record<string, string>)["x-garnet-client"]).toBe("app");
-    const challenge = new URL(body["callbackURL"] ?? "").searchParams.get("challenge") ?? "";
+    const challenge = new URL(body.callbackURL ?? "").searchParams.get("challenge") ?? "";
     expect(challenge).toMatch(/^[A-Za-z0-9_-]{43}$/);
-    expect(body["errorCallbackURL"]).toBe(`${BASE}/v1/auth/app-handoff/failed`);
+    expect(body.errorCallbackURL).toBe(`${BASE}/v1/auth/app-handoff/failed`);
 
     const [proxy, back] = open.mock.calls[0] ?? [];
     expect(proxy).toBe(
@@ -70,12 +72,12 @@ describe("continuing with Google in the browser (P-79)", () => {
 
     const [path, options] = redeem.mock.calls[0] as [string, { body: Record<string, string> }];
     expect(path).toBe("/app-handoff/redeem");
-    expect(options.body["code"]).toBe("one-time");
+    expect(options.body.code).toBe("one-time");
     // The verifier hashes to the challenge sent first, and never left in the sign-in request.
-    const verifier = options.body["verifier"] ?? "";
+    const verifier = options.body.verifier ?? "";
     expect(verifier).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(JSON.stringify(body)).not.toContain(verifier);
-    const { createHash } = jest.requireActual<typeof import("node:crypto")>("node:crypto");
+    const { createHash } = jest.requireActual<{ createHash: typeof createHashFn }>("node:crypto");
     expect(createHash("sha256").update(verifier).digest("base64url")).toBe(challenge);
   });
 
@@ -109,7 +111,7 @@ describe("continuing with Google in the browser (P-79)", () => {
   });
 
   it("survives no connection and a bad answer", async () => {
-    global.fetch = jest.fn(() => Promise.reject(new Error("offline"))) as unknown as typeof fetch;
+    global.fetch = jest.fn(() => Promise.reject(new Error("offline")));
     expect(await continueWithProvider(client, BASE, "google")).toEqual({
       ok: false,
       reason: "failed",
@@ -139,8 +141,8 @@ describe("connecting Google to this account (P-80)", () => {
     expect(await connectProvider(client, BASE, "google")).toEqual({ ok: true });
     const { url, init, body } = sent(fetchMock);
     expect(url).toBe(`${BASE}/v1/auth/link-social`);
-    expect((init.headers as Record<string, string>)["cookie"]).toContain("session_token");
-    expect(body["callbackURL"]).toBe(`${BASE}/v1/auth/app-handoff/linked`);
+    expect((init.headers as Record<string, string>).cookie).toContain("session_token");
+    expect(body.callbackURL).toBe(`${BASE}/v1/auth/app-handoff/linked`);
     expect(redeem).not.toHaveBeenCalled();
   });
 

@@ -12,6 +12,8 @@ import type { Mailer } from "../src/auth/mailer";
 import { hashPassword } from "../src/auth/password";
 import type { AuthPolicy, SocialConfig } from "../src/config";
 import type { Database } from "../src/db/database";
+import { InMemoryPushSender } from "../src/notifications/push-sender";
+import { InMemoryObjectStorage } from "../src/media/storage/object-storage";
 import { pglitePool } from "./pglite-pool";
 
 export const STRANGER = {
@@ -60,6 +62,10 @@ export interface TestApi {
   cookies: { selam: string; noah: string; stranger: string; revoked: string; expired: string };
   /** Every email the API sent, oldest first. */
   mail: SentMail[];
+  /** In-memory push sender capturing pushed notices. */
+  pushSender: InMemoryPushSender;
+  /** In-memory object storage capturing uploaded files. */
+  objectStorage: InMemoryObjectStorage;
   /** "METHOD /pattern" for every route the API registered. */
   routes: string[];
   /** Every log line the API wrote, parsed. */
@@ -67,7 +73,7 @@ export interface TestApi {
   inject(options: InjectOptions): Promise<LightMyRequestResponse>;
   /** A request as the app sends it: the app header, its origin, JSON, and a session cookie. */
   call(
-    method: "GET" | "POST" | "PATCH" | "DELETE",
+    method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE",
     url: string,
     options?: {
       cookie?: string;
@@ -164,6 +170,8 @@ export async function startTestApi(
   });
   const logs: Record<string, unknown>[] = [];
   const routes: string[] = [];
+  const pushSender = new InMemoryPushSender();
+  const objectStorage = new InMemoryObjectStorage();
   const auth = createAuth({
     database: { dialect: new PostgresDialect({ pool: pglitePool(db) }), type: "postgres" },
     secret: "test-secret-test-secret-test-secret-00",
@@ -177,6 +185,8 @@ export async function startTestApi(
     db: kysely,
     auth,
     policy,
+    pushSender,
+    objectStorage,
     ...(options.social === undefined ? {} : { social: options.social }),
     logLevel: "info",
     logStream: {
@@ -246,6 +256,8 @@ export async function startTestApi(
     auth,
     cookies: { selam, noah, stranger, revoked, expired },
     mail,
+    pushSender,
+    objectStorage,
     routes,
     logs,
     inject,

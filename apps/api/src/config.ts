@@ -106,7 +106,13 @@ export interface ApiConfig {
 }
 
 export function readConfig(env: Readonly<Record<string, string | undefined>>): ApiConfig {
-  const parsed = schema.safeParse(env);
+  const normalized = {
+    ...env,
+    ...(env["PORT"] !== undefined && env["GARNET_API_PORT"] === undefined
+      ? { GARNET_API_PORT: env["PORT"] }
+      : {}),
+  };
+  const parsed = schema.safeParse(normalized);
   if (!parsed.success) {
     const names = [...new Set(parsed.error.issues.map((i) => i.path.join(".")))].join(", ");
     throw new Error(`Invalid or missing configuration: ${names}`);

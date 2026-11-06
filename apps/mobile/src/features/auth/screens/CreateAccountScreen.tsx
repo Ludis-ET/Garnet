@@ -193,7 +193,7 @@ export function CreateAccountScreen() {
             label="Display name"
             placeholder="Your name"
             large
-            autoFocus
+            autoFocus={Platform.OS === "ios"}
             value={form.displayName}
             onChangeText={set("displayName")}
             autoComplete="name"
@@ -213,7 +213,7 @@ export function CreateAccountScreen() {
               label="Email"
               placeholder="you@example.com"
               large
-              autoFocus
+              autoFocus={Platform.OS === "ios"}
               value={form.email}
               onChangeText={set("email")}
               keyboardType="email-address"
