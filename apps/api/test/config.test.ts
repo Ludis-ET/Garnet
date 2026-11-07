@@ -100,4 +100,30 @@ describe("API configuration", () => {
   it("refuses to start with Better Auth's telemetry switched on (AGENTS.md §5)", () => {
     expect(errorOf({ ...ENV, BETTER_AUTH_TELEMETRY: "1" })).toMatch(/BETTER_AUTH_TELEMETRY/);
   });
+
+  it("configures S3/R2 storage when all required credentials are set (P-76, U-07)", () => {
+    const s3 = {
+      GARNET_S3_ENDPOINT: "https://3e6d6c75647cf0fa9065b6c77ba698b1.r2.cloudflarestorage.com",
+      GARNET_S3_ACCESS_KEY_ID: "test-access-key",
+      GARNET_S3_SECRET_ACCESS_KEY: "test-secret-key",
+      GARNET_MEDIA_BUCKET: "my-bucket",
+    };
+    expect(readConfig({ ...ENV, ...s3 }).storage).toEqual({
+      endpoint: "https://3e6d6c75647cf0fa9065b6c77ba698b1.r2.cloudflarestorage.com",
+      region: "auto",
+      accessKeyId: "test-access-key",
+      secretAccessKey: "test-secret-key",
+      bucket: "my-bucket",
+    });
+    expect(readConfig(ENV).storage).toBeUndefined();
+
+    // Partial config must be rejected
+    expect(
+      errorOf({
+        ...ENV,
+        GARNET_S3_ENDPOINT: "https://3e6d6c75647cf0fa9065b6c77ba698b1.r2.cloudflarestorage.com",
+      }),
+    ).toMatch(/GARNET_S3_ENDPOINT/);
+    expect(errorOf({ ...ENV, GARNET_S3_ACCESS_KEY_ID: "key" })).toMatch(/GARNET_S3_ENDPOINT/);
+  });
 });

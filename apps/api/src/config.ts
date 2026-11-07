@@ -54,6 +54,13 @@ const schema = z
     /** The iPhone app's bundle id, for Sign in with Apple on the phone itself. */
     GARNET_APPLE_BUNDLE_ID: z.string().min(1).optional(),
 
+    // S3-compatible media storage (Cloudflare R2, AWS S3, SeaweedFS) (P-76, U-07)
+    GARNET_S3_ENDPOINT: z.url().optional(),
+    GARNET_S3_REGION: z.string().min(1).default("auto"),
+    GARNET_S3_ACCESS_KEY_ID: z.string().min(1).optional(),
+    GARNET_S3_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+    GARNET_MEDIA_BUCKET: z.string().min(1).default("garnet-media"),
+
     /** Better Auth's telemetry must stay off (AGENTS.md §5: no analytics). */
     BETTER_AUTH_TELEMETRY: z.undefined({ error: "must not be set" }).optional(),
   })
@@ -76,7 +83,30 @@ const schema = z
       path: ["GARNET_APPLE_CLIENT_SECRET"],
       error: "set both Apple values or neither",
     },
+  )
+  .refine(
+    (c) =>
+      (c.GARNET_S3_ENDPOINT === undefined &&
+        c.GARNET_S3_ACCESS_KEY_ID === undefined &&
+        c.GARNET_S3_SECRET_ACCESS_KEY === undefined) ||
+      (c.GARNET_S3_ENDPOINT !== undefined &&
+        c.GARNET_S3_ACCESS_KEY_ID !== undefined &&
+        c.GARNET_S3_SECRET_ACCESS_KEY !== undefined),
+    {
+      path: ["GARNET_S3_ENDPOINT"],
+      error:
+        "set all of GARNET_S3_ENDPOINT, GARNET_S3_ACCESS_KEY_ID, and GARNET_S3_SECRET_ACCESS_KEY, or none",
+    },
   );
+
+/** S3 / Cloudflare R2 storage configuration for media (P-76, U-07). */
+export interface StorageConfig {
+  endpoint: string;
+  region: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  bucket: string;
+}
 
 /** Google and Apple sign-in, when configured (P-79). */
 export interface SocialConfig {
@@ -103,6 +133,7 @@ export interface ApiConfig {
   logLevel: z.infer<typeof schema>["GARNET_API_LOG_LEVEL"];
   auth: { secret: string; baseUrl: string; policy: AuthPolicy; social: SocialConfig };
   mail: { smtpUrl: string; from: string };
+  storage?: StorageConfig;
 }
 
 export function readConfig(env: Readonly<Record<string, string | undefined>>): ApiConfig {
@@ -160,5 +191,16 @@ export function readConfig(env: Readonly<Record<string, string | undefined>>): A
       },
     },
     mail: { smtpUrl: c.GARNET_SMTP_URL, from: c.GARNET_MAIL_FROM },
+    ...(c.GARNET_S3_ENDPOINT && c.GARNET_S3_ACCESS_KEY_ID && c.GARNET_S3_SECRET_ACCESS_KEY
+      ? {
+          storage: {
+            endpoint: c.GARNET_S3_ENDPOINT,
+            region: c.GARNET_S3_REGION,
+            accessKeyId: c.GARNET_S3_ACCESS_KEY_ID,
+            secretAccessKey: c.GARNET_S3_SECRET_ACCESS_KEY,
+            bucket: c.GARNET_MEDIA_BUCKET,
+          },
+        }
+      : {}),
   };
 }

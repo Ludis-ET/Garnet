@@ -5,6 +5,7 @@ import { createAuth } from "./auth/auth";
 import { createMailer } from "./auth/mailer";
 import { readConfig } from "./config";
 import type { Database } from "./db/database";
+import { InMemoryObjectStorage, S3ObjectStorage } from "./media/storage/object-storage";
 
 // Starts the API (local only until U-07): `pnpm --filter @garnet/api dev`, settings from
 // apps/api/.env (see .env.example and infra/README.md).
@@ -37,9 +38,19 @@ async function startApi(): Promise<void> {
     },
   });
 
+  const objectStorage = config.storage
+    ? new S3ObjectStorage({
+        endpoint: config.storage.endpoint,
+        region: config.storage.region,
+        accessKeyId: config.storage.accessKeyId,
+        secretAccessKey: config.storage.secretAccessKey,
+      })
+    : new InMemoryObjectStorage();
+
   const app = await createApp({
     db,
     auth,
+    objectStorage,
     policy: config.auth.policy,
     social: config.auth.social,
     logLevel: config.logLevel,

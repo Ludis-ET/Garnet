@@ -124,12 +124,13 @@ GARNET_INVITE_TTL_HOURS=24
 GARNET_SMTP_URL=smtps://noreply%40garnet.lunafh.com:YourEmailPassword@cosmopolitan.hostns.io:465
 GARNET_MAIL_FROM="Garnet <noreply@garnet.lunafh.com>"
 
-# 6. Media Storage (Cloudflare R2 or AWS S3)
-GARNET_MEDIA_STORAGE=s3
-GARNET_S3_ENDPOINT=https://your-account-id.r2.cloudflarestorage.com
+# 6. Media Storage (Cloudflare R2 - S3 API)
+# Cloudflare S3 Endpoint: https://<account_id>.r2.cloudflarestorage.com
+# API Token: Cloudflare Dashboard > R2 > Manage R2 API Tokens (Object Read & Write)
+GARNET_S3_ENDPOINT=https://3e6d6c75647cf0fa9065b6c77ba698b1.r2.cloudflarestorage.com
 GARNET_S3_REGION=auto
-GARNET_S3_ACCESS_KEY_ID=your-r2-or-s3-access-key-id
-GARNET_S3_SECRET_ACCESS_KEY=your-r2-or-s3-secret-access-key
+GARNET_S3_ACCESS_KEY_ID=your-r2-access-key-id
+GARNET_S3_SECRET_ACCESS_KEY=your-r2-secret-access-key
 GARNET_MEDIA_BUCKET=garnet-media
 
 # 7. Google OAuth Sign-In (Optional)
