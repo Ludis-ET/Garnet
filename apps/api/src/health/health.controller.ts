@@ -8,8 +8,8 @@ import { KYSELY, type Database } from "../db/database";
 /** How long health waits for the database before calling it unavailable. */
 const DB_TIMEOUT_MS = 2000;
 
-/** `GET /v1/health` (public): the API is up, and whether its database answers. */
-@Controller("v1/health")
+/** `GET /v1/health` or `GET /health` (public): the API is up, and whether its database answers. */
+@Controller(["v1/health", "health"])
 export class HealthController {
   constructor(@Inject(KYSELY) private readonly db: Kysely<Database>) {}
 
