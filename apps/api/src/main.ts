@@ -1,3 +1,5 @@
+import { existsSync, readFileSync } from "node:fs";
+import { URL } from "node:url";
 import { Kysely, PostgresDialect } from "kysely";
 import pg from "pg";
 import { createApp } from "./app";
@@ -7,9 +9,50 @@ import { readConfig } from "./config";
 import type { Database } from "./db/database";
 import { InMemoryObjectStorage, S3ObjectStorage } from "./media/storage/object-storage";
 
+function loadEnv(): void {
+  const envPath = new URL("./.env", import.meta.url);
+  if (!existsSync(envPath)) return;
+  try {
+    if (
+      typeof (process as unknown as { loadEnvFile?: (path: URL) => void }).loadEnvFile ===
+      "function"
+    ) {
+      (process as unknown as { loadEnvFile: (path: URL) => void }).loadEnvFile(envPath);
+      return;
+    }
+  } catch {
+    // Fall back to manual parsing
+  }
+  try {
+    const content = readFileSync(envPath, "utf-8");
+    for (const line of content.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const eqIdx = trimmed.indexOf("=");
+      if (eqIdx === -1) continue;
+      const key = trimmed.slice(0, eqIdx).trim();
+      let val = trimmed.slice(eqIdx + 1).trim();
+      if (
+        (val.startsWith('"') && val.endsWith('"')) ||
+        (val.startsWith("'") && val.endsWith("'"))
+      ) {
+        val = val.slice(1, -1);
+      }
+      if (!(key in process.env)) {
+        process.env[key] = val;
+      }
+    }
+  } catch {
+    // Ignore error
+  }
+}
+
 // Starts the API (local only until U-07): `pnpm --filter @garnet/api dev`, settings from
 // apps/api/.env (see .env.example and infra/README.md).
 async function startApi(): Promise<void> {
+  if (!process.env["GARNET_API_DATABASE_URL"]) {
+    loadEnv();
+  }
   const config = readConfig(process.env);
 
   // One pool, as the API's own role: requests switch to garnet_app (RLS); Better Auth's queries
