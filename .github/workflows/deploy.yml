@@ -43,10 +43,13 @@ jobs:
           # 1. Compile API and migration runner into apps/api/dist
           pnpm --filter @garnet/api run build
 
-          # 2. Deploy isolated production node_modules for @garnet/api
+          # 2. Prepare standalone deployment bundle with flat production dependencies (no symlinks)
           rm -rf deploy-bundle
           mkdir -p deploy-bundle
-          pnpm --filter @garnet/api deploy --legacy --prod deploy-bundle
+          cp apps/api/dist/package.json deploy-bundle/package.json
+          cd deploy-bundle
+          npm install --omit=dev --no-audit --no-fund
+          cd ..
 
           # 3. Copy compiled dist artifacts & passenger app.js into the deployment bundle
           cp -r apps/api/dist deploy-bundle/dist
