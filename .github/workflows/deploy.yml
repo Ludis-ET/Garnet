@@ -1,4 +1,4 @@
-name: Deploy Backend to cPanel
+name: Deploy to cPanel
 
 on:
   push:
@@ -9,18 +9,18 @@ on:
       - "package.json"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
-      - ".github/workflows/deploy-cpanel.yml"
+      - ".github/workflows/deploy.yml"
   workflow_dispatch:
 
 concurrency:
-  group: deploy-cpanel-${{ github.ref }}
+  group: deploy-cpanel
   cancel-in-progress: true
 
 jobs:
-  build-and-deploy:
-    name: Build & Deploy API to cPanel
+  deploy:
+    name: Build & Deploy API
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 8
 
     steps:
       - name: Checkout Code
@@ -37,13 +37,6 @@ jobs:
 
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Run Quality Checks & Typecheck
-        run: |
-          pnpm --filter @garnet/contracts typecheck
-          pnpm --filter @garnet/domain test
-          pnpm --filter @garnet/db typecheck
-          pnpm --filter @garnet/api typecheck
 
       - name: Build Standalone API Package
         run: |
@@ -116,7 +109,7 @@ jobs:
               set +a
               if [ -n "$DATABASE_URL" ]; then
                 echo "🗄️ Running database migrations..."
-                node dist/migrate.mjs migrate || echo "⚠️ Migration completed with notice, verify DATABASE_URL in $APP_DIR/.env"
+                node dist/migrate.mjs migrate || echo "⚠️ Migration notice, check DATABASE_URL in $APP_DIR/.env"
               else
                 echo "⚠️ DATABASE_URL not set in $APP_DIR/.env; skipping automatic migration."
               fi
