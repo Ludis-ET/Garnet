@@ -36,6 +36,19 @@ async function sha256Base64Url(text: string): Promise<string> {
  * receives a one-time code in the garnet:// link, and trades code + verifier for the session.
  * Someone who catches the link can't use it.
  */
+function getWebOrigin(): string {
+  if (Platform.OS !== "web") return "";
+  try {
+    const loc =
+      typeof window !== "undefined"
+        ? (window as unknown as { location?: { origin?: string } }).location
+        : undefined;
+    return typeof loc?.origin === "string" ? loc.origin : "";
+  } catch {
+    return "";
+  }
+}
+
 async function inBrowser(
   client: GarnetAuthClient,
   baseUrl: string,
@@ -45,10 +58,7 @@ async function inBrowser(
   const verifier = randomSecret();
   const challenge = await sha256Base64Url(verifier);
   const isWeb = Platform.OS === "web";
-  const webOrigin =
-    typeof window !== "undefined" && typeof window.location.origin === "string"
-      ? window.location.origin
-      : "";
+  const webOrigin = getWebOrigin();
   const callbackTarget = isWeb && webOrigin ? webOrigin : APP_CALLBACK;
   const callbackQuery = isWeb && webOrigin ? `&redirect_to=${encodeURIComponent(webOrigin)}` : "";
   const start = await fetch(`${auth}/sign-in/social`, {
