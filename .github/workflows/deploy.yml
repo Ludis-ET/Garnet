@@ -69,6 +69,7 @@ jobs:
           host: ${{ steps.server-info.outputs.host }}
           username: ${{ secrets.USERNAME }}
           password: ${{ secrets.PASSWORD }}
+          key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.PORT || 22 }}
           overwrite: true
           source: "api-release.tar.gz"
@@ -80,6 +81,7 @@ jobs:
           host: ${{ steps.server-info.outputs.host }}
           username: ${{ secrets.USERNAME }}
           password: ${{ secrets.PASSWORD }}
+          key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.PORT || 22 }}
           script_stop: true
           script: |
