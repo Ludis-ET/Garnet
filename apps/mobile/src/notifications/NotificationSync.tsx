@@ -1,4 +1,4 @@
-import { router, usePathname } from "expo-router";
+import { router, usePathname, type Href } from "expo-router";
 import { useEffect, useRef } from "react";
 import { AppState } from "react-native";
 import { Temporal } from "temporal-polyfill";
@@ -47,7 +47,7 @@ export function NotificationSync() {
   useEffect(() => {
     if (!notificationsSupported()) return;
     return onOpen((href) => {
-      router.push(href);
+      router.push(href as Href);
     });
   }, []);
 

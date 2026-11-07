@@ -15,19 +15,36 @@ import { CLIENT_HEADER } from "./client";
  * the model. Only the person themselves ever sees it.
  */
 function deviceAgent(): string {
+  if (Platform.OS === "web") return "Garnet (Web)";
   if (Platform.OS === "ios") return "Garnet (iOS)";
-  const model = (Platform.constants as { Model?: unknown }).Model;
+  const constants = Platform.constants as { Model?: unknown } | undefined;
+  const model = constants?.Model;
   return typeof model === "string" ? `Garnet (Android; ${model})` : "Garnet (Android)";
 }
 
+const webStorage = {
+  getItem: (key: string): string | null =>
+    typeof localStorage !== "undefined" ? localStorage.getItem(key) : null,
+  setItem: (key: string, value: string): void => {
+    if (typeof localStorage !== "undefined") localStorage.setItem(key, value);
+  },
+  getItemAsync: (key: string): Promise<string | null> =>
+    Promise.resolve(typeof localStorage !== "undefined" ? localStorage.getItem(key) : null),
+  setItemAsync: (key: string, value: string): Promise<void> => {
+    if (typeof localStorage !== "undefined") localStorage.setItem(key, value);
+    return Promise.resolve();
+  },
+};
+
 export function createGarnetAuthClient(baseURL: string) {
+  const storage = Platform.OS === "web" ? webStorage : SecureStore;
   return createAuthClient({
     baseURL,
     basePath: "/v1/auth",
     fetchOptions: {
       headers: { [CLIENT_HEADER.name]: CLIENT_HEADER.value, "user-agent": deviceAgent() },
     },
-    plugins: [expoClient({ scheme: "garnet", storagePrefix: "garnet", storage: SecureStore })],
+    plugins: [expoClient({ scheme: "garnet", storagePrefix: "garnet", storage })],
   });
 }
 
