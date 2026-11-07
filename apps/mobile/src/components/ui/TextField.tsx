@@ -1,5 +1,5 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useState, type Ref } from "react";
+import { useEffect, useRef, useState, type Ref } from "react";
 import {
   Platform,
   Pressable,
@@ -105,8 +105,17 @@ export function TextField({
   const glow = invalid ? colors.danger : colors.accent;
   const tint = invalid ? colors.danger : focused ? colors.accent : null;
 
+  const localRef = useRef<TextInput>(null);
+  const inputRef = ref && typeof ref === "object" ? ref : localRef;
+
   const field = (
-    <View style={[styles.box, { opacity: disabled ? 0.6 : 1 }]}>
+    <Pressable
+      onPress={() => {
+        if (!disabled) inputRef.current?.focus();
+      }}
+      style={[styles.box, { opacity: disabled ? 0.6 : 1 }]}
+      accessible={false}
+    >
       {icon === undefined ? null : (
         <View style={[styles.lead, { paddingLeft: spacing.lg }]}>
           <Icon name={icon} size={19} color={tint ?? colors.textTertiary} />
@@ -123,7 +132,7 @@ export function TextField({
           </AppText>
         ) : null}
         <TextInput
-          ref={ref}
+          ref={ref ?? inputRef}
           {...input}
           editable={!disabled}
           secureTextEntry={secure && !revealed}
@@ -195,7 +204,7 @@ export function TextField({
           <Icon name={revealed ? "eye-off" : "eye"} color={colors.textSecondary} />
         </Pressable>
       ) : null}
-    </View>
+    </Pressable>
   );
 
   const message = invalid ? (

@@ -75,7 +75,7 @@ export function GlassScreen({
               },
             ]}
             keyboardShouldPersistTaps="handled"
-            keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+            keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "none"}
             showsVerticalScrollIndicator={false}
           >
             <View

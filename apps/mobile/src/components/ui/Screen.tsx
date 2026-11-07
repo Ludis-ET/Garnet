@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ScrollView, StyleSheet, View, type ViewStyle } from "react-native";
+import { Platform, ScrollView, StyleSheet, View, type ViewStyle } from "react-native";
 import { SafeAreaView, type Edge } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useTheme } from "@/theme/ThemeProvider";
@@ -28,7 +28,7 @@ export function Screen({
         <ScrollView
           contentContainerStyle={[padding, contentStyle]}
           keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="interactive"
+          keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "none"}
         >
           {children}
         </ScrollView>
