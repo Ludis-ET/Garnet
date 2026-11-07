@@ -20,6 +20,9 @@ await build({
   format: "esm",
   target: "node22",
   outfile: resolve(distDir, "main.mjs"),
+  banner: {
+    js: "import { createRequire as __createRequire } from 'node:module'; const require = __createRequire(import.meta.url);",
+  },
   external: ["@nestjs/*", "fastify", "pg", "rxjs", "reflect-metadata"],
 });
 
@@ -31,6 +34,9 @@ await build({
   format: "esm",
   target: "node22",
   outfile: resolve(distDir, "migrate.mjs"),
+  banner: {
+    js: "import { createRequire as __createRequire } from 'node:module'; const require = __createRequire(import.meta.url);",
+  },
   external: ["pg"],
 });
 
