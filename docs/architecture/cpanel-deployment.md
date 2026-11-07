@@ -107,7 +107,7 @@ GARNET_API_LOG_LEVEL=info
 # 3. Authentication & Sessions
 # Generate a secret: node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
 GARNET_AUTH_SECRET=replace_with_a_random_32_character_string
-GARNET_AUTH_BASE_URL=https://api.yourdomain.com
+GARNET_AUTH_BASE_URL=https://garnet.lunafh.com
 
 # 4. Security & Account Policies
 GARNET_PASSWORD_MIN_LENGTH=15
@@ -120,9 +120,9 @@ GARNET_VERIFY_TOKEN_MINUTES=1440
 GARNET_RESET_TOKEN_MINUTES=30
 GARNET_INVITE_TTL_HOURS=24
 
-# 5. Email (cPanel Mail Account)
-GARNET_SMTP_URL=smtps://hello%40yourdomain.com:YourEmailPassword@mail.yourdomain.com:465
-GARNET_MAIL_FROM=Garnet <hello@yourdomain.com>
+# 5. Email (cPanel Mail Account - cosmopolitan.hostns.io:465)
+GARNET_SMTP_URL=smtps://noreply%40garnet.lunafh.com:YourEmailPassword@cosmopolitan.hostns.io:465
+GARNET_MAIL_FROM="Garnet <noreply@garnet.lunafh.com>"
 
 # 6. Media Storage (Cloudflare R2 or AWS S3)
 GARNET_MEDIA_STORAGE=s3
