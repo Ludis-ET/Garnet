@@ -39,11 +39,15 @@ async function main(): Promise<void> {
   }
 }
 
-await client.connect();
-try {
-  await main();
-} catch (error) {
-  fail(error instanceof Error ? error.message : "Failed.");
-} finally {
-  await client.end();
+async function run(): Promise<void> {
+  await client.connect();
+  try {
+    await main();
+  } catch (error) {
+    fail(error instanceof Error ? error.message : "Failed.");
+  } finally {
+    await client.end();
+  }
 }
+
+void run();
