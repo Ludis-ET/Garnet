@@ -52,83 +52,26 @@ jobs:
           cp -r apps/api/dist deploy-bundle/dist
           cp apps/api/app.js deploy-bundle/app.js
 
-          # 4. Pack into a single compact archive inside the workspace
-          tar -czf api-release.tar.gz -C deploy-bundle .
+          # 4. Create Passenger restart signal so the app reloads on upload
+          mkdir -p deploy-bundle/tmp
+          date -u > deploy-bundle/tmp/restart.txt
 
       - name: Prepare Server Host
         id: server-info
         run: |
           RAW_SERVER="${{ secrets.SERVER }}"
-          # Clean protocol (https://), trailing slashes, paths, ports and whitespace
+          # Clean protocol (https://, ftp://), trailing slashes, paths, ports and whitespace
           CLEAN_SERVER=$(echo "$RAW_SERVER" | sed -E 's|^[a-zA-Z]+://||' | sed -E 's|/.*$||' | sed -E 's|:[0-9]+$||' | tr -d ' \r\n\t')
           echo "host=$CLEAN_SERVER" >> "$GITHUB_OUTPUT"
 
-      - name: Upload Release to cPanel via SCP
-        uses: appleboy/scp-action@v0.1.7
+      - name: Sync Release to cPanel via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
-          host: ${{ steps.server-info.outputs.host }}
+          server: ${{ steps.server-info.outputs.host }}
           username: ${{ secrets.USERNAME }}
           password: ${{ secrets.PASSWORD }}
-          key: ${{ secrets.SSH_KEY }}
-          port: ${{ secrets.PORT || 22 }}
-          overwrite: true
-          source: "api-release.tar.gz"
-          target: "/home/${{ secrets.USERNAME }}/"
-
-      - name: Extract, Migrate & Restart on cPanel via SSH
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ steps.server-info.outputs.host }}
-          username: ${{ secrets.USERNAME }}
-          password: ${{ secrets.PASSWORD }}
-          key: ${{ secrets.SSH_KEY }}
-          port: ${{ secrets.PORT || 22 }}
-          script_stop: true
-          script: |
-            set -e
-            APP_DIR="/home/${{ secrets.USERNAME }}/garnet-api"
-            ARCHIVE="/home/${{ secrets.USERNAME }}/api-release.tar.gz"
-
-            echo "📦 Preparing application directory at $APP_DIR..."
-            mkdir -p "$APP_DIR"
-
-            echo "📂 Extracting release archive..."
-            tar -xzf "$ARCHIVE" -C "$APP_DIR"
-            rm -f "$ARCHIVE"
-
-            cd "$APP_DIR"
-
-            # Detect node in common cPanel locations if not on PATH
-            if ! command -v node >/dev/null 2>&1; then
-              if [ -d "$HOME/.nvm" ]; then
-                export NVM_DIR="$HOME/.nvm"
-                [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-              fi
-            fi
-            if ! command -v node >/dev/null 2>&1; then
-              CPANEL_NODE=$(find "$HOME/nodevenv" -name node -type f 2>/dev/null | head -n 1)
-              if [ -n "$CPANEL_NODE" ]; then
-                export PATH="$(dirname "$CPANEL_NODE"):$PATH"
-              fi
-            fi
-            echo "Using node: $(command -v node || echo 'not found')"
-
-            if [ -f "$APP_DIR/.env" ]; then
-              set -a
-              . "$APP_DIR/.env"
-              set +a
-              if [ -n "$DATABASE_URL" ]; then
-                echo "🗄️ Running database migrations..."
-                node dist/migrate.mjs migrate || echo "⚠️ Migration notice, check DATABASE_URL in $APP_DIR/.env"
-              else
-                echo "⚠️ DATABASE_URL not set in $APP_DIR/.env; skipping automatic migration."
-              fi
-            else
-              echo "⚠️ $APP_DIR/.env not found. Please create it with DATABASE_URL and secrets."
-            fi
-
-            echo "🔄 Restarting Phusion Passenger application..."
-            mkdir -p "$APP_DIR/tmp"
-            touch "$APP_DIR/tmp/restart.txt"
-
-            echo "✅ Garnet API deployed and restarted successfully!"
+          port: ${{ secrets.PORT || 21 }}
+          protocol: ftp
+          server-dir: ${{ secrets.FTP_DIR || 'garnet-api/' }}
+          local-dir: ./deploy-bundle/
+          dangerous-clean-slate: false
