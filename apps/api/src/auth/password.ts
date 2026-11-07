@@ -1,11 +1,28 @@
-import { verifyPassword as verifyScrypt } from "better-auth/crypto";
-import { argon2, randomBytes, timingSafeEqual } from "node:crypto";
+import { hashPassword as scryptHash, verifyPassword as verifyScrypt } from "better-auth/crypto";
+import * as crypto from "node:crypto";
+
+const { randomBytes, timingSafeEqual } = crypto;
+
+type Argon2Fn = (
+  type: "argon2id",
+  options: {
+    message: string;
+    nonce: Buffer;
+    memory: number;
+    passes: number;
+    parallelism: number;
+    tagLength: number;
+  },
+  callback: (error: Error | null, key: Buffer) => void,
+) => void;
+
+/** Node 24.7+ exports built-in argon2 on node:crypto; on Node 20/22 it is undefined (U-07). */
+const nodeArgon2: Argon2Fn | undefined = (crypto as unknown as { argon2?: Argon2Fn }).argon2;
 
 /**
  * Password hashing (P-78, ADR-0006): Argon2id from Node's own crypto (Node 24.7 or later, no
- * native add-on), with OWASP's baseline parameters (19 MiB, 2 passes, 1 lane). Retune them on
- * the real host when hosting is chosen (U-07); stored hashes carry their own parameters, so old
- * ones keep verifying after a change.
+ * native add-on), with OWASP's baseline parameters (19 MiB, 2 passes, 1 lane). When hosting on
+ * Node < 24.7 (U-07), falls back safely to Better Auth's standard scrypt algorithm.
  *
  * Stored as a PHC string: $argon2id$v=19$m=19456,t=2,p=1$<salt>$<hash> (base64, no padding).
  * Passwords are NFKC-normalised first (NIST SP 800-63B-4), so the same password typed on two
@@ -29,8 +46,11 @@ interface Params {
 const b64 = (b: Buffer) => b.toString("base64").replace(/=+$/, "");
 
 function derive(password: string, nonce: Buffer, p: Params): Promise<Buffer> {
+  if (!nodeArgon2) {
+    return Promise.reject(new Error("Node built-in argon2 is not available on this Node runtime"));
+  }
   return new Promise((resolve, reject) => {
-    argon2("argon2id", { message: password.normalize("NFKC"), nonce, ...p }, (error, key) => {
+    nodeArgon2("argon2id", { message: password.normalize("NFKC"), nonce, ...p }, (error, key) => {
       if (error === null) resolve(key);
       else reject(error);
     });
@@ -38,6 +58,10 @@ function derive(password: string, nonce: Buffer, p: Params): Promise<Buffer> {
 }
 
 export async function hashPassword(password: string): Promise<string> {
+  if (!nodeArgon2) {
+    // Hosting compatibility (Node < 24.7, U-07): use Better Auth's standard scrypt hash
+    return scryptHash(password);
+  }
   const salt = randomBytes(SALT_BYTES);
   const key = await derive(password, salt, ARGON2ID);
   const { memory: m, passes: t, parallelism: p } = ARGON2ID;
@@ -59,6 +83,7 @@ export async function verifyPassword({
   const m = PHC.exec(hash);
   if (m === null)
     return /^[0-9a-f]+:[0-9a-f]+$/.test(hash) ? verifyScrypt({ hash, password }) : false;
+  if (!nodeArgon2) return false;
   const params: Params = {
     memory: Number(m[1]),
     passes: Number(m[2]),
