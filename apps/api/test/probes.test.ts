@@ -48,6 +48,7 @@ import { pglitePool } from "./pglite-pool";
  * nature (signing in needs no session); auth.test.ts covers them and the bridge's allow-list.
  */
 const PUBLIC_ROUTES = new Set([
+  "GET /health",
   "GET /v1/health",
   "GET /v1/sign-in-methods",
   "GET /v1/auth/*",

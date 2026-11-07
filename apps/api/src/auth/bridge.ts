@@ -196,14 +196,19 @@ function socialAllowed(body: Body, providers: readonly ProviderId[], handoff: st
   if (!providers.some((id) => id === body["provider"])) return false;
   if (Object.keys(body).some((k) => !SOCIAL_FIELDS.has(k))) return false;
   const error = body["errorCallbackURL"];
-  if (error !== undefined && error !== `${handoff}/failed`) return false;
+  if (
+    typeof error === "string" &&
+    error !== `${handoff}/failed` &&
+    !error.startsWith(`${handoff}/failed?`)
+  )
+    return false;
   const callback = body["callbackURL"];
   if (body["idToken"] !== undefined) return callback === undefined;
-  return (
-    typeof callback === "string" &&
-    /^[A-Za-z0-9_-]{43}$/.test(callback.slice(`${handoff}/start?challenge=`.length)) &&
-    callback.startsWith(`${handoff}/start?challenge=`)
-  );
+  if (typeof callback !== "string" || !callback.startsWith(`${handoff}/start?challenge=`))
+    return false;
+  const rest = callback.slice(`${handoff}/start?challenge=`.length);
+  const challenge = rest.split("&")[0];
+  return challenge !== undefined && /^[A-Za-z0-9_-]{43}$/.test(challenge);
 }
 
 /** Connecting a provider to a signed-in account returns to the app with no session to hand on. */

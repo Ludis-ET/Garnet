@@ -17,6 +17,7 @@
     "@aws-sdk/client-s3": "3.1149.0",
     "@aws-sdk/s3-request-presigner": "3.1149.0",
     "@better-auth/expo": "1.7.13",
+    "@fastify/cors": "^11.3.1",
     "@garnet/contracts": "workspace:*",
     "@garnet/db": "workspace:*",
     "@garnet/domain": "workspace:*",
@@ -38,8 +39,8 @@
     "@types/node": "^24.19.1",
     "@types/nodemailer": "8.0.2",
     "@types/pg": "8.23.1",
-    "fast-check": "catalog:",
     "esbuild": "0.28.2",
+    "fast-check": "catalog:",
     "tsx": "4.23.15",
     "typescript": "catalog:",
     "vitest": "catalog:"

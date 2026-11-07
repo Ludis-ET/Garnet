@@ -1,5 +1,6 @@
 import "reflect-metadata";
 import { randomUUID } from "node:crypto";
+import cors from "@fastify/cors";
 import { Module, type DynamicModule } from "@nestjs/common";
 import { APP_FILTER, APP_GUARD, NestFactory } from "@nestjs/core";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
@@ -159,6 +160,22 @@ export async function createApp(options: AppOptions): Promise<NestFastifyApplica
     },
   });
   const fastify = adapter.getInstance();
+  await fastify.register(cors, {
+    origin: true,
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: [
+      "Origin",
+      "X-Requested-With",
+      "Content-Type",
+      "Accept",
+      "Authorization",
+      "x-garnet-client",
+      "expo-origin",
+      "user-agent",
+    ],
+    exposedHeaders: ["x-request-id", "retry-after", "set-cookie"],
+  });
   options.beforeRoutes?.(fastify);
   fastify.addHook("onSend", async (request, reply) => {
     void reply.header("x-request-id", request.id);

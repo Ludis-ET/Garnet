@@ -163,6 +163,21 @@ describe("problems, ids and headers (B-12)", () => {
     }
   });
 
+  it("handles CORS preflight and allows headers for browser and web clients", async () => {
+    const res = await api.inject({
+      method: "OPTIONS",
+      url: "/v1/sign-in-methods",
+      headers: {
+        origin: "http://localhost:8081",
+        "access-control-request-method": "GET",
+        "access-control-request-headers": "x-garnet-client,content-type",
+      },
+    });
+    expect(res.statusCode).toBe(204);
+    expect(res.headers["access-control-allow-origin"]).toBe("http://localhost:8081");
+    expect(res.headers["access-control-allow-credentials"]).toBe("true");
+  });
+
   it("turns an unexpected failure into a bare 500 and logs no message", async () => {
     const broken = await startTestApi();
     try {

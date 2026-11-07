@@ -44,17 +44,24 @@ async function inBrowser(
   const auth = `${baseUrl}/v1/auth`;
   const verifier = randomSecret();
   const challenge = await sha256Base64Url(verifier);
+  const isWeb = Platform.OS === "web";
+  const webOrigin =
+    typeof window !== "undefined" && typeof window.location.origin === "string"
+      ? window.location.origin
+      : "";
+  const callbackTarget = isWeb && webOrigin ? webOrigin : APP_CALLBACK;
+  const callbackQuery = isWeb && webOrigin ? `&redirect_to=${encodeURIComponent(webOrigin)}` : "";
   const start = await fetch(`${auth}/sign-in/social`, {
     method: "POST",
     headers: {
       [CLIENT_HEADER.name]: CLIENT_HEADER.value,
       "content-type": "application/json",
-      "expo-origin": "garnet://",
+      "expo-origin": isWeb ? webOrigin : "garnet://",
     },
     body: JSON.stringify({
       provider,
-      callbackURL: `${auth}/app-handoff/start?challenge=${challenge}`,
-      errorCallbackURL: `${auth}/app-handoff/failed`,
+      callbackURL: `${auth}/app-handoff/start?challenge=${challenge}${callbackQuery}`,
+      errorCallbackURL: `${auth}/app-handoff/failed${callbackQuery ? `?${callbackQuery.slice(1)}` : ""}`,
       disableRedirect: true,
     }),
     credentials: "omit",
@@ -66,7 +73,7 @@ async function inBrowser(
 
   // The proxy keeps the sign-in's state in this browser session, then opens the provider.
   const proxy = `${auth}/expo-authorization-proxy?authorizationURL=${encodeURIComponent(url)}`;
-  const result = await WebBrowser.openAuthSessionAsync(proxy, APP_CALLBACK, {
+  const result = await WebBrowser.openAuthSessionAsync(proxy, callbackTarget, {
     // A private session: the browser keeps no cookies of its own afterwards (iOS).
     preferEphemeralSession: true,
   });

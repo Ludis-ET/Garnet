@@ -87,6 +87,7 @@ export function useSignInMethods() {
     queryKey: ["auth", "methods"],
     queryFn: () => auth.signInMethods(),
     staleTime: 5 * 60_000,
+    placeholderData: { google: true, apple: false },
   });
 }
 

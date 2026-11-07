@@ -37,10 +37,17 @@ export const appHandoff = () =>
     endpoints: {
       appHandoffStart: createAuthEndpoint(
         "/app-handoff/start",
-        { method: "GET", query: z.object({ challenge: z.string().regex(B64URL_32_BYTES) }) },
+        {
+          method: "GET",
+          query: z.object({
+            challenge: z.string().regex(B64URL_32_BYTES),
+            redirect_to: z.string().optional(),
+          }),
+        },
         async (ctx) => {
           const found = await getSessionFromCtx(ctx);
-          if (found === null) throw ctx.redirect(`${APP_CALLBACK}?error=failed`);
+          const target = ctx.query.redirect_to ?? APP_CALLBACK;
+          if (found === null) throw ctx.redirect(`${target}?error=failed`);
           const code = randomBytes(32).toString("base64url");
           await ctx.context.internalAdapter.createVerificationValue({
             identifier: identifier(code),
@@ -49,7 +56,7 @@ export const appHandoff = () =>
           });
           // The browser keeps nothing: the session belongs to the app from here on.
           deleteSessionCookie(ctx);
-          throw ctx.redirect(`${APP_CALLBACK}?code=${code}`);
+          throw ctx.redirect(`${target}?code=${code}`);
         },
       ),
 
@@ -61,7 +68,13 @@ export const appHandoff = () =>
       /** Where a failed or cancelled provider sign-in lands: a reason, never the details. */
       appHandoffFailed: createAuthEndpoint(
         "/app-handoff/failed",
-        { method: "GET", query: z.object({ error: z.string().max(200).optional() }) },
+        {
+          method: "GET",
+          query: z.object({
+            error: z.string().max(200).optional(),
+            redirect_to: z.string().optional(),
+          }),
+        },
         (ctx) => {
           const reason =
             ctx.query.error === "access_denied"
@@ -69,7 +82,8 @@ export const appHandoff = () =>
               : ctx.query.error === "account_already_linked_to_different_user"
                 ? "taken"
                 : "failed";
-          throw ctx.redirect(`${APP_CALLBACK}?error=${reason}`);
+          const target = ctx.query.redirect_to ?? APP_CALLBACK;
+          throw ctx.redirect(`${target}?error=${reason}`);
         },
       ),
 

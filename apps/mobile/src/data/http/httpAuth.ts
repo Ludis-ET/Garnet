@@ -166,8 +166,12 @@ export function createHttpAuth(
     },
 
     signInMethods: async () => {
-      const m = await api.get("/v1/sign-in-methods", signInMethodsSchema);
-      return { google: m.google, apple: m.apple };
+      try {
+        const m = await api.get("/v1/sign-in-methods", signInMethodsSchema);
+        return { google: m.google, apple: m.apple };
+      } catch {
+        return { google: true, apple: false };
+      }
     },
 
     continueWith: async (provider) => {

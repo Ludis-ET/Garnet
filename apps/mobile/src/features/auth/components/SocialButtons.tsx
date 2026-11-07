@@ -136,7 +136,7 @@ export function SocialButtons({ divider }: { divider: "above" | "below" }) {
   const go = useContinueWith();
   const offered = (
     Platform.OS === "ios" ? (["apple", "google"] as const) : (["google", "apple"] as const)
-  ).filter((p) => methods.data?.[p] === true);
+  ).filter((p) => (methods.data ? methods.data[p] : p === "google"));
   if (offered.length === 0) return null;
 
   const start = (provider: SocialProvider) => {
