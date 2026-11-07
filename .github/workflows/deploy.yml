@@ -55,10 +55,18 @@ jobs:
           # 4. Pack into a single compact archive inside the workspace
           tar -czf api-release.tar.gz -C deploy-bundle .
 
+      - name: Prepare Server Host
+        id: server-info
+        run: |
+          RAW_SERVER="${{ secrets.SERVER }}"
+          # Clean protocol (https://), trailing slashes, paths, ports and whitespace
+          CLEAN_SERVER=$(echo "$RAW_SERVER" | sed -E 's|^[a-zA-Z]+://||' | sed -E 's|/.*$||' | sed -E 's|:[0-9]+$||' | tr -d ' \r\n\t')
+          echo "host=$CLEAN_SERVER" >> "$GITHUB_OUTPUT"
+
       - name: Upload Release to cPanel via SCP
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.SERVER }}
+          host: ${{ steps.server-info.outputs.host }}
           username: ${{ secrets.USERNAME }}
           password: ${{ secrets.PASSWORD }}
           port: ${{ secrets.PORT || 22 }}
@@ -69,7 +77,7 @@ jobs:
       - name: Extract, Migrate & Restart on cPanel via SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.SERVER }}
+          host: ${{ steps.server-info.outputs.host }}
           username: ${{ secrets.USERNAME }}
           password: ${{ secrets.PASSWORD }}
           port: ${{ secrets.PORT || 22 }}
