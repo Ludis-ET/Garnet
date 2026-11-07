@@ -131,7 +131,7 @@ GARNET_S3_ENDPOINT=https://3e6d6c75647cf0fa9065b6c77ba698b1.r2.cloudflarestorage
 GARNET_S3_REGION=auto
 GARNET_S3_ACCESS_KEY_ID=your-r2-access-key-id
 GARNET_S3_SECRET_ACCESS_KEY=your-r2-secret-access-key
-GARNET_MEDIA_BUCKET=garnet-media
+GARNET_MEDIA_BUCKET=garnet
 
 # 7. Google OAuth Sign-In (Optional)
 GARNET_GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
