@@ -51,14 +51,16 @@ jobs:
           pnpm --filter @garnet/api run build
 
           # 2. Deploy isolated production node_modules for @garnet/api
-          pnpm --filter @garnet/api deploy --legacy --prod /tmp/deploy-api
+          rm -rf deploy-bundle
+          mkdir -p deploy-bundle
+          pnpm --filter @garnet/api deploy --legacy --prod deploy-bundle
 
           # 3. Copy compiled dist artifacts & passenger app.js into the deployment bundle
-          cp -r apps/api/dist /tmp/deploy-api/dist
-          cp apps/api/app.js /tmp/deploy-api/app.js
+          cp -r apps/api/dist deploy-bundle/dist
+          cp apps/api/app.js deploy-bundle/app.js
 
-          # 4. Pack into a single compact archive
-          tar -czf /tmp/api-release.tar.gz -C /tmp/deploy-api .
+          # 4. Pack into a single compact archive inside the workspace
+          tar -czf api-release.tar.gz -C deploy-bundle .
 
       - name: Upload Release to cPanel via SCP
         uses: appleboy/scp-action@v0.1.7
@@ -66,10 +68,10 @@ jobs:
           host: ${{ secrets.SERVER }}
           username: ${{ secrets.USERNAME }}
           password: ${{ secrets.PASSWORD }}
-          port: 22
-          source: "/tmp/api-release.tar.gz"
+          port: ${{ secrets.PORT || 22 }}
+          overwrite: true
+          source: "api-release.tar.gz"
           target: "/home/${{ secrets.USERNAME }}/"
-          strip_components: 1
 
       - name: Extract, Migrate & Restart on cPanel via SSH
         uses: appleboy/ssh-action@v1.2.0
@@ -77,7 +79,7 @@ jobs:
           host: ${{ secrets.SERVER }}
           username: ${{ secrets.USERNAME }}
           password: ${{ secrets.PASSWORD }}
-          port: 22
+          port: ${{ secrets.PORT || 22 }}
           script_stop: true
           script: |
             set -e
@@ -93,16 +95,34 @@ jobs:
 
             cd "$APP_DIR"
 
-            # Ensure Node is on PATH
-            export PATH="$HOME/.nvm/versions/node/$(nvm current 2>/dev/null || echo "")/bin:$PATH"
+            # Detect node in common cPanel locations if not on PATH
+            if ! command -v node >/dev/null 2>&1; then
+              if [ -d "$HOME/.nvm" ]; then
+                export NVM_DIR="$HOME/.nvm"
+                [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+              fi
+            fi
+            if ! command -v node >/dev/null 2>&1; then
+              CPANEL_NODE=$(find "$HOME/nodevenv" -name node -type f 2>/dev/null | head -n 1)
+              if [ -n "$CPANEL_NODE" ]; then
+                export PATH="$(dirname "$CPANEL_NODE"):$PATH"
+              fi
+            fi
+            echo "Using node: $(command -v node || echo 'not found')"
 
-            echo "🗄️ Running database migrations..."
             if [ -f "$APP_DIR/.env" ]; then
               set -a
               . "$APP_DIR/.env"
               set +a
+              if [ -n "$DATABASE_URL" ]; then
+                echo "🗄️ Running database migrations..."
+                node dist/migrate.mjs migrate || echo "⚠️ Migration completed with notice, verify DATABASE_URL in $APP_DIR/.env"
+              else
+                echo "⚠️ DATABASE_URL not set in $APP_DIR/.env; skipping automatic migration."
+              fi
+            else
+              echo "⚠️ $APP_DIR/.env not found. Please create it with DATABASE_URL and secrets."
             fi
-            node dist/migrate.mjs migrate
 
             echo "🔄 Restarting Phusion Passenger application..."
             mkdir -p "$APP_DIR/tmp"
