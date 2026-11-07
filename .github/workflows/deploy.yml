@@ -72,6 +72,6 @@ jobs:
           password: ${{ secrets.PASSWORD }}
           port: ${{ secrets.PORT || 21 }}
           protocol: ftp
-          server-dir: ${{ secrets.FTP_DIR || 'garnet-api/' }}
+          server-dir: ./
           local-dir: ./deploy-bundle/
           dangerous-clean-slate: false
