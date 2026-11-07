@@ -141,7 +141,7 @@ export function NotificationDetailScreen({ id }: { id: string }) {
           label="Open"
           variant="primary"
           onPress={() => {
-            router.push(item.href as never);
+            router.push(item.href);
           }}
         />
         <Button

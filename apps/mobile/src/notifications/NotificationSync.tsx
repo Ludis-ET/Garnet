@@ -47,7 +47,7 @@ export function NotificationSync() {
   useEffect(() => {
     if (!notificationsSupported()) return;
     return onOpen((href) => {
-      router.push(href as never);
+      router.push(href);
     });
   }, []);
 

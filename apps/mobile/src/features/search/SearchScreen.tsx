@@ -192,7 +192,7 @@ export function SearchScreen() {
 
   const open = (r: SearchResult) => {
     remember.mutate(query);
-    router.push(r.href as never);
+    router.push(r.href);
   };
   const groups = KINDS.map((k) => ({
     ...k,
