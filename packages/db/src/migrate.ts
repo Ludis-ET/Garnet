@@ -42,6 +42,23 @@ export function checksumOf(sql: string): string {
   return createHash("sha256").update(sql.replace(/\r\n/g, "\n"), "utf8").digest("hex");
 }
 
+/**
+ * Strips role creation, grants, and revokes for garnet_app and garnet_auth when running in a
+ * single-role environment (e.g. shared cPanel hosting where the database user lacks CREATEROLE
+ * and GARNET_DISABLE_ROLE_SWITCH=true is configured).
+ */
+export function adaptSqlForSingleRole(sql: string): string {
+  let result = sql.replace(
+    /do\s*\$\$\s*begin[\s\S]*?(?:create role\s+(?:garnet_app|garnet_auth)[\s\S]*?)end\s*\$\$;/gi,
+    "-- [single-role] skipped role creation",
+  );
+  result = result.replace(
+    /(?:grant|revoke)\s+[\s\S]*?(?:to|from)\s+(?:garnet_app|garnet_auth)\s*;/gi,
+    "-- [single-role] skipped grant/revoke for garnet role",
+  );
+  return result;
+}
+
 /** Reads `NNNN_name.sql` files from a folder, in order. Anything else there is an error. */
 export function loadMigrations(dir: string): Migration[] {
   const files = readdirSync(dir).filter((f) => f.endsWith(".sql"));
@@ -105,7 +122,11 @@ export async function migrate(
       if (done.has(m.version)) continue;
       await db.exec("begin");
       try {
-        await db.exec(m.sql);
+        const sql =
+          process.env["GARNET_DISABLE_ROLE_SWITCH"] === "true"
+            ? adaptSqlForSingleRole(m.sql)
+            : m.sql;
+        await db.exec(sql);
         await db.query(
           "insert into garnet_meta.schema_migration (version, name, checksum) values ($1, $2, $3)",
           [m.version, m.name, m.checksum],

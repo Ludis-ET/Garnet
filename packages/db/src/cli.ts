@@ -13,8 +13,12 @@ const fail = (line: string): never => {
 };
 
 const [command = ""] = process.argv.slice(2);
-const url = process.env["GARNET_DATABASE_OWNER_URL"] ?? process.env["DATABASE_URL"];
-if (url === undefined || url === "") fail("Set GARNET_DATABASE_OWNER_URL or DATABASE_URL.");
+const url =
+  process.env["GARNET_DATABASE_OWNER_URL"] ??
+  process.env["DATABASE_URL"] ??
+  process.env["GARNET_API_DATABASE_URL"];
+if (url === undefined || url === "")
+  fail("Set GARNET_DATABASE_OWNER_URL, DATABASE_URL, or GARNET_API_DATABASE_URL.");
 
 const client = new pg.Client({ connectionString: url ?? "" });
 const db: SqlClient = {

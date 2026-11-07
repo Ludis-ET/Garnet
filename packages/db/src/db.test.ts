@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { DEV_PEOPLE, DEV_RELATIONSHIP_ID, isLocalDatabase, seedDev } from "./dev.ts";
 import {
+  adaptSqlForSingleRole,
   checksumOf,
   loadMigrations,
   migrate,
@@ -126,6 +127,18 @@ describe("migration runner (B-13)", () => {
     writeFileSync(join(dup, "0001_a.sql"), "select 1;");
     writeFileSync(join(dup, "0001_b.sql"), "select 1;");
     expect(() => loadMigrations(dup)).toThrow(/share version 0001/);
+  });
+
+  it("adapts migration SQL for single-role environments without role statements", () => {
+    const raw = `
+      do $$ begin if not exists (select from pg_catalog.pg_roles where rolname = 'garnet_app') then create role garnet_app nologin; end if; end $$;
+      grant select on all tables in schema public to garnet_app;
+      revoke all on app_user from garnet_app;
+    `;
+    const adapted = adaptSqlForSingleRole(raw);
+    expect(adapted).not.toMatch(/create role/i);
+    expect(adapted).not.toMatch(/grant select/i);
+    expect(adapted).not.toMatch(/revoke all/i);
   });
 });
 
