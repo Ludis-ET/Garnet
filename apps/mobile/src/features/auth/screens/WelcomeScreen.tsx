@@ -7,10 +7,8 @@
 import { useRouter } from "expo-router";
 import { StyleSheet, useWindowDimensions, View } from "react-native";
 import Animated from "react-native-reanimated";
-import { GarnetMark } from "@/components/brand/GarnetMark";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
-import { Icon } from "@/components/ui/Icon";
 import { useTheme } from "@/theme/ThemeProvider";
 import { GlassScreen } from "@/components/ui/GlassScreen";
 import { HeroWindows } from "../components/HeroWindows";
@@ -19,7 +17,7 @@ import { ENTER } from "@/theme/transitions";
 
 export function WelcomeScreen() {
   const router = useRouter();
-  const { colors, spacing, reduceMotion } = useTheme();
+  const { spacing, reduceMotion } = useTheme();
   const { height, width } = useWindowDimensions();
   // Compact phones (375×667): smaller panes so the actions stay above the fold.
   const paneWidth = Math.round(Math.min(168, width * 0.42, height * 0.19));
@@ -43,22 +41,9 @@ export function WelcomeScreen() {
               router.push("/sign-in");
             }}
           />
-          <View style={[styles.row, { gap: spacing.xs }]}>
-            <Icon name="lock" size={13} color={colors.textTertiary} />
-            <AppText variant="footnote" color="textTertiary">
-              A private space for just the two of you.
-            </AppText>
-          </View>
         </Animated.View>
       }
     >
-      <View style={[styles.row, { gap: spacing.sm }]}>
-        <GarnetMark size={30} animated={false} />
-        <AppText variant="headline" serif accessibilityRole="header">
-          Garnet
-        </AppText>
-      </View>
-
       <View style={[styles.center, { gap: spacing.xxl }]}>
         <HeroWindows paneWidth={paneWidth} />
         <Animated.View {...enter()} style={{ gap: spacing.md }}>

@@ -3,8 +3,12 @@ import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold } from "@expo-goog
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
+import * as WebBrowser from "expo-web-browser";
 import { useEffect } from "react";
 import { Platform } from "react-native";
+
+// Web: complete social auth handoffs when returning from browser (P-79).
+WebBrowser.maybeCompleteAuthSession({ skipRedirectCheck: true });
 import { API_AREAS_ON } from "@/data/http/config";
 import { useTestingTools } from "@/features/prototype/devTools";
 import { NotificationSync } from "@/notifications/NotificationSync";

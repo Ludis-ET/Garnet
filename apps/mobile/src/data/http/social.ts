@@ -59,8 +59,9 @@ async function inBrowser(
   const challenge = await sha256Base64Url(verifier);
   const isWeb = Platform.OS === "web";
   const webOrigin = getWebOrigin();
-  const callbackTarget = isWeb && webOrigin ? webOrigin : APP_CALLBACK;
-  const callbackQuery = isWeb && webOrigin ? `&redirect_to=${encodeURIComponent(webOrigin)}` : "";
+  const callbackTarget = isWeb && webOrigin ? `${webOrigin}/auth-callback` : APP_CALLBACK;
+  const callbackQuery =
+    isWeb && webOrigin ? `&redirect_to=${encodeURIComponent(callbackTarget)}` : "";
   const start = await fetch(`${auth}/sign-in/social`, {
     method: "POST",
     headers: {
@@ -81,24 +82,43 @@ async function inBrowser(
   const { url } = (await start.json().catch(() => ({}))) as { url?: unknown };
   if (typeof url !== "string") return { ok: false, reason: "failed" };
 
+  if (isWeb && typeof localStorage !== "undefined") {
+    try {
+      localStorage.setItem("garnet_handoff_verifier", verifier);
+    } catch {
+      // Ignored if storage is blocked
+    }
+  }
+
   // The proxy keeps the sign-in's state in this browser session, then opens the provider.
   const proxy = `${auth}/expo-authorization-proxy?authorizationURL=${encodeURIComponent(url)}`;
   const result = await WebBrowser.openAuthSessionAsync(proxy, callbackTarget, {
     // A private session: the browser keeps no cookies of its own afterwards (iOS).
     preferEphemeralSession: true,
   });
-  if (result.type !== "success") return { ok: false, reason: "cancelled" };
-  const back = new URL(result.url);
-  const error = back.searchParams.get("error");
-  if (error !== null) return { ok: false, reason: error === "cancelled" ? "cancelled" : "failed" };
-  const code = back.searchParams.get("code");
-  if (code === null) return { ok: false, reason: "failed" };
-  // Through Better Auth's client, which keeps the session cookie in the keystore.
-  const { error: redeemError } = await client.$fetch("/app-handoff/redeem", {
-    method: "POST",
-    body: { code, verifier },
-  });
-  return redeemError === null ? { ok: true } : { ok: false, reason: "failed" };
+  try {
+    if (result.type !== "success") return { ok: false, reason: "cancelled" };
+    const back = new URL(result.url);
+    const error = back.searchParams.get("error");
+    if (error !== null)
+      return { ok: false, reason: error === "cancelled" ? "cancelled" : "failed" };
+    const code = back.searchParams.get("code");
+    if (code === null) return { ok: false, reason: "failed" };
+    // Through Better Auth's client, which keeps the session cookie in the keystore.
+    const { error: redeemError } = await client.$fetch("/app-handoff/redeem", {
+      method: "POST",
+      body: { code, verifier },
+    });
+    return redeemError === null ? { ok: true } : { ok: false, reason: "failed" };
+  } finally {
+    if (isWeb && typeof localStorage !== "undefined") {
+      try {
+        localStorage.removeItem("garnet_handoff_verifier");
+      } catch {
+        // Ignored
+      }
+    }
+  }
 }
 
 /**
@@ -191,18 +211,23 @@ export async function connectProvider(
     return { ok: false, reason: error.status === 403 ? "sign-in-again" : "failed" };
   }
   const auth = `${baseUrl}/v1/auth`;
+  const isWeb = Platform.OS === "web";
+  const webOrigin = getWebOrigin();
+  const callbackTarget = isWeb && webOrigin ? `${webOrigin}/auth-callback` : APP_CALLBACK;
+  const callbackQuery =
+    isWeb && webOrigin ? `?redirect_to=${encodeURIComponent(callbackTarget)}` : "";
   const start = await fetch(`${auth}/link-social`, {
     method: "POST",
     headers: {
       [CLIENT_HEADER.name]: CLIENT_HEADER.value,
       "content-type": "application/json",
-      "expo-origin": "garnet://",
+      "expo-origin": isWeb ? webOrigin : "garnet://",
       cookie: await client.getCookie(),
     },
     body: JSON.stringify({
       provider,
-      callbackURL: `${auth}/app-handoff/linked`,
-      errorCallbackURL: `${auth}/app-handoff/failed`,
+      callbackURL: `${auth}/app-handoff/linked${callbackQuery}`,
+      errorCallbackURL: `${auth}/app-handoff/failed${callbackQuery}`,
       disableRedirect: true,
     }),
     credentials: "omit",
@@ -213,7 +238,7 @@ export async function connectProvider(
   const { url } = (await start.json().catch(() => ({}))) as { url?: unknown };
   if (typeof url !== "string") return { ok: false, reason: "failed" };
   const proxy = `${auth}/expo-authorization-proxy?authorizationURL=${encodeURIComponent(url)}`;
-  const result = await WebBrowser.openAuthSessionAsync(proxy, APP_CALLBACK, {
+  const result = await WebBrowser.openAuthSessionAsync(proxy, callbackTarget, {
     preferEphemeralSession: true,
   });
   if (result.type !== "success") return { ok: false, reason: "cancelled" };

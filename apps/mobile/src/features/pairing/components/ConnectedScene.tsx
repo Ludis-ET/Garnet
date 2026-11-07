@@ -1,23 +1,68 @@
 import { Haptics } from "@/components/ui/haptics";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
-import { Platform, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import {
+  Platform,
+  Pressable,
+  StyleSheet,
+  useWindowDimensions,
+  Vibration,
+  View,
+} from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
+  withRepeat,
   withSpring,
+  withTiming,
   type SharedValue,
 } from "react-native-reanimated";
+import { Image, type ImageSource } from "expo-image";
+import { Audio, type AVPlaybackSource } from "expo-av";
+import { AppText } from "@/components/ui/AppText";
 import { GarnetMark } from "@/components/brand/GarnetMark";
 import { SparkleBurst } from "@/components/brand/SparkleBurst";
 import { CharacterSlot } from "@/components/character/CharacterSlot";
 import { Glass } from "@/components/ui/Glass";
 import { FRAME_ASPECT } from "@/features/figures/art/figure";
+import { artworkFiles } from "@/features/figures/art/artworkFiles";
 import { useTheme } from "@/theme/ThemeProvider";
 
-/** 0 gliding · 1 ruby facet · 2 sapphire facet · 3 violet core · 4 bloom (final frame). */
+let defaultFusionSource: ImageSource | undefined;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  defaultFusionSource = require("../../../../assets/characters/fusion.webp") as ImageSource;
+} catch {
+  // Ignored if not found
+}
+
+let defaultStartSource: ImageSource | undefined;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  defaultStartSource = require("../../../../assets/characters/fusion-start.png") as ImageSource;
+} catch {
+  // Ignored if not found
+}
+
+let defaultSettledSource: ImageSource | undefined;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  defaultSettledSource = require("../../../../assets/characters/fusion-settled.png") as ImageSource;
+} catch {
+  // Ignored if not found
+}
+
+let defaultSoundAsset: AVPlaybackSource | undefined;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  defaultSoundAsset = require("../../../../assets/characters/fusion.aac") as AVPlaybackSource;
+} catch {
+  // Ignored if not found
+}
+
+/** 0 gliding/fusing · 1 ruby facet · 2 sapphire facet · 3 violet core · 4 bloom (settled frame). */
 export type ConnectPhase = 0 | 1 | 2 | 3 | 4;
 
-/** When each phase starts, in ms after the glide begins (about 1.2 s in all). */
+/** When each phase starts for the glass pane fallback (ms). */
 const TIMELINE: readonly [ConnectPhase, number][] = [
   [1, 620],
   [2, 740],
@@ -25,7 +70,12 @@ const TIMELINE: readonly [ConnectPhase, number][] = [
   [4, 1000],
 ];
 
-function Pane({
+/** The fusion video duration before settling on Garnet (ms). */
+const FUSION_DURATION_MS = 2550;
+/** The moment when the sparkle explosion bursts and Garnet appears (ms). */
+const FUSION_BURST_PEAK_MS = 1800;
+
+function FallbackPane({
   side,
   glide,
   paneWidth,
@@ -69,56 +119,265 @@ function Pane({
 }
 
 /**
- * PAIR-05 celebration (P-49): Ruby's and Sapphire's glass windows glide in from the screen edges
- * and overlap; the Garnet crystal lights facet by facet (ruby, sapphire, violet core), then
- * blooms with sparkles and a success haptic. About 1.2 s; a tap anywhere jumps to the final
- * frame, and reduced motion starts there. `onSettled` fires once the final frame is reached.
+ * PAIR-05 celebration (P-49):
+ * When accounts link, Ruby and Sapphire twirl together, fuse with a burst of magical sparkles,
+ * and Garnet emerges smiling into her iconic visor pose, accompanied by the fusion sound.
+ * Transparent, borderless, seamless — designed to feel like live character magic, not a video.
  */
-export function ConnectedScene({ onSettled }: { onSettled?: () => void }) {
+export function ConnectedScene({
+  onSettled,
+  replayKey = 0,
+}: {
+  onSettled?: (() => void) | undefined;
+  replayKey?: number | undefined;
+}) {
   const { motion, reduceMotion } = useTheme();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
+
+  // Character artwork from owner-supplied assets (git-ignored assets/characters)
+  const fusionSource = artworkFiles.fusion ?? defaultFusionSource;
+  const settledSource =
+    artworkFiles["fusion-settled"] ??
+    defaultSettledSource ??
+    artworkFiles["garnet-happy"] ??
+    artworkFiles["garnet-celebrating"] ??
+    artworkFiles.garnet;
+  const hasFusionVideo = fusionSource !== undefined;
+
+  // Fallback glass dimensions
   const paneWidth = Math.round(Math.min(150, width * 0.36));
   const travel = width * 0.6;
+
+  // Video / Animation dimensions (9:16 portrait aspect ratio, transparent)
+  const maxAnimHeight = Math.min(540, height * 0.58);
+  const maxAnimWidth = Math.min(width * 0.92, 380);
+  const animHeight = Math.round(Math.min(maxAnimHeight, maxAnimWidth * (16 / 9)));
+  const animWidth = Math.round(animHeight * (9 / 16));
+
   const glide = useSharedValue(reduceMotion ? 1 : 0);
   const [phase, setPhase] = useState<ConnectPhase>(reduceMotion ? 4 : 0);
+  const [animatingKey, setAnimatingKey] = useState<number | null>(
+    Platform.OS !== "web" || reduceMotion ? replayKey : null,
+  );
+  const animating = animatingKey === replayKey;
+  const [needsSoundHint, setNeedsSoundHint] = useState(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const settled = useRef(false);
+  const soundRef = useRef<Audio.Sound | null>(null);
+  const webAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const stopAudio = () => {
+    if (soundRef.current !== null) {
+      void soundRef.current.stopAsync();
+      void soundRef.current.unloadAsync();
+      soundRef.current = null;
+    }
+    if (webAudioRef.current !== null) {
+      webAudioRef.current.pause();
+      webAudioRef.current = null;
+    }
+  };
+
+  const playAudio = () => {
+    stopAudio();
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      try {
+        const audio = new window.Audio(`/fusion.aac?k=${replayKey}`);
+        audio.volume = 1.0;
+        audio.loop = false;
+        webAudioRef.current = audio;
+        audio
+          .play()
+          .then(() => {
+            // Audio hardware has started playing at 0.0s: start animation in lockstep!
+            setAnimatingKey(replayKey);
+          })
+          .catch(() => {
+            setNeedsSoundHint(true);
+            setAnimatingKey(replayKey);
+          });
+      } catch {
+        queueMicrotask(() => {
+          setAnimatingKey(replayKey);
+        });
+      }
+    } else if (defaultSoundAsset !== undefined) {
+      void Audio.Sound.createAsync(defaultSoundAsset, {
+        shouldPlay: true,
+        volume: 1.0,
+        isLooping: false,
+      })
+        .then((result) => {
+          soundRef.current = result.sound;
+          setAnimatingKey(replayKey);
+        })
+        .catch(() => {
+          setNeedsSoundHint(true);
+          setAnimatingKey(replayKey);
+        });
+    } else {
+      queueMicrotask(() => {
+        setAnimatingKey(replayKey);
+      });
+    }
+  };
+
+  // Subtle floating breathing motion once Garnet is settled
+  const floatAnim = useSharedValue(0);
+  useEffect(() => {
+    if (phase === 4 && !reduceMotion) {
+      floatAnim.set(withRepeat(withTiming(1, { duration: 2200 }), -1, true));
+    }
+  }, [phase, reduceMotion, floatAnim]);
+
+  const floatStyle = useAnimatedStyle(() => {
+    if (reduceMotion) return {};
+    const f = floatAnim.get();
+    return {
+      transform: [{ translateY: (f - 0.5) * 6 }],
+    };
+  });
 
   const settle = () => {
     if (settled.current) return;
     settled.current = true;
-    if (Platform.OS !== "web")
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (Platform.OS !== "web") {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      Vibration.vibrate(50);
+    }
+    // Note: Do not abort audio here so the magical shimmer sound naturally resolves to silence
     onSettled?.();
   };
 
   const settleFromEffect = useEffectEvent(settle);
+  const playAudioFromEffect = useEffectEvent(playAudio);
+
   useEffect(() => {
     if (reduceMotion) {
       settleFromEffect();
       return;
     }
-    glide.set(withSpring(1, motion.spring.smooth));
-    const ids = TIMELINE.map(([p, at]) =>
-      setTimeout(() => {
-        setPhase(p);
-        if (p === 4) settleFromEffect();
-      }, at),
-    );
-    timers.current = ids;
+
+    if (hasFusionVideo) {
+      playAudioFromEffect();
+      return () => {
+        stopAudio();
+      };
+    } else {
+      // Fallback glass panes timeline
+      glide.set(withSpring(1, motion.spring.smooth));
+      const ids = TIMELINE.map(([p, at]) =>
+        setTimeout(() => {
+          setPhase(p);
+          if (p === 4) settleFromEffect();
+        }, at),
+      );
+      timers.current = ids;
+      return () => {
+        ids.forEach(clearTimeout);
+      };
+    }
+  }, [reduceMotion, glide, motion.spring.smooth, hasFusionVideo, replayKey]);
+
+  // Synchronized animation timeline starts only when audio/animation begins
+  useEffect(() => {
+    if (!animating || phase === 4 || reduceMotion) return;
+
+    // Contact vibration at t=1000ms as Ruby & Sapphire leap together
+    const leapTimer = setTimeout(() => {
+      if (Platform.OS !== "web") {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        Vibration.vibrate(40);
+      }
+    }, 1000);
+
+    // Burst vibration at the peak of the fusion
+    const hapticTimer = setTimeout(() => {
+      if (Platform.OS !== "web") {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Vibration.vibrate([0, 80, 50, 120]);
+      }
+    }, FUSION_BURST_PEAK_MS);
+
+    // Settle timer
+    const settleTimer = setTimeout(() => {
+      setPhase(4);
+      settleFromEffect();
+    }, FUSION_DURATION_MS);
+
+    timers.current = [leapTimer, hapticTimer, settleTimer];
+
     return () => {
-      ids.forEach(clearTimeout);
+      timers.current.forEach(clearTimeout);
+      if (Platform.OS !== "web") {
+        Vibration.cancel();
+      }
     };
-  }, [reduceMotion, glide, motion.spring.smooth]);
+  }, [animating, phase, reduceMotion]);
 
   const skip = () => {
     if (phase === 4) return;
     timers.current.forEach(clearTimeout);
     glide.set(1);
     setPhase(4);
+    stopAudio();
     settle();
   };
 
+  const handlePress = () => {
+    if (needsSoundHint) {
+      setNeedsSoundHint(false);
+      playAudio();
+      return;
+    }
+    skip();
+  };
+
+  // 1. Owner-supplied video fusion animation (completely transparent, no video chrome)
+  if (hasFusionVideo) {
+    const isSettled = phase === 4;
+    const startSource =
+      Platform.OS === "web" ? { uri: "/fusion-start.png" } : (defaultStartSource ?? fusionSource);
+    const webpSource =
+      Platform.OS === "web" ? { uri: `/fusion.webp?k=${replayKey}` } : fusionSource;
+    const activeImageSource = isSettled
+      ? (settledSource ?? webpSource)
+      : animating
+        ? webpSource
+        : startSource;
+
+    return (
+      <Pressable
+        onPress={handlePress}
+        accessible={false}
+        importantForAccessibility="no-hide-descendants"
+        style={styles.fusionStage}
+      >
+        <Animated.View style={[styles.fusionWrap, floatStyle]}>
+          <Image
+            source={activeImageSource}
+            style={{ width: animWidth, height: animHeight }}
+            contentFit="contain"
+            priority="high"
+            accessible={false}
+          />
+          <View pointerEvents="none" style={styles.sparkleOverlay}>
+            <SparkleBurst play={isSettled} />
+          </View>
+          {needsSoundHint && !isSettled ? (
+            <View style={styles.unmutePill}>
+              <AppText variant="caption" color="accent">
+                Tap for sound 🔊
+              </AppText>
+            </View>
+          ) : null}
+        </Animated.View>
+      </Pressable>
+    );
+  }
+
+  // 2. Glass pane fallback (used in unit tests and before character assets exist)
   const lit = phase === 4 ? 3 : phase;
   return (
     <Pressable
@@ -128,10 +387,10 @@ export function ConnectedScene({ onSettled }: { onSettled?: () => void }) {
       style={styles.stage}
     >
       <View style={[styles.row, { marginRight: -paneWidth * 0.1 }]}>
-        <Pane side="ruby" glide={glide} paneWidth={paneWidth} travel={travel} />
+        <FallbackPane side="ruby" glide={glide} paneWidth={paneWidth} travel={travel} />
       </View>
       <View style={[styles.row, styles.front, { marginLeft: -paneWidth * 0.1 }]}>
-        <Pane side="sapphire" glide={glide} paneWidth={paneWidth} travel={travel} />
+        <FallbackPane side="sapphire" glide={glide} paneWidth={paneWidth} travel={travel} />
       </View>
       <View pointerEvents="none" style={styles.crystal}>
         <GarnetMark size={Math.round(paneWidth * 0.5)} progress={lit} />
@@ -152,4 +411,33 @@ const styles = StyleSheet.create({
   front: { zIndex: 1 },
   pane: { alignItems: "center", justifyContent: "flex-end", overflow: "hidden" },
   crystal: { position: "absolute", top: 0, alignSelf: "center", alignItems: "center", zIndex: 2 },
+
+  // Seamless fusion video styling
+  fusionStage: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+  },
+  fusionWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sparkleOverlay: {
+    position: "absolute",
+    alignSelf: "center",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  unmutePill: {
+    position: "absolute",
+    bottom: 8,
+    alignSelf: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.85)",
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 16,
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
 });

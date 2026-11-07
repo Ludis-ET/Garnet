@@ -1,6 +1,9 @@
 /** Where Better Auth's routes live (its basePath). */
 export const AUTH_BASE = "/v1/auth";
 
+/** The app's deep-link scheme (app.json "scheme"): the only origin Better Auth trusts. */
+export const APP_ORIGIN = "garnet://";
+
 /**
  * The client's address as the API itself saw it, the only one Better Auth may use (rate limits,
  * session records). Fastify doesn't trust proxies, so request.ip is the socket's address.

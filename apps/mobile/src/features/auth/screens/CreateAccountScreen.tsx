@@ -254,7 +254,6 @@ export function CreateAccountScreen() {
               set("birthDate")(iso ?? "");
             }}
             autofill="birthday"
-            helper="Your partner sees it, so you never miss a celebration. Garnet is for people 16 and over."
             disabled={busy}
             {...errorFor("birthDate")}
           />

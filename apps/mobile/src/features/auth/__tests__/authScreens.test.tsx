@@ -85,14 +85,10 @@ beforeEach(() => {
 });
 
 describe("AUTH-01 Welcome", () => {
-  it("shows the wordmark, the promise, both actions and the privacy note", async () => {
+  it("shows the promise and both actions", async () => {
     await renderWith(<WelcomeScreen />);
-    expect(await screen.findByRole("header", { name: "Garnet" }, WAIT)).toBeTruthy();
     expect(await screen.findByText(/Two lives\./, {}, WAIT)).toBeTruthy();
     expect(await screen.findByText("One space.", {}, WAIT)).toBeTruthy();
-    expect(
-      await screen.findByText("A private space for just the two of you.", {}, WAIT),
-    ).toBeTruthy();
     await press("Continue with email");
     expect(mockRouter.push).toHaveBeenCalledWith("/create-account");
     await press("I already have an account");

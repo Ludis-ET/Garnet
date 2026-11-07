@@ -13,7 +13,6 @@ import Animated, {
 } from "react-native-reanimated";
 import { GarnetMark } from "@/components/brand/GarnetMark";
 import { CharacterSlot } from "@/components/character/CharacterSlot";
-import { Glass } from "@/components/ui/Glass";
 import { FRAME_ASPECT } from "@/features/figures/art/figure";
 import { useTheme } from "@/theme/ThemeProvider";
 
@@ -32,7 +31,7 @@ function Window({
   height: number;
   delay: number;
 }) {
-  const { radii, motion, reduceMotion } = useTheme();
+  const { motion, reduceMotion } = useTheme();
   const enter = useSharedValue(reduceMotion ? 1 : 0);
   const bob = useSharedValue(0);
   const hop = useSharedValue(0);
@@ -82,16 +81,11 @@ function Window({
     <Animated.View style={paneStyle}>
       {/* Decorative: a tap makes the figure hop; screen readers skip it. */}
       <Pressable onPress={onTap} accessible={false} importantForAccessibility="no-hide-descendants">
-        <Glass
-          radius={radii.xl + 8}
-          veil="soft"
-          tint={side}
-          contentStyle={[styles.window, { width, height }]}
-        >
+        <View style={[styles.window, { width, height }]}>
           <Animated.View style={figureStyle}>
             <CharacterSlot character={side} pose="wave" size={figureH} aspectRatio={FRAME_ASPECT} />
           </Animated.View>
-        </Glass>
+        </View>
       </Pressable>
     </Animated.View>
   );

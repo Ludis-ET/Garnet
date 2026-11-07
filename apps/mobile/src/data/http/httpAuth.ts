@@ -85,8 +85,17 @@ export function createHttpAuth(
       });
       // Too many tries: the screen shows its calm "try again" error.
       if (error?.status === 429) throw new Error("rate-limited");
-      // The API answers sign-up the same way for a taken email; any refusal stays neutral too.
-      if (error !== null) return { ok: false, reason: "may-already-exist" };
+      if (
+        error?.status === 422 ||
+        error?.status === 409 ||
+        error?.code === "USER_ALREADY_EXISTS" ||
+        error?.message?.toLowerCase().includes("exist")
+      ) {
+        return { ok: false, reason: "may-already-exist" };
+      }
+      if (error !== null) {
+        throw new Error(error.message ?? `Sign up failed (${error.status})`);
+      }
       writeLocal("pendingEmail", normal);
       await clearLocal("justVerified");
       return { ok: true, maskedEmail: maskEmail(normal) };

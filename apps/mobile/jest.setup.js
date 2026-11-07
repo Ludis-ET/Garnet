@@ -17,6 +17,23 @@ jest.mock("expo-secure-store", () => ({
 }));
 require("react-native-gesture-handler/jestSetup");
 
+jest.mock("expo-av", () => ({
+  Audio: {
+    Sound: {
+      createAsync: jest.fn(() =>
+        Promise.resolve({
+          sound: {
+            playAsync: jest.fn(() => Promise.resolve()),
+            unloadAsync: jest.fn(() => Promise.resolve()),
+            stopAsync: jest.fn(() => Promise.resolve()),
+          },
+        }),
+      ),
+    },
+  },
+  Video: "Video",
+}));
+
 // The phone's location (P-66): no device in Jest. By default permission is refused, so the
 // distance falls back to time zones; tests that need a position set one on this mock.
 jest.mock("expo-location", () => ({

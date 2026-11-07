@@ -13,6 +13,7 @@ import { problemBody, type Issue } from "../errors/problem";
 import type { Auth } from "./auth";
 import { CLIENT_HEADER } from "./client-header";
 import {
+  APP_ORIGIN,
   AUTH_BASE,
   CLIENT_IP_HEADER,
   isRecentSignIn,
@@ -53,6 +54,19 @@ export function authHeaders(request: FastifyRequest): Headers {
   const headers = toWebHeaders(request.headers);
   for (const name of SPOOFABLE) headers.delete(name);
   headers.set(CLIENT_IP_HEADER, request.ip);
+  if (request.headers[CLIENT_HEADER.name] === CLIENT_HEADER.value) {
+    const origin = request.headers.origin;
+    if (
+      origin === undefined ||
+      origin === "null" ||
+      origin.startsWith("http://localhost") ||
+      origin.startsWith("http://127.0.0.1") ||
+      origin.startsWith("http://192.168.") ||
+      origin.startsWith("http://10.")
+    ) {
+      headers.set("origin", APP_ORIGIN);
+    }
+  }
   return headers;
 }
 

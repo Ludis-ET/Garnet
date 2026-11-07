@@ -5,7 +5,13 @@ import { APIError } from "better-auth/api";
 import type { Dialect } from "kysely";
 import type { Pool } from "pg";
 import type { AuthPolicy, SocialConfig } from "../config";
-import { AUTH_BASE, CLIENT_IP_HEADER, PROVIDER_HOSTS, type ProviderId } from "./constants";
+import {
+  APP_ORIGIN,
+  AUTH_BASE,
+  CLIENT_IP_HEADER,
+  PROVIDER_HOSTS,
+  type ProviderId,
+} from "./constants";
 import { appHandoff } from "./handoff";
 import type { Mailer } from "./mailer";
 import { hashPassword, verifyPassword } from "./password";
@@ -75,8 +81,7 @@ export const CREDENTIAL_PATHS = [
 /** The limit for the other auth routes: high enough that normal use never meets it. */
 const GENERAL_LIMIT = { windowSeconds: 60, max: 100 };
 
-/** The app's deep-link scheme (app.json "scheme"): the only origin Better Auth trusts. */
-export const APP_ORIGIN = "garnet://";
+export { APP_ORIGIN };
 
 const DAY_SECONDS = 24 * 60 * 60;
 
@@ -109,6 +114,12 @@ export function createAuth(o: AuthOptions) {
     // Apple posts its answer back from its own site (form_post).
     trustedOrigins: [
       APP_ORIGIN,
+      "http://localhost:8081",
+      "http://127.0.0.1:8081",
+      "http://localhost:19006",
+      "http://127.0.0.1:19006",
+      "http://localhost:3000",
+      "http://127.0.0.1:3000",
       ...(social.apple === undefined ? [] : ["https://appleid.apple.com"]),
     ],
     plugins: [expo(), appHandoff()],

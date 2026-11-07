@@ -22,6 +22,8 @@ GoogleService-Info.plist
 # tracked, so the folder exists for the app to read owner-supplied images locally.
 **/assets/characters/*
 !**/assets/characters/README.md
+apps/mobile/public/*
+apps/mobile/assets/fusion.mp4
 
 # OS / editor
 .DS_Store

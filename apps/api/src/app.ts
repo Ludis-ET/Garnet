@@ -161,7 +161,22 @@ export async function createApp(options: AppOptions): Promise<NestFastifyApplica
   });
   const fastify = adapter.getInstance();
   await fastify.register(cors, {
-    origin: true,
+    origin: (origin, cb) => {
+      if (!origin) {
+        cb(null, true);
+        return;
+      }
+      const isLocal =
+        origin.startsWith("http://localhost:") ||
+        origin.startsWith("http://127.0.0.1:") ||
+        origin.startsWith("https://localhost:") ||
+        origin.startsWith("https://127.0.0.1:");
+      if (isLocal) {
+        cb(null, true);
+        return;
+      }
+      cb(null, false);
+    },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: [
