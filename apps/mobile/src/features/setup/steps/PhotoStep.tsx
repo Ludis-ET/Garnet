@@ -1,25 +1,25 @@
 /**
- * SETUP-04 · Your picture. Initials on a swatch from the side's family, or a demo "photo"
- * through a simulated permission flow: rationale first, then a clearly badged system prompt
- * (Phase 2 never asks the real OS; rule 4). Denying is fine: Garnet works without it.
+ * SETUP-04 · Your picture (P-98). Initials on a swatch from the side's family, or a real photo:
+ * chosen from the gallery through the system picker (cropped square, made small on the phone),
+ * or, for a Google account, the account's own picture already there. "Remove photo" goes back to
+ * initials and deletes the stored picture. Garnet works without a photo.
  */
+import { LinearGradient } from "expo-linear-gradient";
 import { useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import { ActionSheet } from "@/components/ui/ActionSheet";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { Icon } from "@/components/ui/Icon";
-import { Notice } from "@/components/ui/Notice";
 import { Segmented } from "@/components/ui/Segmented";
-import { SimulatedPrompt } from "@/components/ui/SimulatedPrompt";
-import { DEMO_PHOTOS, type AvatarChoice } from "@/data/fixtures/demoProfile";
+import { useToast } from "@/components/ui/Toast";
+import type { AvatarChoice } from "@/data/fixtures/demoProfile";
 import type { GemSide } from "@/domain/identity";
+import { serviceErrorMessage } from "@/features/auth/authUi";
 import { useTheme } from "@/theme/ThemeProvider";
-import { avatarSwatches, demoPhotoArt } from "@/theme/tokens";
+import { avatarSwatches } from "@/theme/tokens";
 import { ProfileAvatar, sideColor } from "../components/ProfileAvatar";
-
-type Access = "unknown" | "granted" | "denied";
+import { pickPicture } from "../pickPicture";
+import { useClearPicture, useSetPicture } from "../useSetup";
 
 export function PhotoStep({
   name,
@@ -33,11 +33,54 @@ export function PhotoStep({
   onAvatar: (a: AvatarChoice) => void;
 }) {
   const { colors, spacing } = useTheme();
-  const [mode, setMode] = useState<"initials" | "photo">(avatar.kind);
-  const [access, setAccess] = useState<Access>(avatar.kind === "photo" ? "granted" : "unknown");
-  const [sheet, setSheet] = useState<"rationale" | "prompt" | null>(null);
+  const toast = useToast();
+  const setPicture = useSetPicture();
+  const clearPicture = useClearPicture();
+  const [picking, setPicking] = useState(false);
+  const hasPhoto = avatar.kind === "image";
+  const [mode, setMode] = useState<"initials" | "photo">(hasPhoto ? "photo" : "initials");
   const family = avatarSwatches[side ?? "garnet"];
   const ring = sideColor(side);
+  const busy = picking || setPicture.isPending || clearPicture.isPending;
+
+  const choosePhoto = async () => {
+    setPicking(true);
+    const picked = await pickPicture();
+    setPicking(false);
+    if (!picked.ok) {
+      if (picked.reason === "failed")
+        toast.show("That photo couldn't be used. Please try another one.", "error");
+      return;
+    }
+    setPicture.mutate(
+      { base64: picked.base64 },
+      {
+        onSuccess: (next) => {
+          onAvatar(next);
+        },
+        onError: (e) => {
+          toast.show(serviceErrorMessage(e), "error");
+        },
+      },
+    );
+  };
+
+  /** Initials replace a photo: the stored photo is removed too (P-98). */
+  const chooseInitials = (swatch: number) => {
+    const next: AvatarChoice = { kind: "initials", swatch };
+    if (avatar.kind !== "image") {
+      onAvatar(next);
+      return;
+    }
+    clearPicture.mutate(undefined, {
+      onSuccess: () => {
+        onAvatar(next);
+      },
+      onError: (e) => {
+        toast.show(serviceErrorMessage(e), "error");
+      },
+    });
+  };
 
   return (
     <View style={{ gap: spacing.xl }}>
@@ -51,11 +94,7 @@ export function PhotoStep({
           { label: "Photo", value: "photo" },
         ]}
         value={mode}
-        onChange={(m) => {
-          setMode(m);
-          if (m === "initials" && avatar.kind === "photo")
-            onAvatar({ kind: "initials", swatch: 0 });
-        }}
+        onChange={setMode}
       />
 
       {mode === "initials" ? (
@@ -70,11 +109,12 @@ export function PhotoStep({
               <Pressable
                 key={swatch.name}
                 onPress={() => {
-                  onAvatar({ kind: "initials", swatch: i });
+                  chooseInitials(i);
                 }}
+                disabled={busy}
                 accessibilityRole="radio"
                 accessibilityLabel={swatch.name}
-                accessibilityState={{ checked: selected }}
+                accessibilityState={{ checked: selected, disabled: busy }}
                 hitSlop={6}
                 style={[styles.swatchRing, { borderColor: selected ? ring : "transparent" }]}
               >
@@ -85,81 +125,32 @@ export function PhotoStep({
             );
           })}
         </View>
-      ) : access === "granted" ? (
-        <View style={{ gap: spacing.sm }}>
-          <AppText variant="footnote" color="textSecondary" style={styles.textCenter}>
-            Choose a picture
-          </AppText>
-          <View
-            accessibilityRole="radiogroup"
-            accessibilityLabel="Pictures"
-            style={[styles.row, { gap: spacing.md }]}
-          >
-            {DEMO_PHOTOS.map((photo) => {
-              const selected = avatar.kind === "photo" && avatar.photo === photo;
-              return (
-                <Pressable
-                  key={photo}
-                  onPress={() => {
-                    onAvatar({ kind: "photo", photo });
-                  }}
-                  accessibilityRole="radio"
-                  accessibilityLabel={demoPhotoArt[photo].label}
-                  accessibilityState={{ checked: selected }}
-                  style={[styles.thumbRing, { borderColor: selected ? ring : colors.glassRimEnd }]}
-                >
-                  <LinearGradient colors={demoPhotoArt[photo].colors} style={styles.thumb} />
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
       ) : (
-        <View style={{ gap: spacing.md }}>
+        <View style={{ gap: spacing.sm }}>
           <Button
-            label="Choose a photo"
+            label={hasPhoto ? "Choose another photo" : "Choose from your photos"}
             variant="secondary"
+            loading={busy}
             onPress={() => {
-              setSheet("rationale");
+              void choosePhoto();
             }}
           />
-          {access === "denied" ? (
-            <Notice
-              icon="lock"
-              text="Garnet can work without this permission. You can enable it in Settings later."
+          {hasPhoto ? (
+            <Button
+              label="Remove photo"
+              variant="text"
+              disabled={busy}
+              onPress={() => {
+                chooseInitials(0);
+                setMode("initials");
+              }}
             />
           ) : null}
+          <AppText variant="footnote" color="textSecondary" style={styles.textCenter}>
+            Only the photo you choose is used, and only you and your person see it.
+          </AppText>
         </View>
       )}
-
-      <ActionSheet
-        visible={sheet === "rationale"}
-        icon="lock"
-        title="Choose a photo"
-        body="Garnet only uses the photo you pick. Nothing else in your library is read."
-        confirmLabel="Open photo library"
-        cancelLabel="Not now"
-        onCancel={() => {
-          setSheet(null);
-        }}
-        onConfirm={() => {
-          setSheet("prompt");
-        }}
-      />
-      <SimulatedPrompt
-        visible={sheet === "prompt"}
-        title="“Garnet” would like to access your photos"
-        body="Choose the photo for your picture."
-        onAllow={() => {
-          setSheet(null);
-          setAccess("granted");
-          onAvatar({ kind: "photo", photo: "sunrise" });
-        }}
-        onDeny={() => {
-          setSheet(null);
-          setAccess("denied");
-        }}
-      />
     </View>
   );
 }
@@ -176,6 +167,4 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  thumbRing: { borderWidth: 2.5, borderRadius: 22, padding: 3 },
-  thumb: { width: 84, height: 84, borderRadius: 18 },
 });

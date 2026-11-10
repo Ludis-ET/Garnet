@@ -65,7 +65,7 @@ def generate_assets():
         save_all=True,
         append_images=frames_pil[1:],
         duration=42,
-        loop=0, # loop continuously while active, ConnectedScene switches to settled frame on settle
+        loop=1, # loop=1 plays once and stops on frame 60 (Garnet)
         quality=85,
         method=3
     )

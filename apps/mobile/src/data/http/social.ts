@@ -5,6 +5,7 @@ import { Platform } from "react-native";
 import type { ConnectResult, SocialProvider, SocialSignInResult } from "@/data/repositories/types";
 import type { GarnetAuthClient } from "./authClient";
 import { CLIENT_HEADER } from "./client";
+import { clearLocal, readLocal, writeLocal } from "./localState";
 
 /** Where the API's hand-off opens the app (apps/api/src/auth/handoff.ts). */
 export const APP_CALLBACK = "garnet://auth-callback";
@@ -27,6 +28,53 @@ async function sha256Base64Url(text: string): Promise<string> {
     new TextEncoder().encode(text),
   );
   return toBase64Url(new Uint8Array(digest));
+}
+
+/** Codes being, or already, traded: the browser's return and the deep link share one try. */
+const redeeming = new Map<string, { attempt: Promise<boolean>; at: number }>();
+
+/**
+ * Trades a hand-off code for the session, once per code (production-fix-plan A2). On Android the
+ * same garnet://auth-callback link reaches both the code that opened the browser and the
+ * auth-callback route; the code works once, so a second try would fail and send the person back
+ * to the welcome page although the first had signed them in. Both callers await this promise.
+ * True only when the server answered with a session.
+ */
+export function redeemHandoff(
+  client: GarnetAuthClient,
+  code: string,
+  /** The secret, when the caller still holds it; otherwise it is read from the keystore. */
+  knownVerifier?: string,
+): Promise<boolean> {
+  // The code lives a minute on the server (HANDOFF_TTL_MS): older entries are forgotten here,
+  // without a timer that would outlive the screen.
+  const now = Date.now();
+  for (const [old, entry] of redeeming) if (now - entry.at > 120_000) redeeming.delete(old);
+  const known = redeeming.get(code)?.attempt;
+  if (known !== undefined) return known;
+  const attempt = (async () => {
+    const verifier = knownVerifier ?? readLocal("handoffVerifier");
+    if (verifier === null) return false;
+    try {
+      const { error } = await client.$fetch("/app-handoff/redeem", {
+        method: "POST",
+        body: { code, verifier },
+      });
+      if (error !== null) return false;
+      await clearLocal("handoffVerifier");
+      writeLocal("hadSession", "yes");
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+  redeeming.set(code, { attempt, at: now });
+  return attempt;
+}
+
+/** Tests only. */
+export function forgetRedeemsForTest(): void {
+  redeeming.clear();
 }
 
 /**
@@ -82,43 +130,40 @@ async function inBrowser(
   const { url } = (await start.json().catch(() => ({}))) as { url?: unknown };
   if (typeof url !== "string") return { ok: false, reason: "failed" };
 
-  if (isWeb && typeof localStorage !== "undefined") {
-    try {
-      localStorage.setItem("garnet_handoff_verifier", verifier);
-    } catch {
-      // Ignored if storage is blocked
-    }
-  }
+  writeLocal("handoffVerifier", verifier);
 
   // The proxy keeps the sign-in's state in this browser session, then opens the provider.
   const proxy = `${auth}/expo-authorization-proxy?authorizationURL=${encodeURIComponent(url)}`;
+
+  // On Web: avoid popup windows which are blocked after async fetch and suffer from cross-origin
+  // opener restrictions. Redirect the window directly to the proxy (P-79).
+  if (isWeb && typeof window !== "undefined" && typeof window.location !== "undefined") {
+    window.location.href = proxy;
+    return new Promise<never>(() => undefined);
+  }
+
   const result = await WebBrowser.openAuthSessionAsync(proxy, callbackTarget, {
     // A private session: the browser keeps no cookies of its own afterwards (iOS).
     preferEphemeralSession: true,
   });
-  try {
-    if (result.type !== "success") return { ok: false, reason: "cancelled" };
-    const back = new URL(result.url);
-    const error = back.searchParams.get("error");
-    if (error !== null)
-      return { ok: false, reason: error === "cancelled" ? "cancelled" : "failed" };
-    const code = back.searchParams.get("code");
-    if (code === null) return { ok: false, reason: "failed" };
-    // Through Better Auth's client, which keeps the session cookie in the keystore.
-    const { error: redeemError } = await client.$fetch("/app-handoff/redeem", {
-      method: "POST",
-      body: { code, verifier },
-    });
-    return redeemError === null ? { ok: true } : { ok: false, reason: "failed" };
-  } finally {
-    if (isWeb && typeof localStorage !== "undefined") {
-      try {
-        localStorage.removeItem("garnet_handoff_verifier");
-      } catch {
-        // Ignored
-      }
-    }
+  if (result.type !== "success") {
+    // On Android the browser can close as the link opens the app; the auth-callback route then
+    // has the code and redeems it. That route finishes the sign-in, so "cancelled" here is
+    // quiet: the screen stays as it is until the route moves on.
+    return { ok: false, reason: "cancelled" };
   }
+  const back = new URL(result.url);
+  const error = back.searchParams.get("error");
+  if (error !== null) {
+    await clearLocal("handoffVerifier");
+    return { ok: false, reason: error === "cancelled" ? "cancelled" : "failed" };
+  }
+  const code = back.searchParams.get("code");
+  if (code === null) return { ok: false, reason: "failed" };
+  // Through Better Auth's client, which keeps the session cookie in the keystore.
+  return (await redeemHandoff(client, code, verifier))
+    ? { ok: true }
+    : { ok: false, reason: "failed" };
 }
 
 /**
@@ -238,6 +283,10 @@ export async function connectProvider(
   const { url } = (await start.json().catch(() => ({}))) as { url?: unknown };
   if (typeof url !== "string") return { ok: false, reason: "failed" };
   const proxy = `${auth}/expo-authorization-proxy?authorizationURL=${encodeURIComponent(url)}`;
+  if (isWeb && typeof window !== "undefined" && typeof window.location !== "undefined") {
+    window.location.href = proxy;
+    return new Promise<never>(() => undefined);
+  }
   const result = await WebBrowser.openAuthSessionAsync(proxy, callbackTarget, {
     preferEphemeralSession: true,
   });

@@ -15,6 +15,7 @@ import { ApiProblem } from "../errors/problem";
 import { AttemptLimiter } from "../http/attempts";
 import { parseBody } from "../http/body";
 import { ensureProfile, readProfile } from "../setup/profiles";
+import { CODE_SEALER, type CodeSealer } from "./sealed-code";
 
 /** Guesses at codes per person: 10 every 10 minutes (P-18 leaves the exact limit open). */
 const CODE_ATTEMPTS = { max: 10, windowMs: 10 * 60 * 1000 };
@@ -34,8 +35,8 @@ function isInvalidInvitation(error: unknown): boolean {
 
 /**
  * Pairing (PAIR-01 to PAIR-07, P-18): invitations are single-use, expire (at most 24 hours,
- * enforced by the database), are stored only as hashes, and every unusable code gets the same
- * answer. The code is returned once, when created. All of it runs through the database's
+ * enforced by the database), are checked by hash, and every unusable code gets the same answer.
+ * The inviter can see their own live code again: it is kept sealed for them alone (P-97). All of it runs through the database's
  * pairing functions, which take the person from the session context, never from the request.
  */
 @Controller()
@@ -45,6 +46,7 @@ export class PairingController {
   constructor(
     @Inject(KYSELY) private readonly db: Kysely<Database>,
     @Inject(POLICY) private readonly policy: AuthPolicy,
+    @Inject(CODE_SEALER) private readonly sealer: CodeSealer,
   ) {}
 
   @Get("v1/pairing")
@@ -57,10 +59,14 @@ export class PairingController {
           partner_name: string | null;
           invite_expires_at: Date | null;
           invite_expired: boolean | null;
-        }>`select partner_name, invite_expires_at, invite_expires_at <= now() as invite_expired
+          sealed: string | null;
+        }>`select partner_name, invite_expires_at, invite_expires_at <= now() as invite_expired,
+                  my_invitation_code() as sealed
            from pairing_status()`.execute(trx)
       ).rows[0];
       const partnerName = row?.partner_name ?? null;
+      // The inviter's own code, on any phone and after signing out and in (P-97).
+      const code = row?.sealed == null ? null : this.sealer.open(row.sealed, viewer.userId);
       return {
         me,
         partnerName,
@@ -70,6 +76,7 @@ export class PairingController {
             : {
                 expiresAt: row.invite_expires_at.toISOString(),
                 expired: row.invite_expired === true,
+                code,
               },
       };
     });
@@ -86,6 +93,7 @@ export class PairingController {
       }>`select create_invitation(${hashToken(code)}, ${this.policy.inviteTtlHours}) as expires_at`.execute(
         trx,
       );
+      await sql`select seal_my_invitation(${this.sealer.seal(code, viewer.userId)})`.execute(trx);
       return r.rows[0]?.expires_at;
     }).catch((error: unknown) => {
       // Already paired: nothing to invite into.

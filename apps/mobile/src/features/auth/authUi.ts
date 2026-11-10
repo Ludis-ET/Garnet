@@ -3,8 +3,28 @@ import { MockServiceError } from "@/data/mock/MockStore";
 
 /** One calm message for any failed call (SYS-02): never technical, input always kept. */
 export function serviceErrorMessage(error: unknown): string {
-  if (error instanceof MockServiceError && error.kind === "offline") {
-    return "You're offline. Try again when you're back online.";
+  if (error instanceof MockServiceError) {
+    if (error.kind === "offline") {
+      return "You're offline. Try again when you're back online.";
+    }
+    return "That didn't work. Try again.";
+  }
+  if (error instanceof Error) {
+    if (error.message === "rate-limited") {
+      return "Too many tries. Please wait a moment and try again.";
+    }
+    const msg = error.message.toLowerCase();
+    if (msg.includes("failed to fetch") || msg.includes("network") || msg.includes("offline")) {
+      return "Unable to connect to the server. Please check your connection and try again.";
+    }
+    if (
+      error.message.length > 0 &&
+      !error.message.startsWith("Sign up failed (") &&
+      !error.message.startsWith("Failed to") &&
+      error.message !== "That didn't work. Try again."
+    ) {
+      return error.message;
+    }
   }
   return "That didn't work. Try again.";
 }

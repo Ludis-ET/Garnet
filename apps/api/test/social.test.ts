@@ -6,6 +6,7 @@
 import { signInMethodsSchema } from "@garnet/contracts";
 import { createHash, randomBytes } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { handoffTarget } from "../src/auth/handoff";
 import {
   DEV_PEOPLE,
   PASSWORD,
@@ -248,6 +249,44 @@ describe("the hand-off back to the app (PKCE-bound)", () => {
     expect(csrf.statusCode).toBe(400);
     const nobody = await api.call("GET", `/v1/auth/app-handoff/start?challenge=${challenge}`);
     expect(nobody.headers.location).toBe("garnet://auth-callback?error=failed");
+  });
+
+  it("never hands a code to another site (production-fix-plan S14)", async () => {
+    for (const evil of [
+      "https://evil.example/auth-callback",
+      "http://localhost.evil.example/auth-callback",
+      "http://user@localhost:8081/auth-callback",
+      "http://localhost:8081/elsewhere",
+      "javascript:alert(1)",
+      "garnet://auth-callback?code=planted",
+    ]) {
+      const browser = await api.signIn(DEV_PEOPLE.noah.email);
+      const res = await api.call(
+        "GET",
+        `/v1/auth/app-handoff/start?challenge=${pkce().challenge}&redirect_to=${encodeURIComponent(evil)}`,
+        { cookie: browser },
+      );
+      const location = new URL(String(res.headers.location));
+      expect(`${location.protocol}//${location.host}${location.pathname}`, evil).toBe(
+        "garnet://auth-callback",
+      );
+      expect([...location.searchParams.keys()], evil).toEqual(["code"]);
+      const failed = await api.call(
+        "GET",
+        `/v1/auth/app-handoff/failed?error=access_denied&redirect_to=${encodeURIComponent(evil)}`,
+      );
+      expect(failed.headers.location, evil).toBe("garnet://auth-callback?error=cancelled");
+    }
+  });
+
+  it("lands the local web build (development only) on its own callback page", () => {
+    expect(handoffTarget("http://localhost:8081/auth-callback")).toBe(
+      "http://localhost:8081/auth-callback",
+    );
+    expect(handoffTarget("http://127.0.0.1:19006/auth-callback")).toBe(
+      "http://127.0.0.1:19006/auth-callback",
+    );
+    expect(handoffTarget(undefined)).toBe("garnet://auth-callback");
   });
 
   it("tells the app a cancelled sign-in from a failed one, and nothing more", async () => {

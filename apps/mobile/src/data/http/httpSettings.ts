@@ -1,3 +1,5 @@
+import type { AvatarDto } from "@garnet/contracts";
+import { avatarFromDto } from "./avatar";
 import {
   accountMethodsSchema,
   devicesSchema,
@@ -6,7 +8,7 @@ import {
   settingsViewSchema,
   type SettingsPatchDto,
 } from "@garnet/contracts";
-import { DEMO_PHOTOS, type AvatarChoice } from "@/data/fixtures/demoProfile";
+import type { AvatarChoice } from "@/data/fixtures/demoProfile";
 import type { SettingsRepository } from "@/data/repositories/types";
 import { normaliseEmail } from "@/domain/auth";
 import { withDefaults, type UserSettings } from "@/domain/settings";
@@ -17,12 +19,9 @@ import { connectProvider } from "./social";
 /** The app's deep link that the reset email opens. */
 const RESET_LINK = "garnet://reset-password";
 
-function toAvatar(a: { kind: "initials"; swatch: number } | { kind: "photo"; photo: string }) {
-  if (a.kind === "initials") return a;
-  const photo = DEMO_PHOTOS.find((p) => p === a.photo);
-  const choice: AvatarChoice =
-    photo === undefined ? { kind: "initials", swatch: 0 } : { kind: "photo", photo };
-  return choice;
+/** The API's picture as the app's (P-98). */
+function toAvatar(a: AvatarDto): AvatarChoice {
+  return avatarFromDto(a, "me");
 }
 
 /** What the server stores: the export state is its own, never a setting (B9). */

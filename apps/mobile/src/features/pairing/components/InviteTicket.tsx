@@ -17,6 +17,7 @@ import { spokenInviteCode } from "@/domain/pairing";
 import { useTheme } from "@/theme/ThemeProvider";
 import { CodeTiles } from "./CodeTiles";
 import { ENTER } from "@/theme/transitions";
+import { API_AREAS_ON } from "@/data/http/config";
 
 /**
  * The invitation as a glass ticket (PAIR-02, P-49): a slow holographic sheen sweeps across it,
@@ -113,7 +114,7 @@ export function InviteTicket({
             {timeLeft === null ? "Expired · works once" : `Expires in ${timeLeft} · works once`}
           </AppText>
         </View>
-        <SimulatedBadge text="Simulated invitation" />
+        {API_AREAS_ON.has("pairing") ? null : <SimulatedBadge text="Simulated invitation" />}
       </Glass>
     </Animated.View>
   );

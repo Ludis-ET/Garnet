@@ -5,7 +5,7 @@
  * hours are on without inventing a window (U-21 open). Navigation is mocked.
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, screen } from "@testing-library/react-native";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 import type { ReactElement } from "react";
 import type * as ReactNative from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -146,31 +146,43 @@ describe("SETUP-03 Choose your side (P-51)", () => {
 });
 
 describe("SETUP-04 to SETUP-07", () => {
-  it("offers a photo only through a permission prompt (labelled with testing tools on)", async () => {
+  it("takes a real photo from the gallery, and can go back to initials (P-98)", async () => {
+    const picker = jest.requireMock<{ launchImageLibraryAsync: jest.Mock }>("expo-image-picker");
+    picker.launchImageLibraryAsync.mockResolvedValueOnce({
+      canceled: false,
+      assets: [{ uri: "file:///gallery/me.jpg", width: 1200, height: 1200 }],
+    });
+    const store = await renderWith(
+      <SetupScreen />,
+      setupStore({ done: ["name", "side"], side: "ruby" }),
+    );
+    await fireEvent.press(await screen.findByRole("radio", { name: "Photo" }, WAIT));
+    // The system picker: no simulated prompt, no sample pictures.
+    expect(screen.queryByText("“Garnet” would like to access your photos")).toBeNull();
+    await press("Choose from your photos");
+    expect(await screen.findByRole("button", { name: "Remove photo" }, WAIT)).toBeTruthy();
+    // Cropped square by the picker; made small on the phone before it is kept.
+    expect(picker.launchImageLibraryAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ allowsEditing: true, aspect: [1, 1] }),
+    );
+    const me = Object.values(store.read().profiles.byUser)[0];
+    expect(me?.avatar).toEqual({ kind: "image", uri: "data:image/jpeg;base64,AAAA" });
+
+    await press("Remove photo");
+    await waitFor(() => {
+      expect(Object.values(store.read().profiles.byUser)[0]?.avatar.kind).toBe("initials");
+    }, WAIT);
+    expect(screen.queryByRole("button", { name: "Remove photo" })).toBeNull();
+  });
+
+  it("says nothing when the person closes the gallery without choosing", async () => {
     await renderWith(<SetupScreen />, setupStore({ done: ["name", "side"], side: "ruby" }));
     await fireEvent.press(await screen.findByRole("radio", { name: "Photo" }, WAIT));
-    await press("Choose a photo");
+    await press("Choose from your photos");
     expect(
-      await screen.findByText(
-        "Garnet only uses the photo you pick. Nothing else in your library is read.",
-        {},
-        WAIT,
-      ),
+      await screen.findByRole("button", { name: "Choose from your photos" }, WAIT),
     ).toBeTruthy();
-    await press("Open photo library");
-    // The prompt itself; its "Simulated" badge shows only with testing tools on (P-75).
-    expect(
-      await screen.findByText("“Garnet” would like to access your photos", {}, WAIT),
-    ).toBeTruthy();
-    expect(screen.queryByText("Simulated system prompt")).toBeNull();
-    await press("Don't Allow");
-    expect(
-      await screen.findByText(
-        "Garnet can work without this permission. You can enable it in Settings later.",
-        {},
-        WAIT,
-      ),
-    ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Remove photo" })).toBeNull();
   });
 
   it("shows both cities' times", async () => {
@@ -274,7 +286,8 @@ describe("SETUP-08 You're all set", () => {
     expect(screen.getByText("Still setting up…")).toBeTruthy();
     await press("Go to our space");
     await screen.findByRole("button", { name: "Go to our space", busy: false }, WAIT);
-    expect(mockRouter.replace).toHaveBeenCalledWith("/home");
+    // The gate decides next: waiting for the partner, the fusion, or home (P-99).
+    expect(mockRouter.replace).toHaveBeenCalledWith("/");
     expect(mine(store)?.complete).toBe(true);
   });
 });

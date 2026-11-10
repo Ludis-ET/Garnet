@@ -17,7 +17,7 @@ import Animated, {
   type SharedValue,
 } from "react-native-reanimated";
 import { Image, type ImageSource } from "expo-image";
-import { Audio, type AVPlaybackSource } from "expo-av";
+import { createAudioPlayer, type AudioPlayer, type AudioSource } from "expo-audio";
 import { AppText } from "@/components/ui/AppText";
 import { GarnetMark } from "@/components/brand/GarnetMark";
 import { SparkleBurst } from "@/components/brand/SparkleBurst";
@@ -51,10 +51,10 @@ try {
   // Ignored if not found
 }
 
-let defaultSoundAsset: AVPlaybackSource | undefined;
+let defaultSoundAsset: AudioSource | undefined;
 try {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  defaultSoundAsset = require("../../../../assets/characters/fusion.aac") as AVPlaybackSource;
+  defaultSoundAsset = require("../../../../assets/characters/fusion.aac") as AudioSource;
 } catch {
   // Ignored if not found
 }
@@ -159,17 +159,25 @@ export function ConnectedScene({
   const [animatingKey, setAnimatingKey] = useState<number | null>(
     Platform.OS !== "web" || reduceMotion ? replayKey : null,
   );
+  const [prevReplayKey, setPrevReplayKey] = useState(replayKey);
+  const [hideUnderlyingAnim, setHideUnderlyingAnim] = useState(false);
+  if (prevReplayKey !== replayKey) {
+    setPrevReplayKey(replayKey);
+    setPhase(reduceMotion ? 4 : 0);
+    setAnimatingKey(Platform.OS !== "web" || reduceMotion ? replayKey : null);
+    setHideUnderlyingAnim(false);
+  }
   const animating = animatingKey === replayKey;
   const [needsSoundHint, setNeedsSoundHint] = useState(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const settled = useRef(false);
-  const soundRef = useRef<Audio.Sound | null>(null);
+  const soundRef = useRef<AudioPlayer | null>(null);
   const webAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const stopAudio = () => {
     if (soundRef.current !== null) {
-      void soundRef.current.stopAsync();
-      void soundRef.current.unloadAsync();
+      soundRef.current.pause();
+      soundRef.current.release();
       soundRef.current = null;
     }
     if (webAudioRef.current !== null) {
@@ -202,19 +210,17 @@ export function ConnectedScene({
         });
       }
     } else if (defaultSoundAsset !== undefined) {
-      void Audio.Sound.createAsync(defaultSoundAsset, {
-        shouldPlay: true,
-        volume: 1.0,
-        isLooping: false,
-      })
-        .then((result) => {
-          soundRef.current = result.sound;
-          setAnimatingKey(replayKey);
-        })
-        .catch(() => {
-          setNeedsSoundHint(true);
-          setAnimatingKey(replayKey);
-        });
+      try {
+        const player = createAudioPlayer(defaultSoundAsset);
+        player.volume = 1.0;
+        player.loop = false;
+        soundRef.current = player;
+        player.play();
+        setAnimatingKey(replayKey);
+      } catch {
+        setNeedsSoundHint(true);
+        setAnimatingKey(replayKey);
+      }
     } else {
       queueMicrotask(() => {
         setAnimatingKey(replayKey);
@@ -257,6 +263,12 @@ export function ConnectedScene({
       settleFromEffect();
       return;
     }
+
+    settled.current = false;
+    // Reset phase when replaying
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPhase(0);
+    setAnimatingKey(Platform.OS !== "web" ? replayKey : null);
 
     if (hasFusionVideo) {
       playAudioFromEffect();
@@ -306,7 +318,12 @@ export function ConnectedScene({
       settleFromEffect();
     }, FUSION_DURATION_MS);
 
-    timers.current = [leapTimer, hapticTimer, settleTimer];
+    // Clean up underlying animation shortly after settled overlay mounts to prevent looping
+    const cleanupTimer = setTimeout(() => {
+      setHideUnderlyingAnim(true);
+    }, FUSION_DURATION_MS + 150);
+
+    timers.current = [leapTimer, hapticTimer, settleTimer, cleanupTimer];
 
     return () => {
       timers.current.forEach(clearTimeout);
@@ -321,6 +338,7 @@ export function ConnectedScene({
     timers.current.forEach(clearTimeout);
     glide.set(1);
     setPhase(4);
+    setHideUnderlyingAnim(true);
     stopAudio();
     settle();
   };
@@ -338,14 +356,14 @@ export function ConnectedScene({
   if (hasFusionVideo) {
     const isSettled = phase === 4;
     const startSource =
-      Platform.OS === "web" ? { uri: "/fusion-start.png" } : (defaultStartSource ?? fusionSource);
+      Platform.OS === "web"
+        ? { uri: `/fusion-start.png?v=2&k=${replayKey}` }
+        : (defaultStartSource ?? fusionSource);
     const webpSource =
-      Platform.OS === "web" ? { uri: `/fusion.webp?k=${replayKey}` } : fusionSource;
-    const activeImageSource = isSettled
-      ? (settledSource ?? webpSource)
-      : animating
-        ? webpSource
-        : startSource;
+      Platform.OS === "web" ? { uri: `/fusion.webp?v=2&k=${replayKey}` } : fusionSource;
+    const settledWebSource =
+      Platform.OS === "web" ? { uri: `/fusion-settled.png?v=2&k=${replayKey}` } : undefined;
+    const settledSourceToUse = settledWebSource ?? settledSource ?? webpSource;
 
     return (
       <Pressable
@@ -355,13 +373,27 @@ export function ConnectedScene({
         style={styles.fusionStage}
       >
         <Animated.View style={[styles.fusionWrap, floatStyle]}>
-          <Image
-            source={activeImageSource}
-            style={{ width: animWidth, height: animHeight }}
-            contentFit="contain"
-            priority="high"
-            accessible={false}
-          />
+          {!hideUnderlyingAnim ? (
+            <Image
+              key={`fusion-anim-${replayKey}`}
+              source={animating ? webpSource : startSource}
+              style={{ width: animWidth, height: animHeight }}
+              contentFit="contain"
+              priority="high"
+              accessible={false}
+            />
+          ) : null}
+          {isSettled ? (
+            <View pointerEvents="none" style={styles.settledOverlay}>
+              <Image
+                source={settledSourceToUse}
+                style={{ width: animWidth, height: animHeight }}
+                contentFit="contain"
+                priority="high"
+                accessible={false}
+              />
+            </View>
+          ) : null}
           <View pointerEvents="none" style={styles.sparkleOverlay}>
             <SparkleBurst play={isSettled} />
           </View>
@@ -419,6 +451,16 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   fusionWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  settledOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     alignItems: "center",
     justifyContent: "center",
   },

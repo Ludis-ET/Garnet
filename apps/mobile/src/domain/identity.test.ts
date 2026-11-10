@@ -108,12 +108,31 @@ describe("time zones (ADR-0002)", () => {
   });
 
   it("searches by city, country or zone, and names unknown zones from their id", () => {
-    expect(searchZones("addis").map((z) => z.zone)).toEqual(["Africa/Addis_Ababa"]);
-    expect(searchZones("united kingdom").map((z) => z.city)).toEqual(["London"]);
-    expect(searchZones("new york").map((z) => z.zone)).toEqual(["America/New_York"]);
+    const addis = searchZones("addis");
+    expect(addis[0]?.city).toBe("Addis Ababa");
+    expect(new Set(addis.map((z) => z.zone))).toEqual(new Set(["Africa/Addis_Ababa"]));
+    const uk = searchZones("united kingdom").map((z) => z.city);
+    expect(uk[0]).toBe("London");
+    expect(uk).toEqual(expect.arrayContaining(["Manchester", "Edinburgh", "Belfast"]));
+    expect(searchZones("new york")[0]?.zone).toBe("America/New_York");
     expect(searchZones("zzzz")).toEqual([]);
-    expect(searchZones("")).toHaveLength(ZONES.length);
     expect(cityForZone("America/Port_of_Spain")).toBe("Port of Spain");
+  });
+
+  it("offers every place in the world, and finds them however they are typed", () => {
+    const all = searchZones("");
+    expect(all.length).toBeGreaterThan(400);
+    // The best-known cities come first.
+    expect(all.slice(0, ZONES.length)).toEqual([...ZONES]);
+    for (const z of all) expect(isKnownZone(z.zone)).toBe(true);
+    expect(searchZones("port of spain")[0]?.zone).toBe("America/Port_of_Spain");
+    expect(searchZones("sao paulo")[0]?.city).toBe("São Paulo");
+    expect(searchZones("bahir")[0]).toMatchObject({
+      city: "Bahir Dar",
+      zone: "Africa/Addis_Ababa",
+    });
+    expect(searchZones("kathmandu")[0]?.zone).toBe("Asia/Kathmandu");
+    expect(searchZones("ulaanbaatar").length).toBeGreaterThan(0);
   });
 
   it("knows every zone in the picker, and rejects made-up ones", () => {

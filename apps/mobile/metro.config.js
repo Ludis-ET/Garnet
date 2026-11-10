@@ -9,5 +9,8 @@ config.resolver.blockList = [
   ...(Array.isArray(blockList) ? blockList : blockList === undefined ? [] : [blockList]),
   /[/\\]\.cache[/\\].*/,
 ];
+if (!config.resolver.assetExts.includes("wasm")) {
+  config.resolver.assetExts.push("wasm");
+}
 
 module.exports = config;

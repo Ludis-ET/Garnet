@@ -1,14 +1,15 @@
 /**
  * PAIR-02 · Your invitation, and PAIR-06 · your person joined (Daylight Glass, P-49). The code
- * is a simulated, single-use invitation that expires after 24 hours (P-18, proposed; P-50).
- * Sharing is a local preview: nothing leaves the device. Delivery by code is a prototype
- * assumption; U-33 (link, code or both) stays open.
+ * is single-use and expires after 24 hours (P-18, proposed; P-50). The inviter sees it again on
+ * any phone (P-97). Sharing uses the phone's own share sheet with a message laid out for
+ * messengers; "How your person joins" walks them through it. Delivery by code is an assumption;
+ * U-33 (link, code or both) stays open.
  */
 import * as Clipboard from "expo-clipboard";
 import { Haptics } from "@/components/ui/haptics";
 import { Redirect, useRouter } from "expo-router";
 import { useState } from "react";
-import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Platform, Share, StyleSheet, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { SparkleBurst } from "@/components/brand/SparkleBurst";
 import { ActionSheet } from "@/components/ui/ActionSheet";
@@ -28,12 +29,13 @@ import { useCreateInvite, usePairingStatus, useRevokeInvite } from "../usePairin
 import { useTimeLeft } from "../useTimeLeft";
 import { goBack } from "@/navigation/goBack";
 import { ENTER } from "@/theme/transitions";
+import { API_AREAS_ON } from "@/data/http/config";
 
 export function InviteScreen() {
   const router = useRouter();
   const toast = useToast();
   const { colors, radii, spacing, reduceMotion } = useTheme();
-  const status = usePairingStatus();
+  const status = usePairingStatus(true, 2500);
   const create = useCreateInvite();
   const revoke = useRevokeInvite();
   const demo = usePairingDemo();
@@ -44,6 +46,23 @@ export function InviteScreen() {
   const data = status.data;
   const timeLeft = useTimeLeft(data?.kind === "inviting" ? data.expiresAt : null);
   if (data?.kind === "inviting" && !sawInvite) setSawInvite(true);
+
+  const handleShare = async () => {
+    if (data?.kind !== "inviting") return;
+    const message = inviteShareMessage(data.me, data.code, INVITE_POLICY_P18);
+    if (Platform.OS !== "web") {
+      try {
+        await Share.share(
+          { message, title: "Your Garnet invitation" },
+          { dialogTitle: "Share your invitation", subject: `${data.me} invited you to Garnet` },
+        );
+        return;
+      } catch {
+        // Fallback to modal if native share tray fails
+      }
+    }
+    setSheet("share");
+  };
 
   if (data === undefined) {
     return (
@@ -95,6 +114,9 @@ export function InviteScreen() {
 
   const { code } = data;
   const expired = data.expired || timeLeft === null;
+  // An invitation made before the server kept codes, on a phone that no longer has it: say so
+  // and offer a fresh one, instead of empty tiles.
+  const lost = !expired && code === "";
   const copy = async (text: string, message: string) => {
     await Clipboard.setStringAsync(text);
     if (Platform.OS !== "web") void Haptics.selectionAsync();
@@ -114,24 +136,44 @@ export function InviteScreen() {
         goBack("/pair");
       }}
       footer={
-        expired ? (
-          <Button label="Create a new one" onPress={renew} loading={create.isPending} />
+        expired || lost ? (
+          <Button
+            label={lost ? "Make a fresh code" : "Create a new one"}
+            onPress={renew}
+            loading={create.isPending}
+          />
         ) : (
           <>
             <Button
               label="Share invitation"
               onPress={() => {
-                setSheet("share");
+                void handleShare();
               }}
             />
-            <Button
-              label="Copy code"
-              variant="secondary"
-              onPress={() => {
-                setCopied((n) => n + 1);
-                void copy(formatInviteCode(code), "Code copied");
-              }}
-            />
+            <View style={[styles.pair, { gap: spacing.sm }]}>
+              <View style={styles.half}>
+                <Button
+                  label="Copy code"
+                  variant="secondary"
+                  onPress={() => {
+                    setCopied((n) => n + 1);
+                    void copy(formatInviteCode(code), "Code copied");
+                  }}
+                />
+              </View>
+              <View style={styles.half}>
+                <Button
+                  label="Copy message"
+                  variant="secondary"
+                  onPress={() => {
+                    void copy(
+                      inviteShareMessage(data.me, code, INVITE_POLICY_P18),
+                      "Message copied",
+                    );
+                  }}
+                />
+              </View>
+            </View>
             <Button
               label="Revoke invitation"
               variant="text"
@@ -145,20 +187,29 @@ export function InviteScreen() {
     >
       <Animated.View {...(reduceMotion ? {} : { entering: ENTER })} style={{ gap: spacing.sm }}>
         <AppText variant="largeTitle">Your invitation</AppText>
+        <AppText variant="body" color="textSecondary">
+          {lost
+            ? "This code was made before Garnet kept it for you. Make a fresh one to share; the old one stops working."
+            : "Send this to your person. Only they can use it, and only once."}
+        </AppText>
       </Animated.View>
 
-      <InviteTicket
-        code={code}
-        timeLeft={expired ? null : timeLeft}
-        expired={expired}
-        copiedKey={copied === 0 ? undefined : copied}
-        onCopy={() => {
-          setCopied((n) => n + 1);
-          void copy(formatInviteCode(code), "Code copied");
-        }}
-      />
+      {lost ? null : (
+        <InviteTicket
+          code={code}
+          timeLeft={expired ? null : timeLeft}
+          expired={expired}
+          copiedKey={copied === 0 ? undefined : copied}
+          onCopy={() => {
+            setCopied((n) => n + 1);
+            void copy(formatInviteCode(code), "Code copied");
+          }}
+        />
+      )}
 
-      {expired ? null : (
+      {expired || lost ? null : <JoinSteps />}
+
+      {expired || lost ? null : (
         <View style={{ gap: spacing.md }}>
           <AvatarLink left={data.me} right={null} connected={false} />
           <AppText
@@ -169,11 +220,13 @@ export function InviteScreen() {
           >
             Waiting for your person to join…
           </AppText>
-          <Button
-            label="Simulate your person joining (demo)"
-            variant="subtle"
-            onPress={demo.partnerJoins}
-          />
+          {API_AREAS_ON.has("pairing") ? null : (
+            <Button
+              label="Simulate your person joining (demo)"
+              variant="subtle"
+              onPress={demo.partnerJoins}
+            />
+          )}
         </View>
       )}
 
@@ -192,7 +245,7 @@ export function InviteScreen() {
           void copy(inviteShareMessage(data.me, code, INVITE_POLICY_P18), "Message copied");
         }}
       >
-        <SimulatedBadge text="Simulated — nothing is sent" />
+        {API_AREAS_ON.has("pairing") ? null : <SimulatedBadge text="Simulated — nothing is sent" />}
       </ActionSheet>
       <ActionSheet
         visible={sheet === "revoke"}
@@ -222,7 +275,47 @@ export function InviteScreen() {
   );
 }
 
+/** PAIR-02: what the person receiving the code does, in three short steps. */
+function JoinSteps() {
+  const { colors, radii, spacing } = useTheme();
+  const steps = [
+    "Install Garnet and create an account",
+    "Choose “I have an invitation”",
+    "Enter the code to open your space together",
+  ];
+  return (
+    <Glass radius={radii.xl} contentStyle={{ padding: spacing.lg, gap: spacing.md }}>
+      <AppText variant="headline" accessibilityRole="header">
+        How your person joins
+      </AppText>
+      {steps.map((step, i) => (
+        <View key={step} style={[styles.step, { gap: spacing.md }]}>
+          <View style={[styles.stepDot, { backgroundColor: colors.accent }]}>
+            <AppText variant="footnote" weight="600" color="onAccent">
+              {String(i + 1)}
+            </AppText>
+          </View>
+          <AppText variant="callout" style={styles.stepText}>
+            {step}
+          </AppText>
+        </View>
+      ))}
+    </Glass>
+  );
+}
+
 const styles = StyleSheet.create({
+  pair: { flexDirection: "row" },
+  half: { flex: 1 },
+  step: { flexDirection: "row", alignItems: "center" },
+  stepDot: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stepText: { flex: 1 },
   fill: { flex: 1, alignItems: "center", justifyContent: "center" },
   full: { alignSelf: "stretch" },
   joined: { alignItems: "center" },

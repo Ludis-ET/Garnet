@@ -40,6 +40,20 @@ await build({
   external: ["pg"],
 });
 
+// 2b. The email settings check, run by hand on the host: node dist/mail-check.mjs you@example.com
+await build({
+  entryPoints: [resolve(apiRoot, "src/mail/check.ts")],
+  bundle: true,
+  platform: "node",
+  format: "esm",
+  target: "node20",
+  outfile: resolve(distDir, "mail-check.mjs"),
+  banner: {
+    js: "import { createRequire as __createRequire } from 'node:module'; const require = __createRequire(import.meta.url);",
+  },
+  external: ["pg"],
+});
+
 // 3. Copy SQL migrations into dist/migrations
 const migrationsSource = resolve(repoRoot, "packages/db/migrations");
 const migrationsDest = resolve(distDir, "migrations");

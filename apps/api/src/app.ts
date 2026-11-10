@@ -16,6 +16,8 @@ import { DataRightsService } from "./account/data-rights.service";
 import { AUTH, KYSELY, POLICY, SOCIAL, type Database } from "./db/database";
 import { ProblemFilter } from "./errors/problem.filter";
 import { HealthController } from "./health/health.controller";
+import { OpenLinkController } from "./auth/open-link.controller";
+import { CODE_SEALER, createCodeSealer } from "./pairing/sealed-code";
 import { SafeLogController } from "./logging";
 import { MeController } from "./me/me.controller";
 import { PairingController } from "./pairing/pairing.controller";
@@ -25,6 +27,7 @@ import {
 } from "./registration/registration.controller";
 import { SettingsController } from "./settings/settings.controller";
 import { SetupController } from "./setup/setup.controller";
+import { AvatarController } from "./setup/avatar.controller";
 import { SyncController } from "./sync/sync.controller";
 import { SyncService } from "./sync/sync.service";
 import { DaysController } from "./days/days.controller";
@@ -68,10 +71,12 @@ class AppModule {
       module: AppModule,
       controllers: [
         HealthController,
+        OpenLinkController,
         SignInMethodsController,
         MeController,
         RegistrationController,
         SetupController,
+        AvatarController,
         PairingController,
         SettingsController,
         AccountController,
@@ -109,6 +114,7 @@ class AppModule {
         { provide: KYSELY, useValue: options.db },
         { provide: AUTH, useValue: options.auth },
         { provide: POLICY, useValue: options.policy },
+        { provide: CODE_SEALER, useValue: createCodeSealer(options.auth.options.secret) },
         { provide: SOCIAL, useValue: options.social ?? {} },
         { provide: PUSH_SENDER, useValue: options.pushSender ?? new InMemoryPushSender() },
         { provide: OBJECT_STORAGE, useValue: options.objectStorage ?? new InMemoryObjectStorage() },
@@ -192,9 +198,21 @@ export async function createApp(options: AppOptions): Promise<NestFastifyApplica
     exposedHeaders: ["x-request-id", "retry-after", "set-cookie"],
   });
   options.beforeRoutes?.(fastify);
+  fastify.addHook("onRequest", (request, _reply, done) => {
+    const sock = request.raw.socket as unknown as {
+      setKeepAlive?: () => void;
+      setNoDelay?: () => void;
+      setTimeout?: () => void;
+    };
+    if (typeof sock.setKeepAlive !== "function") sock.setKeepAlive = () => undefined;
+    if (typeof sock.setNoDelay !== "function") sock.setNoDelay = () => undefined;
+    if (typeof sock.setTimeout !== "function") sock.setTimeout = () => undefined;
+    done();
+  });
   fastify.addHook("onSend", async (request, reply) => {
     void reply.header("x-request-id", request.id);
-    void reply.header("cache-control", "no-store");
+    // Nothing is cached unless a route says so (only profile pictures do, privately, P-98).
+    if (!reply.hasHeader("cache-control")) void reply.header("cache-control", "no-store");
     void reply.header("x-content-type-options", "nosniff");
   });
   fastify.addHook("onResponse", async (request, reply) => {

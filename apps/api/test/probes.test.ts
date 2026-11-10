@@ -51,6 +51,8 @@ const PUBLIC_ROUTES = new Set([
   "GET /health",
   "GET /v1/health",
   "GET /v1/sign-in-methods",
+  // The email-link opener (production-fix-plan A7): hands a token to garnet://, reads nothing.
+  "GET /v1/open/:page",
   "GET /v1/auth/*",
   "POST /v1/auth/*",
   "GET /v1/me/export/download/:token",
@@ -61,7 +63,8 @@ async function setupOf(api: TestApi, cookie: string): Promise<SetupStateDto> {
 }
 
 /** The only fields the partner's answers may show (P-51): never nickname, avatar, alerts... */
-const PARTNER_KEYS = ["birthDate", "homeCity", "name", "ready", "side", "timeZone"];
+// "avatar": the partner sees their picture (P-98).
+const PARTNER_KEYS = ["avatar", "birthDate", "homeCity", "name", "ready", "side", "timeZone"];
 
 /**
  * For each private route: what a stranger (another relationship) and the partner get. "Not
@@ -340,13 +343,69 @@ const PROBES: Record<string, (api: TestApi) => Promise<void>> = {
       `%${code}%`,
     ]);
     expect(stored.rows).toEqual([]);
+    // P-97: kept only sealed, so a copy of the database shows no code...
+    const sealed = await api.db.query<{ sealed_code: string | null }>(
+      "select sealed_code from invitation where sealed_code is not null",
+    );
+    for (const row of sealed.rows) expect(row.sealed_code).not.toContain(code);
+    // ...and only the inviter is given it back.
     const later = pairingStatusSchema.parse(
       (await api.call("GET", "/v1/pairing", { cookie: api.cookies.stranger })).json(),
     );
-    expect(JSON.stringify(later)).not.toContain(code);
+    expect(later.invite?.code).toBe(code);
     // The paired couple see nothing of it.
     const noah = await api.call("GET", "/v1/pairing", { cookie: api.cookies.noah });
     expect(noah.json()).toMatchObject({ invite: null });
+  },
+
+  "PUT /v1/me/avatar": async (api) => {
+    const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(32, 1)]);
+    const res = await api.call("PUT", "/v1/me/avatar", {
+      cookie: api.cookies.stranger,
+      body: { contentType: "image/jpeg", data: jpeg.toString("base64") },
+    });
+    expect(res.statusCode).toBe(200);
+    // A stranger's picture goes under their own id, and never to the couple.
+    expect(
+      await api.objectStorage.listKeys("garnet-media", `avatars/${STRANGER.id}/`),
+    ).toHaveLength(1);
+    for (const cookie of [api.cookies.selam, api.cookies.noah]) {
+      const seen = await api.call("GET", "/v1/partner/avatar", { cookie });
+      expect(seen.rawPayload.equals(jpeg)).toBe(false);
+    }
+  },
+
+  "DELETE /v1/me/avatar": async (api) => {
+    const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(32, 2)]);
+    await api.call("PUT", "/v1/me/avatar", {
+      cookie: api.cookies.selam,
+      body: { contentType: "image/jpeg", data: jpeg.toString("base64") },
+    });
+    // A stranger removing removes only their own.
+    await api.call("DELETE", "/v1/me/avatar", { cookie: api.cookies.stranger });
+    const still = await api.call("GET", "/v1/me/avatar", { cookie: api.cookies.selam });
+    expect(still.rawPayload.equals(jpeg)).toBe(true);
+  },
+
+  "GET /v1/me/avatar": async (api) => {
+    // Always the caller's own; there is no way to name someone else's.
+    const res = await api.call("GET", "/v1/me/avatar?user=" + DEV_PEOPLE.selam.id, {
+      cookie: api.cookies.stranger,
+    });
+    if (res.statusCode === 200) {
+      const selams = await api.call("GET", "/v1/me/avatar", { cookie: api.cookies.selam });
+      expect(res.rawPayload.equals(selams.rawPayload)).toBe(false);
+    } else expect(res.statusCode).toBe(404);
+  },
+
+  "GET /v1/partner/avatar": async (api) => {
+    // The stranger's partner is in their own relationship: never Selam or Noah.
+    const res = await api.call("GET", "/v1/partner/avatar", { cookie: api.cookies.stranger });
+    for (const cookie of [api.cookies.selam, api.cookies.noah]) {
+      const own = await api.call("GET", "/v1/me/avatar", { cookie });
+      if (own.statusCode === 200 && res.statusCode === 200)
+        expect(res.rawPayload.equals(own.rawPayload)).toBe(false);
+    }
   },
 
   "DELETE /v1/invitations": async (api) => {
@@ -819,6 +878,20 @@ const PROBES: Record<string, (api: TestApi) => Promise<void>> = {
     });
     expect(stranger.statusCode).toBe(200);
     expect(stranger.json<SearchChatResponse>().messages).toEqual([]);
+  },
+
+  "GET /v1/chat/stream": async (api) => {
+    const stranger = await api.call("GET", "/v1/chat/stream?probe=true", {
+      cookie: api.cookies.stranger,
+    });
+    expect(stranger.statusCode).toBe(200);
+    expect(stranger.headers["content-type"]).toContain("text/event-stream");
+
+    const partner = await api.call("GET", "/v1/chat/stream?probe=true", {
+      cookie: api.cookies.selam,
+    });
+    expect(partner.statusCode).toBe(200);
+    expect(partner.headers["content-type"]).toContain("text/event-stream");
   },
 
   "POST /v1/me/push-devices": async (api) => {

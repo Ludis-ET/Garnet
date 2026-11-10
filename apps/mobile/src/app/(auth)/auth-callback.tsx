@@ -1,12 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef } from "react";
 import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
-import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import { useQueryClient } from "@tanstack/react-query";
 import { authKeys } from "@/features/auth/useAuth";
-import { createGarnetAuthClient } from "@/data/http/authClient";
+import { getGarnetAuthClient } from "@/data/http/authClient";
 import { API_URL } from "@/data/http/config";
-import { writeLocal } from "@/data/http/localState";
+import { clearLocal } from "@/data/http/localState";
+import { redeemHandoff } from "@/data/http/social";
+import { useTheme } from "@/theme/ThemeProvider";
 
 // Web: complete OAuth sessions when returning from Google/Apple sign-in (P-79).
 if (Platform.OS === "web") {
@@ -14,91 +16,81 @@ if (Platform.OS === "web") {
 }
 
 /**
- * garnet://auth-callback: where a Google or Apple sign-in in the browser comes back (P-79). The
- * sign-in itself finishes in the code that opened the browser, which trades the one-time code
- * for the session; this route closes the popup or redeems if redirected in the same window.
+ * garnet://auth-callback: where a Google or Apple sign-in in the browser comes back (P-79).
+ *
+ * The one-time code is traded through redeemHandoff, which the code that opened the browser
+ * shares, so the two never race each other for it (production-fix-plan A2). Before moving on,
+ * the auth status is fetched again and awaited (A1): navigating first used to land on the
+ * entry gate while it still held "signed out", which sent the person to the welcome page.
  */
 export default function AuthCallback() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const params = useLocalSearchParams<{ code?: string; error?: string }>();
-  const [done, setDone] = useState(Platform.OS !== "web");
+  const { colors } = useTheme();
+  const params = useLocalSearchParams<{ code?: string; error?: string; linked?: string }>();
+  const started = useRef(false);
 
   useEffect(() => {
-    if (Platform.OS !== "web") return;
+    // Expo Router can deliver the same link twice; the first run owns it.
+    if (started.current) return;
+    started.current = true;
 
-    let cleanup: (() => void) | undefined;
-
-    // Try completing the WebBrowser auth session if opened in popup
-    WebBrowser.maybeCompleteAuthSession({ skipRedirectCheck: true });
-    if (typeof window !== "undefined" && window.opener) {
-      // In a popup window: close after messaging opener
-      const timer = setTimeout(() => {
-        try {
-          window.close();
-        } catch {
-          setDone(true);
-        }
-      }, 300);
-      cleanup = () => {
-        clearTimeout(timer);
-      };
-      return cleanup;
+    // Web popup: the opener finishes; this window only closes.
+    if (Platform.OS === "web" && typeof window !== "undefined" && window.opener) {
+      try {
+        window.close();
+        return;
+      } catch {
+        // Fall through and finish here.
+      }
     }
 
-    // Fallback if navigated in same tab without opener: redeem code directly
-    const code = params.code;
-    const verifier =
-      typeof localStorage !== "undefined" ? localStorage.getItem("garnet_handoff_verifier") : null;
-
-    if (code && verifier && API_URL) {
-      const client = createGarnetAuthClient(API_URL);
-      void client
-        .$fetch("/app-handoff/redeem", {
-          method: "POST",
-          body: { code, verifier },
-        })
-        .then(() => {
-          try {
-            localStorage.removeItem("garnet_handoff_verifier");
-          } catch {
-            // Ignored
-          }
-          writeLocal("hadSession", "yes");
-          void queryClient.invalidateQueries({ queryKey: authKeys.all });
-          router.replace("/");
-        })
-        .catch(() => {
-          setDone(true);
-        });
-      return cleanup;
-    }
-
-    const fallback = setTimeout(() => {
-      setDone(true);
-    }, 0);
-    cleanup = () => {
-      clearTimeout(fallback);
+    const goTo = async (href: "/" | "/welcome" | "/settings") => {
+      // Fresh status first, then the route that reads it.
+      await queryClient.refetchQueries({ queryKey: authKeys.status }).catch(() => undefined);
+      router.replace(href);
     };
-    return cleanup;
-  }, [params.code, queryClient, router]);
 
-  if (done) {
-    return <Redirect href="/" />;
-  }
+    if (params.linked === "1") {
+      void goTo("/settings");
+      return;
+    }
+    if (params.error !== undefined || params.code === undefined || API_URL === null) {
+      void (async () => {
+        await clearLocal("handoffVerifier");
+        await goTo(params.error === undefined && params.code === undefined ? "/" : "/welcome");
+      })();
+      return;
+    }
+
+    const code = params.code;
+    void (async () => {
+      const client = getGarnetAuthClient(API_URL);
+      const ok = await redeemHandoff(client, code);
+      if (ok) {
+        // A Google or Apple sign-in replaces any email sign-up waiting on this phone.
+        await clearLocal("pendingEmail", "justVerified");
+        await goTo("/");
+        return;
+      }
+      // The code was already used, or expired: the person may still be signed in from the
+      // first use; the gate decides from the server's answer.
+      await goTo("/");
+    })();
+  }, [params.code, params.error, params.linked, queryClient, router]);
 
   return (
-    <View style={styles.container}>
-      <ActivityIndicator size="large" color="#FF7A8A" />
+    <View
+      style={[styles.container, { backgroundColor: colors.background }]}
+      accessible
+      accessibilityLabel="Signing you in"
+      accessibilityRole="progressbar"
+    >
+      <ActivityIndicator size="large" color={colors.accent} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#0B0C10",
-  },
+  container: { flex: 1, justifyContent: "center", alignItems: "center" },
 });

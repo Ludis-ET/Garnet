@@ -1,7 +1,12 @@
 import type { createHash as createHashFn } from "node:crypto";
 import * as WebBrowser from "expo-web-browser";
 import type { GarnetAuthClient } from "./authClient";
-import { connectProvider, continueWithProvider } from "./social";
+import {
+  connectProvider,
+  continueWithProvider,
+  forgetRedeemsForTest,
+  redeemHandoff,
+} from "./social";
 
 jest.mock("expo-web-browser", () => ({ openAuthSessionAsync: jest.fn() }));
 jest.mock("expo-apple-authentication", () => ({
@@ -47,7 +52,38 @@ function sent(fetchMock: jest.Mock): {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  forgetRedeemsForTest();
   redeem.mockResolvedValue({ error: null });
+});
+
+describe("one redeem per hand-off code (production-fix-plan A2)", () => {
+  const VERIFIER = "v".repeat(43);
+
+  it("the browser's return and the deep link share one try, and both see it succeed", async () => {
+    let answer: (value: { error: null }) => void = () => undefined;
+    redeem.mockReturnValue(
+      new Promise((resolve) => {
+        answer = resolve;
+      }),
+    );
+    const fromBrowser = redeemHandoff(client, "code-a", VERIFIER);
+    const fromLink = redeemHandoff(client, "code-a");
+    answer({ error: null });
+    expect(await Promise.all([fromBrowser, fromLink])).toEqual([true, true]);
+    expect(redeem).toHaveBeenCalledTimes(1);
+  });
+
+  it("is false when the server refuses the code, or the request fails", async () => {
+    redeem.mockResolvedValueOnce({ error: { status: 400 } });
+    expect(await redeemHandoff(client, "code-b", VERIFIER)).toBe(false);
+    redeem.mockRejectedValueOnce(new Error("offline"));
+    expect(await redeemHandoff(client, "code-c", VERIFIER)).toBe(false);
+  });
+
+  it("sends nothing without a verifier (a link this phone didn't start)", async () => {
+    expect(await redeemHandoff(client, "code-d")).toBe(false);
+    expect(redeem).not.toHaveBeenCalled();
+  });
 });
 
 describe("continuing with Google in the browser (P-79)", () => {

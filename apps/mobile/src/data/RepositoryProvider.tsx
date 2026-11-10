@@ -18,6 +18,7 @@ import {
 import { MockStore } from "./mock/MockStore";
 import { withApiAreas } from "./http/apiRepositories";
 import { API_AREAS_ON, API_URL } from "./http/config";
+import { onSessionLost } from "./http/sessionEvents";
 import { createMockRepositories } from "./mock/mockRepositories";
 import type { Repositories } from "./repositories/types";
 import { SqliteStore } from "./sqlite/sqliteStore";
@@ -53,6 +54,7 @@ export function RepositoryProvider({
   return (
     <DataContext.Provider value={value}>
       <DemoQuerySync store={value.demo} />
+      <SessionWatch />
       {widgetsSupported() ? <WidgetSync store={value.demo} sqlite={value.sqlite} /> : null}
       {children}
     </DataContext.Provider>
@@ -81,6 +83,23 @@ function DemoQuerySync({ store }: { store: MockStore }) {
           ),
       ),
     [store, client],
+  );
+  return null;
+}
+
+/**
+ * When the API turns the session down, the auth status is asked again (production-fix-plan A5);
+ * the layouts route from that answer ("signed out for privacy", or carry on if it was a blip).
+ * The key is useAuth's authKeys.status, written out to keep data/ free of feature imports.
+ */
+function SessionWatch() {
+  const client = useQueryClient();
+  useEffect(
+    () =>
+      onSessionLost(() => {
+        void client.invalidateQueries({ queryKey: ["auth", "status"] });
+      }),
+    [client],
   );
   return null;
 }

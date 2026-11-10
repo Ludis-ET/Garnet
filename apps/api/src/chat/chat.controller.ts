@@ -9,7 +9,10 @@ import {
   Patch,
   Post,
   Query,
+  Sse,
+  type MessageEvent,
 } from "@nestjs/common";
+import { Observable } from "rxjs";
 import {
   deleteMessageRequestSchema,
   editMessageRequestSchema,
@@ -182,5 +185,47 @@ export class ChatController {
   ): Promise<SearchChatResponse> {
     const messages = await this.chatService.search(viewer, query);
     return { messages };
+  }
+
+  @Sse("stream")
+  async chatStream(
+    @CurrentViewer() viewer: Viewer,
+    @Query("probe") probe?: string,
+  ): Promise<Observable<MessageEvent>> {
+    const relId = await this.chatService.getRelationshipId(viewer);
+
+    return new Observable<MessageEvent>((subscriber) => {
+      let unsubscribe: (() => void) | null = null;
+      let active = true;
+
+      // Initial connection event
+      subscriber.next({ data: { type: "connected", relationshipId: relId } });
+
+      // In probe test environments, complete immediately after connection
+      if (probe === "true") {
+        subscriber.complete();
+        return;
+      }
+
+      // Subscribe to relationship chat events
+      unsubscribe = this.chatService.subscribeEvents(relId, (event) => {
+        if (active) {
+          subscriber.next({ data: event });
+        }
+      });
+
+      // Keepalive heartbeat every 15s to keep mobile proxies and connections alive
+      const pingInterval = setInterval(() => {
+        if (active) {
+          subscriber.next({ data: { type: "ping" } });
+        }
+      }, 15000);
+
+      return () => {
+        active = false;
+        clearInterval(pingInterval);
+        unsubscribe();
+      };
+    });
   }
 }

@@ -24,6 +24,7 @@ import { GlassScreen } from "@/components/ui/GlassScreen";
 import { StatusHero } from "@/components/ui/StatusHero";
 import { useRequestPasswordReset } from "../useAuth";
 import { goBack } from "@/navigation/goBack";
+import { API_AREAS_ON } from "@/data/http/config";
 
 /** The one message every request gets (AUTH-05). Exported for the privacy test. */
 export const RESET_SENT_MESSAGE =
@@ -74,21 +75,23 @@ export function ForgotPasswordScreen() {
       <GlassScreen
         footer={
           <>
-            <Button
-              label="Open reset link (demo)"
-              onPress={() => {
-                router.push({
-                  pathname: "/reset-password",
-                  params: { token: DEMO_RESET_TOKENS.valid },
-                });
-              }}
-            />
+            {API_AREAS_ON.has("auth") ? null : (
+              <Button
+                label="Open reset link (demo)"
+                onPress={() => {
+                  router.push({
+                    pathname: "/reset-password",
+                    params: { token: DEMO_RESET_TOKENS.valid },
+                  });
+                }}
+              />
+            )}
             {backToSignIn}
           </>
         }
       >
         <StatusHero icon="mail" title="Check your inbox" body={RESET_SENT_MESSAGE}>
-          <SimulatedBadge />
+          {API_AREAS_ON.has("auth") ? null : <SimulatedBadge />}
         </StatusHero>
       </GlassScreen>
     );

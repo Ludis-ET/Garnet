@@ -1,4 +1,6 @@
 import { LinearGradient } from "expo-linear-gradient";
+import { useState } from "react";
+import { AuthImage } from "@/components/ui/AuthImage";
 import { StyleSheet, View } from "react-native";
 import Animated from "react-native-reanimated";
 import Svg, { Circle, Defs, RadialGradient, Stop } from "react-native-svg";
@@ -19,8 +21,8 @@ export function sideColor(side: GemSide | null): string {
 }
 
 /**
- * A person's picture (SETUP-04): their initial on a swatch gradient from their side's family,
- * or an abstract demo "photo" (simulated, never a real picture). Ringed in the side colour; a
+ * A person's picture (SETUP-04): their own photo (P-98: from their gallery, or their Google
+ * account's), or their initial on a swatch gradient from their side's family. Ringed in the side colour; a
  * change pops in with a spring. Decorative: the screen names the person.
  */
 export function ProfileAvatar({
@@ -34,12 +36,20 @@ export function ProfileAvatar({
   side: GemSide | null;
   size: number;
 }) {
-  const key = avatar.kind === "photo" ? avatar.photo : `i${avatar.swatch}`;
+  // A picture that can't load (offline before it was ever kept) shows the initial instead.
+  const [broken, setBroken] = useState<string | null>(null);
+  const key =
+    avatar.kind === "photo"
+      ? avatar.photo
+      : avatar.kind === "image"
+        ? avatar.uri
+        : `i${String(avatar.swatch)}`;
   const pop = usePop(`${key}-${side ?? "none"}`, 0.1);
   const glow = useSvgId("photo-sun");
   const family = avatarSwatches[side ?? "garnet"];
   const swatch =
     family[avatar.kind === "initials" ? avatar.swatch % family.length : 0] ?? family[0];
+  const showImage = avatar.kind === "image" && broken !== avatar.uri;
   const ring = sideColor(side);
   const inner = size - 8;
   const initial = Array.from(name.trim())[0]?.toUpperCase() ?? "?";
@@ -55,7 +65,15 @@ export function ProfileAvatar({
       importantForAccessibility="no-hide-descendants"
     >
       <View style={{ width: inner, height: inner, borderRadius: inner / 2, overflow: "hidden" }}>
-        {avatar.kind === "photo" ? (
+        {showImage ? (
+          <AuthImage
+            uri={avatar.uri}
+            style={StyleSheet.absoluteFill}
+            onFailed={() => {
+              setBroken(avatar.uri);
+            }}
+          />
+        ) : avatar.kind === "photo" ? (
           <>
             <LinearGradient
               colors={demoPhotoArt[avatar.photo].colors}

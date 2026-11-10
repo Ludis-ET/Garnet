@@ -7,8 +7,15 @@ import type { GemSide, SetupStep } from "@/domain/identity";
 export type DemoPhotoId = "sunrise" | "sea" | "night";
 export const DEMO_PHOTOS: readonly DemoPhotoId[] = ["sunrise", "sea", "night"];
 
+/**
+ * A person's picture: initials on a swatch, a real image (P-98: an address the app loads with
+ * the session, or a local file on mock data), or one of the prototype's sample pictures (still
+ * shown if stored, never offered).
+ */
 export type AvatarChoice =
-  { kind: "initials"; swatch: number } | { kind: "photo"; photo: DemoPhotoId };
+  | { kind: "initials"; swatch: number }
+  | { kind: "image"; uri: string }
+  | { kind: "photo"; photo: DemoPhotoId };
 
 export type Appearance = "system" | "light" | "dark";
 export type AccentIntensity = "subtle" | "rich";
@@ -46,6 +53,8 @@ export interface DemoPartnerProfile {
   /** The partner's full birthday, YYYY-MM-DD (P-79), or null before pairing. */
   birthDate: string | null;
   ready: boolean;
+  /** Their picture (P-98); their initial when absent. */
+  avatar?: AvatarChoice;
 }
 
 export interface DemoProfilesState {

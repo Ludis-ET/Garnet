@@ -1,3 +1,8 @@
+/* global process */
+// Jest runs on mock data (P-75); ignore any build/dev env vars pointing at a live API.
+delete process.env.EXPO_PUBLIC_API_AREAS;
+delete process.env.EXPO_PUBLIC_API_URL;
+
 // Jest runs without the native worklets runtime: use the official mocks (Reanimated 4 / Worklets).
 jest.mock("react-native-worklets", () => require("react-native-worklets/src/mock"));
 require("react-native-reanimated").setUpTests();
@@ -16,22 +21,43 @@ jest.mock("expo-secure-store", () => ({
   deleteItemAsync: () => Promise.resolve(),
 }));
 require("react-native-gesture-handler/jestSetup");
-
-jest.mock("expo-av", () => ({
-  Audio: {
-    Sound: {
-      createAsync: jest.fn(() =>
-        Promise.resolve({
-          sound: {
-            playAsync: jest.fn(() => Promise.resolve()),
-            unloadAsync: jest.fn(() => Promise.resolve()),
-            stopAsync: jest.fn(() => Promise.resolve()),
-          },
-        }),
-      ),
-    },
+// The gallery picker and resizer (P-98): native modules, so tests decide what they return.
+jest.mock("expo-image-picker", () => ({
+  launchImageLibraryAsync: jest.fn(() => Promise.resolve({ canceled: true, assets: null })),
+}));
+jest.mock("expo-image-manipulator", () => ({
+  SaveFormat: { JPEG: "jpeg", PNG: "png" },
+  ImageManipulator: {
+    manipulate: jest.fn(() => ({
+      resize: () => ({
+        renderAsync: () =>
+          Promise.resolve({
+            saveAsync: () => Promise.resolve({ uri: "file:///small.jpg", base64: "AAAA" }),
+          }),
+      }),
+    })),
   },
-  Video: "Video",
+}));
+// The keyboard library's own mock (its components render as plain views).
+jest.mock("react-native-keyboard-controller", () =>
+  require("react-native-keyboard-controller/jest"),
+);
+
+jest.mock("expo-audio", () => ({
+  createAudioPlayer: jest.fn(() => ({
+    play: jest.fn(),
+    pause: jest.fn(),
+    release: jest.fn(),
+    volume: 1.0,
+    loop: false,
+  })),
+  useAudioPlayer: jest.fn(() => ({
+    play: jest.fn(),
+    pause: jest.fn(),
+    release: jest.fn(),
+    volume: 1.0,
+    loop: false,
+  })),
 }));
 
 // The phone's location (P-66): no device in Jest. By default permission is refused, so the

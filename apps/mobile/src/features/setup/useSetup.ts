@@ -9,10 +9,18 @@ import type { GemSide } from "@/domain/identity";
 
 export const setupKeys = { all: ["setup"] as const };
 
-/** Only for signed-in people; pass `enabled: false` elsewhere. */
-export function useSetupState(enabled = true) {
+/**
+ * Only for signed-in people; pass `enabled: false` elsewhere. `refetchMs` looks again while a
+ * screen waits on the partner (P-99), until realtime updates arrive (production-fix-plan R).
+ */
+export function useSetupState(enabled = true, refetchMs?: number) {
   const { setup } = useRepositories();
-  return useQuery({ queryKey: setupKeys.all, queryFn: () => setup.get(), enabled });
+  return useQuery({
+    queryKey: setupKeys.all,
+    queryFn: () => setup.get(),
+    enabled,
+    ...(refetchMs === undefined ? {} : { refetchInterval: refetchMs }),
+  });
 }
 
 function useSetupMutation<TInput, TResult>(
@@ -47,3 +55,10 @@ export function useSetTogetherSince() {
     onSettled: () => client.invalidateQueries({ queryKey: setupKeys.all }),
   });
 }
+
+/** A picture from the gallery becomes theirs (P-98); the screens see it at once. */
+export const useSetPicture = () =>
+  useSetupMutation((s, picture: { base64: string }) => s.setPicture(picture));
+
+/** Back to initials; the stored picture is removed (P-98). */
+export const useClearPicture = () => useSetupMutation((s) => s.clearPicture());

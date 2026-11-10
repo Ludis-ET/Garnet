@@ -8,7 +8,9 @@ import { useEffect } from "react";
 import { Platform } from "react-native";
 
 // Web: complete social auth handoffs when returning from browser (P-79).
-WebBrowser.maybeCompleteAuthSession({ skipRedirectCheck: true });
+if (Platform.OS === "web") {
+  WebBrowser.maybeCompleteAuthSession({ skipRedirectCheck: true });
+}
 import { API_AREAS_ON } from "@/data/http/config";
 import { useTestingTools } from "@/features/prototype/devTools";
 import { NotificationSync } from "@/notifications/NotificationSync";

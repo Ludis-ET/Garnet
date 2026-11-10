@@ -33,3 +33,7 @@ Thumbs.db
 
 # Office lock files
 ~$*
+
+# Built app packages (production-fix-plan S12): never committed.
+*.apk
+*.aab

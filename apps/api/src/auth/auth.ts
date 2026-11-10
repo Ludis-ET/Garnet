@@ -148,8 +148,13 @@ export function createAuth(o: AuthOptions) {
     },
     logger: {
       level: "warn",
-      log: (level) => {
-        o.log(level, "auth");
+      // Fixed event names only: Better Auth's messages can carry details we don't log. A failing
+      // email used to vanish here as "auth"; it is named now (the outbox makes it rare, P-96).
+      log: (level, message) => {
+        o.log(
+          level,
+          message.startsWith("Failed to run background task") ? "auth_task_failed" : "auth",
+        );
       },
     },
     advanced: {

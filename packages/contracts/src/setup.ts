@@ -18,10 +18,47 @@ export const homeCitySchema = z.string().trim().min(1).max(80);
 
 export const sideSchema = z.enum(["ruby", "sapphire"]);
 
+const initialsAvatarSchema = z.object({
+  kind: z.literal("initials"),
+  swatch: z.number().int().min(0).max(31),
+});
+/** The prototype's sample pictures; still read, never offered any more. */
+const samplePhotoAvatarSchema = z.object({
+  kind: z.literal("photo"),
+  photo: z.string().min(1).max(40),
+});
+
+/** A picture as the API reports it: initials, or a real image (P-98) by its version. */
 export const avatarSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("initials"), swatch: z.number().int().min(0).max(31) }),
-  z.object({ kind: z.literal("photo"), photo: z.string().min(1).max(40) }),
+  initialsAvatarSchema,
+  samplePhotoAvatarSchema,
+  z.object({ kind: z.literal("image"), version: z.uuid() }),
 ]);
+export type AvatarDto = z.infer<typeof avatarSchema>;
+
+/** What setup may save directly: a real image is only ever set by uploading it (P-98). */
+export const avatarInputSchema = z.discriminatedUnion("kind", [
+  initialsAvatarSchema,
+  samplePhotoAvatarSchema,
+]);
+
+/** The picture formats accepted, by their magic bytes too (P-98). */
+export const AVATAR_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+/** Base64 characters: about 45 KB of image, under the API's 64 KB request limit. */
+export const AVATAR_MAX_BASE64 = 60_000;
+
+/** `PUT /v1/me/avatar`: a small square picture, resized on the phone. */
+export const uploadAvatarSchema = z
+  .object({
+    contentType: z.enum(AVATAR_TYPES),
+    data: z
+      .string()
+      .min(16)
+      .max(AVATAR_MAX_BASE64)
+      .regex(/^[A-Za-z0-9+/]+={0,2}$/),
+  })
+  .strict();
+export const uploadAvatarResultSchema = z.object({ avatar: avatarSchema });
 
 export const notificationPrefsSchema = z.object({
   status: z.enum(["unset", "on", "off", "denied"]),
@@ -57,6 +94,8 @@ export const partnerProfileSchema = z.object({
   homeCity: z.string().nullable(),
   birthDate: z.string().nullable(),
   ready: z.boolean(),
+  /** Their picture (P-98); initials until they choose one. */
+  avatar: avatarSchema,
 });
 
 export const setupStateSchema = z.object({
@@ -77,7 +116,7 @@ export const updateSetupSchema = z
   .object({
     displayName: z.string().trim().min(1).max(100),
     nickname: z.string().trim().max(100),
-    avatar: avatarSchema,
+    avatar: avatarInputSchema,
     timeZone: z.string().min(1).max(64).nullable(),
     homeCity: homeCitySchema.nullable(),
     appearance: z.enum(["system", "light", "dark"]),

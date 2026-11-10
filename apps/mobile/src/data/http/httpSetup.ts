@@ -2,26 +2,16 @@ import {
   chooseSideResultSchema,
   completeSetupResultSchema,
   setupStateSchema,
+  uploadAvatarResultSchema,
   type ProfileDto,
 } from "@garnet/contracts";
-import {
-  DEMO_PHOTOS,
-  type AvatarChoice,
-  type DemoPartnerProfile,
-  type Profile,
-} from "@/data/fixtures/demoProfile";
+import type { DemoPartnerProfile, Profile } from "@/data/fixtures/demoProfile";
 import type { SetupRepository } from "@/data/repositories/types";
+import { avatarFromDto } from "./avatar";
 import type { ApiClient } from "./client";
 
-/** The app's picture choice from the API's; an unknown photo falls back to initials. */
-function toAvatar(a: ProfileDto["avatar"]): AvatarChoice {
-  if (a.kind === "initials") return a;
-  const photo = DEMO_PHOTOS.find((p) => p === a.photo);
-  return photo === undefined ? { kind: "initials", swatch: 0 } : { kind: "photo", photo };
-}
-
 function toProfile(p: ProfileDto): Profile {
-  return { ...p, avatar: toAvatar(p.avatar) };
+  return { ...p, avatar: avatarFromDto(p.avatar, "me") };
 }
 
 /**
@@ -50,12 +40,28 @@ export function createHttpSetup(api: ApiClient): SetupRepository {
               homeCity: s.partner.homeCity,
               birthDate: s.partner.birthDate,
               ready: s.partner.ready,
+              avatar: avatarFromDto(s.partner.avatar, "partner"),
             };
       return { profile: toProfile(s.profile), partner, togetherSince: s.togetherSince };
     },
 
     save: async (patch) => {
-      await api.patch("/v1/me/setup", patch);
+      // A real picture is only ever set by uploading it (setPicture); never echoed back here.
+      const { avatar, ...rest } = patch;
+      const body = avatar === undefined || avatar.kind === "image" ? rest : { ...rest, avatar };
+      if (Object.keys(body).length > 0) await api.patch("/v1/me/setup", body);
+    },
+
+    setPicture: async ({ base64 }) => {
+      const r = await api.putWith("/v1/me/avatar", uploadAvatarResultSchema, {
+        contentType: "image/jpeg",
+        data: base64,
+      });
+      return avatarFromDto(r.avatar, "me");
+    },
+
+    clearPicture: async () => {
+      await api.delete("/v1/me/avatar");
     },
 
     chooseSide: (side) => api.post("/v1/me/setup/side", chooseSideResultSchema, { side }),

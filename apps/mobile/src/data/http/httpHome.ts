@@ -6,10 +6,16 @@
 import {
   daysOverviewResponseSchema,
   dayDetailResponseSchema,
+  listEventsResponseSchema,
+  memoryListSchema,
+  openWhenListSchema,
+  pairingStatusSchema,
   sendSignalResponseSchema,
   signalHistoryResponseSchema,
 } from "@garnet/contracts";
 import type { SignalId } from "@garnet/domain";
+import { kindOf } from "@/domain/events";
+import { daysUntil, todayIn } from "@/domain/home";
 import type { HomeRepository, HomeToday, MomentView } from "@/data/repositories/types";
 import { EMPTY_PAIRING } from "@/data/fixtures/demoPairing";
 import { companionsOf } from "@/data/mock/mockHome";
@@ -80,17 +86,89 @@ export function createHttpHome(
         }
       }
 
+      // Real aggregate queries (B3/B5/B8)
+      let event: HomeToday["event"] = null;
+      try {
+        const eventsRes = await api.get("/v1/events", listEventsResponseSchema);
+        const today = todayIn(now, v.me.zone);
+        const upcomingEvents = eventsRes.events
+          .map((e) => {
+            const targetStr = e.nextOccurrence ?? e.firstDate;
+            const date = Temporal.PlainDate.from(targetStr);
+            const diff = daysUntil(today, date);
+            return { e, targetStr, date, daysAway: diff };
+          })
+          .filter((item) => item.daysAway >= 0)
+          .sort((a, b) => a.daysAway - b.daysAway);
+
+        const first = upcomingEvents[0];
+        if (first !== undefined) {
+          event = {
+            id: first.e.id,
+            kind: first.e.kind,
+            title: first.e.title,
+            emoji: kindOf(first.e.kind).emoji,
+            date: first.targetStr,
+            daysAway: first.daysAway,
+          };
+        }
+      } catch {
+        // Fallback to null
+      }
+
+      let waiting = false;
+      let waitingCount = 0;
+      try {
+        const openWhenLetters = await api.get("/v1/open-when", openWhenListSchema);
+        const readyLetters = openWhenLetters.filter(
+          (l) => l.status === "sealed" && l.recipientId === v.userId,
+        );
+        waitingCount = readyLetters.length;
+        waiting = waitingCount > 0;
+      } catch {
+        // Fallback to 0
+      }
+
+      let memory: HomeToday["memory"] = null;
+      try {
+        const memoryList = await api.get("/v1/memories", memoryListSchema);
+        if (memoryList.length > 0) {
+          const today = todayIn(now, v.me.zone);
+          const pick = memoryList[today.dayOfYear % memoryList.length];
+          if (pick !== undefined) {
+            memory = {
+              id: pick.id,
+              title: pick.title,
+              art: "sunrise",
+              date: pick.date,
+            };
+          }
+        }
+      } catch {
+        // Fallback to null
+      }
+
+      let partnerActive =
+        (s.pairing.byUser[v.userId] ?? EMPTY_PAIRING).partnerName !== null &&
+        s.profiles.partner.ready;
+      try {
+        const pairingRes = await api.get("/v1/pairing", pairingStatusSchema);
+        if (pairingRes.partnerName !== null) {
+          partnerActive = true;
+        }
+      } catch {
+        // Fallback to store
+      }
+
       return {
         me: v.me,
         partner: v.partner,
-        partnerActive:
-          (s.pairing.byUser[v.userId] ?? EMPTY_PAIRING).partnerName !== null &&
-          s.profiles.partner.ready,
+        partnerActive,
         moments,
-        event: null,
-        waiting: false,
-        waitingCount: 0,
-        memory: null,
+        event,
+        waiting,
+        waitingCount,
+        memory,
         incoming,
         companions,
       };

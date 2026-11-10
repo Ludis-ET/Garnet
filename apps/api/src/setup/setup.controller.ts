@@ -15,7 +15,12 @@ import { ageCheckToday } from "../auth/today";
 import { asViewer, KYSELY, type Database, type Viewer } from "../db/database";
 import { ApiProblem } from "../errors/problem";
 import { parseBody } from "../http/body";
+import { OBJECT_STORAGE, type ObjectStorage } from "../media/storage/object-storage";
+import { avatarOf, fetchAccountPicture, saveAvatar } from "./avatar";
 import { ensureProfile, readProfile, toProfileDto } from "./profiles";
+
+/** People whose Google picture was already tried in this process (once is enough, P-98). */
+const triedAccountPicture = new Set<string>();
 
 type Missing = (typeof SETUP_STEPS)[number];
 
@@ -26,10 +31,14 @@ type Missing = (typeof SETUP_STEPS)[number];
  */
 @Controller("v1/me/setup")
 export class SetupController {
-  constructor(@Inject(KYSELY) private readonly db: Kysely<Database>) {}
+  constructor(
+    @Inject(KYSELY) private readonly db: Kysely<Database>,
+    @Inject(OBJECT_STORAGE) private readonly storage: ObjectStorage,
+  ) {}
 
   @Get()
   async get(@CurrentViewer() viewer: Viewer): Promise<SetupStateDto> {
+    await this.#importAccountPicture(viewer);
     return asViewer(this.db, viewer, async (trx) => {
       await ensureProfile(trx, viewer);
       const profile = toProfileDto(await readProfile(trx, viewer));
@@ -41,7 +50,8 @@ export class SetupController {
           home_city: string | null;
           birth_date: string | null;
           ready: boolean;
-        }>`select name, side, time_zone, home_city, birth_date, ready
+          avatar: unknown;
+        }>`select name, side, time_zone, home_city, birth_date, ready, partner_avatar() as avatar
              from partner_profile()`.execute(trx)
       ).rows[0];
       const together = (
@@ -60,6 +70,7 @@ export class SetupController {
                 homeCity: partner.home_city,
                 birthDate: partner.birth_date,
                 ready: partner.ready,
+                avatar: avatarOf(partner.avatar),
               },
         togetherSince: together ?? null,
       };
@@ -98,6 +109,35 @@ export class SetupController {
         .where("user_id", "=", viewer.userId)
         .execute();
     });
+  }
+
+  /**
+   * The first time someone with a Google picture opens setup, before they chose a picture, it
+   * becomes theirs (P-98). They can change it or go back to initials in the picture step.
+   */
+  async #importAccountPicture(viewer: Viewer): Promise<void> {
+    if (triedAccountPicture.has(viewer.userId)) return;
+    triedAccountPicture.add(viewer.userId);
+    const state = await asViewer(this.db, viewer, async (trx) => {
+      await ensureProfile(trx, viewer);
+      const profile = await readProfile(trx, viewer);
+      const image = (
+        await sql<{ image: string | null }>`select my_account_image() as image`.execute(trx)
+      ).rows[0]?.image;
+      return { avatar: avatarOf(profile.avatar), chosen: profile.done.includes("photo"), image };
+    });
+    if (state.chosen || state.avatar.kind !== "initials" || state.avatar.swatch !== 0) return;
+    if (state.image == null) return;
+    const picture = await fetchAccountPicture(state.image);
+    if (picture === null) return;
+    await saveAvatar(
+      this.storage,
+      viewer,
+      picture.bytes,
+      picture.type,
+      (fn) => asViewer(this.db, viewer, fn),
+      false,
+    ).catch(() => undefined);
   }
 
   @Post("side")

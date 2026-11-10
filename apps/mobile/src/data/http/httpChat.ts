@@ -1,4 +1,6 @@
-import { DEMO_PHOTOS, type AvatarChoice } from "@/data/fixtures/demoProfile";
+import type { AvatarDto } from "@garnet/contracts";
+import { avatarFromDto } from "./avatar";
+import type { AvatarChoice } from "@/data/fixtures/demoProfile";
 import type { ChatRepository, SendMessageInput } from "@/data/repositories/types";
 import {
   type ChatMessage,
@@ -21,7 +23,7 @@ import {
 import type { SqliteStore } from "../sqlite/sqliteStore";
 import type { ApiClient } from "./client";
 
-function toChatMessage(dto: ChatMessageDto): ChatMessage {
+export function toChatMessage(dto: ChatMessageDto): ChatMessage {
   const msg: ChatMessage = {
     id: dto.id,
     senderId: dto.senderId,
@@ -55,12 +57,9 @@ function toChatMessage(dto: ChatMessageDto): ChatMessage {
   return msg;
 }
 
-function toAvatar(
-  a: { kind: "initials"; swatch: number } | { kind: "photo"; photo: string },
-): AvatarChoice {
-  if (a.kind === "initials") return a;
-  const photo = DEMO_PHOTOS.find((p) => p === a.photo);
-  return photo === undefined ? { kind: "initials", swatch: 0 } : { kind: "photo", photo };
+/** The API's picture as the app's (P-98). */
+function toAvatar(a: AvatarDto): AvatarChoice {
+  return avatarFromDto(a, "partner");
 }
 
 function toConversationSummary(dto: ConversationSummaryResponse): ConversationSummary {

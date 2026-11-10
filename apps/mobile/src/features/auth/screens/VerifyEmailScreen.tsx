@@ -1,7 +1,8 @@
 /**
- * AUTH-04 · Verify email (Daylight Glass, P-48). Simulated: no email is sent; "Open email preview
- * (demo)" stands in for tapping the link. Only a masked address is shown. States: waiting,
- * resent with cooldown, verified (sparkles), expired link, already verified.
+ * AUTH-04 · Verify email (Daylight Glass, P-48). With the API, the email's link opens this screen
+ * with its token (through the https opener, production-fix-plan A7); on mock data "Open email
+ * preview (demo)" stands in for it. Only a masked address is shown. States: waiting, confirming
+ * a link, resent with cooldown, verified (sparkles), expired link, already verified.
  */
 import { Haptics } from "@/components/ui/haptics";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
@@ -61,11 +62,18 @@ export function VerifyEmailScreen() {
     });
   }, [linkToken, openLink, toast]);
 
-  if (status.data === undefined) {
+  // A link being handled waits here (production-fix-plan A6): the status may not say
+  // "verifying" yet (a fresh start, a reinstall), and redirecting now would drop the token and
+  // land on the welcome page. The mutation settles only once the new status is in (useAuth).
+  const linkInFlight = linkToken !== undefined && (open.isIdle || open.isPending);
+  if (status.data === undefined || linkInFlight) {
     return (
       <GlassScreen>
         <View style={styles.fill}>
-          <ActivityIndicator color={colors.accent} accessibilityLabel="Loading" />
+          <ActivityIndicator
+            color={colors.accent}
+            accessibilityLabel={linkInFlight ? "Confirming your email" : "Loading"}
+          />
         </View>
       </GlassScreen>
     );
@@ -176,7 +184,7 @@ export function VerifyEmailScreen() {
             </AppText>
           </Glass>
         </Animated.View>
-        <SimulatedBadge />
+        {API_AREAS_ON.has("auth") ? null : <SimulatedBadge />}
         {expired ? (
           <Notice tone="error" icon="clock" text="This link has expired. We can send a new one." />
         ) : null}

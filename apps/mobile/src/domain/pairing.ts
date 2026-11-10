@@ -95,7 +95,15 @@ export function inviteShareMessage(
   code: string,
   policy: InvitePolicy,
 ): string {
-  return `${inviterName} invited you to Garnet, a private space for two. Your code: ${formatInviteCode(code)}. It works once and expires in ${policy.ttlHours} hours.`;
+  // Laid out to read well in any messenger: who, the code on its own line, then what to do.
+  return [
+    `${inviterName} invited you to Garnet, a private space for just the two of you.`,
+    "",
+    "Your invitation code:",
+    formatInviteCode(code),
+    "",
+    `Open Garnet, choose "I have an invitation" and enter the code. It works once and expires in ${String(policy.ttlHours)} hours.`,
+  ].join("\n");
 }
 
 /** The one message for any code that can't be used (P-18: unknown, used, expired, revoked). */

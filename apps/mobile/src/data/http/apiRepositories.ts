@@ -3,9 +3,10 @@ import type { MockStore } from "@/data/mock/MockStore";
 import type { Repositories } from "@/data/repositories/types";
 import { SqliteStore } from "../sqlite/sqliteStore";
 import { SyncEngine } from "../sync/syncEngine";
-import { createGarnetAuthClient } from "./authClient";
+import { getGarnetAuthClient } from "./authClient";
 import { createApiClient } from "./client";
 import { API_AREAS_ON, API_URL, type ApiArea } from "./config";
+import { handleUnauthorized } from "./sessionEvents";
 import { createHttpAuth } from "./httpAuth";
 import { createHttpDays } from "./httpDays";
 import { createHttpHome } from "./httpHome";
@@ -37,12 +38,15 @@ export function withApiAreas(
   sqliteStore: SqliteStore = new SqliteStore(),
 ): Repositories {
   if (url === null || areas.size === 0) return repositories;
-  const auth = createGarnetAuthClient(url);
+  const auth = getGarnetAuthClient(url);
   const api = createApiClient({
     baseUrl: url,
     headers: async () => {
       const cookie = await auth.getCookie();
       return cookie === "" ? {} : { cookie };
+    },
+    onUnauthorized: (sent) => {
+      void handleUnauthorized(auth, sent);
     },
   });
 

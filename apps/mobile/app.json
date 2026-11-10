@@ -28,6 +28,14 @@
       "expo-font",
       "expo-apple-authentication",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Garnet uses only the photo you choose, as your picture. Nothing else in your library is read.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ],
+      [
         "expo-location",
         {
           "locationWhenInUsePermission": "Garnet uses your location while the app is open, rounded to about 10 km, to show how far apart you are. Your partner sees only the distance, never where you are.",

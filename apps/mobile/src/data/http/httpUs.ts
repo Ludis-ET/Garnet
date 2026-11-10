@@ -1,3 +1,5 @@
+import type { AvatarDto } from "@garnet/contracts";
+import { avatarFromDto } from "./avatar";
 /**
  * UsRepository over the Garnet API (B4, B-51, US-01 to US-10, P-07, P-66, §5).
  *
@@ -14,17 +16,14 @@ import {
   type SignalPayloadDto,
 } from "@garnet/contracts";
 import type { SignalId } from "@garnet/domain";
-import { DEMO_PHOTOS, type AvatarChoice } from "@/data/fixtures/demoProfile";
+import type { AvatarChoice } from "@/data/fixtures/demoProfile";
 import type { SignalPayload, SignalResponse } from "@/domain/us";
 import type { SignalItem, UsOverview, UsRepository } from "@/data/repositories/types";
 import type { ApiClient } from "./client";
 
-function toAvatar(
-  a: { kind: "initials"; swatch: number } | { kind: "photo"; photo: string },
-): AvatarChoice {
-  if (a.kind === "initials") return a;
-  const photo = DEMO_PHOTOS.find((p) => p === a.photo);
-  return photo === undefined ? { kind: "initials", swatch: 0 } : { kind: "photo", photo };
+/** The API's picture as the app's (P-98). */
+function toAvatar(a: AvatarDto): AvatarChoice {
+  return avatarFromDto(a, "me");
 }
 
 function toSignalPayload(dto: SignalPayloadDto): SignalPayload {

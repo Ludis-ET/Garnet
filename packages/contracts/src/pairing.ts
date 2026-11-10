@@ -28,7 +28,12 @@ export const pairingStatusSchema = z.object({
   partnerName: z.string().nullable(),
   /** The person's own invitation, while it hasn't been used or withdrawn. */
   invite: z
-    .object({ expiresAt: z.iso.datetime({ offset: true }), expired: z.boolean() })
+    .object({
+      expiresAt: z.iso.datetime({ offset: true }),
+      expired: z.boolean(),
+      /** The inviter's own code (P-97); null for an invitation made before it was kept. */
+      code: z.string().length(INVITE_CODE_LENGTH).nullable(),
+    })
     .nullable(),
 });
 export type PairingStatusDto = z.infer<typeof pairingStatusSchema>;

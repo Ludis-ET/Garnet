@@ -1,5 +1,5 @@
 import { LinearGradient } from "expo-linear-gradient";
-import { useEffect, useRef, useState, type Ref } from "react";
+import { useEffect, useState, type Ref } from "react";
 import {
   Platform,
   Pressable,
@@ -20,7 +20,6 @@ import { Icon, type IconName } from "@/components/ui/Icon";
 import { useShake } from "@/components/ui/motion";
 import { useTheme } from "@/theme/ThemeProvider";
 import { touchTarget } from "@/theme/tokens";
-import { ENTER, EXIT } from "@/theme/transitions";
 
 export interface TextFieldProps extends Omit<
   TextInputProps,
@@ -79,13 +78,19 @@ export function TextField({
   const shake = useShake(error);
   const row = appearance === "row";
   const value = typeof input.value === "string" ? input.value : "";
-  const canClear =
-    (clearable ?? (rows === undefined && !secure)) &&
-    value.length > 0 &&
-    !disabled &&
-    input.onChangeText !== undefined;
+  // The clear button's place is kept while the field is empty too, so the text never shifts
+  // when the first character appears (production-fix-plan K7).
+  const clearSlot =
+    (clearable ?? (rows === undefined && !secure)) && input.onChangeText !== undefined;
+  const canClear = clearSlot && value.length > 0 && !disabled;
   const max = input.maxLength;
-  const showCount = max !== undefined && focused && value.length >= Math.floor(max * 0.8);
+  // Only fields with room for writing count down (K1): a two-digit day field used to grow a
+  // counter line after its first digit, moving everything below it on each key.
+  const showCount =
+    max !== undefined &&
+    max >= COUNTER_MIN_LENGTH &&
+    focused &&
+    value.length >= Math.floor(max * 0.8);
 
   const lift = useSharedValue(0);
   useEffect(() => {
@@ -95,9 +100,14 @@ export function TextField({
         : withSpring(focused ? 1 : 0, motion.spring.smooth),
     );
   }, [focused, reduceMotion, lift, motion.spring.smooth]);
-  const paneStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: reduceMotion || Platform.OS === "android" ? 0 : -lift.get() * 1.5 }],
-  }));
+  const paneStyle = useAnimatedStyle(() => {
+    if (reduceMotion || Platform.OS === "android") {
+      return {};
+    }
+    return {
+      transform: [{ translateY: -lift.get() * 1.5 }],
+    };
+  });
   const glowStyle = useAnimatedStyle(() => ({
     opacity: invalid ? 0.55 : lift.get() * 0.6,
     transform: [{ scaleX: 0.9 + lift.get() * 0.1 }],
@@ -105,17 +115,8 @@ export function TextField({
   const glow = invalid ? colors.danger : colors.accent;
   const tint = invalid ? colors.danger : focused ? colors.accent : null;
 
-  const localRef = useRef<TextInput>(null);
-  const inputRef = ref && typeof ref === "object" ? ref : localRef;
-
   const field = (
-    <Pressable
-      onPress={() => {
-        if (!disabled) inputRef.current?.focus();
-      }}
-      style={[styles.box, { opacity: disabled ? 0.6 : 1 }]}
-      accessible={false}
-    >
+    <View style={[styles.box, { opacity: disabled ? 0.6 : 1 }]}>
       {icon === undefined ? null : (
         <View style={[styles.lead, { paddingLeft: spacing.lg }]}>
           <Icon name={icon} size={19} color={tint ?? colors.textTertiary} />
@@ -132,7 +133,7 @@ export function TextField({
           </AppText>
         ) : null}
         <TextInput
-          ref={ref ?? inputRef}
+          {...(ref === undefined ? {} : { ref })}
           {...input}
           editable={!disabled}
           secureTextEntry={secure && !revealed}
@@ -174,22 +175,24 @@ export function TextField({
           {...(rows === undefined ? {} : { multiline: true })}
         />
       </View>
-      {canClear ? (
-        <Animated.View entering={ENTER} exiting={EXIT}>
-          <Pressable
-            onPress={() => {
-              input.onChangeText?.("");
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={`Clear ${label}`}
-            hitSlop={8}
-            style={styles.clear}
-          >
-            <View style={[styles.clearDot, { backgroundColor: colors.textTertiary }]}>
-              <Icon name="x" size={11} color={colors.background} />
-            </View>
-          </Pressable>
-        </Animated.View>
+      {clearSlot ? (
+        <View style={styles.clear}>
+          {canClear ? (
+            <Pressable
+              onPress={() => {
+                input.onChangeText?.("");
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`Clear ${label}`}
+              hitSlop={8}
+              style={styles.clearHit}
+            >
+              <View style={[styles.clearDot, { backgroundColor: colors.textTertiary }]}>
+                <Icon name="x" size={11} color={colors.background} />
+              </View>
+            </Pressable>
+          ) : null}
+        </View>
       ) : null}
       {secure ? (
         <Pressable
@@ -204,7 +207,7 @@ export function TextField({
           <Icon name={revealed ? "eye-off" : "eye"} color={colors.textSecondary} />
         </Pressable>
       ) : null}
-    </Pressable>
+    </View>
   );
 
   const message = invalid ? (
@@ -251,7 +254,7 @@ export function TextField({
     <View style={{ gap: spacing.sm }}>
       <AppText
         variant="footnote"
-        weight={focused ? "600" : "500"}
+        weight="500"
         color={invalid ? "danger" : focused ? "accent" : "textSecondary"}
       >
         {label}
@@ -266,7 +269,7 @@ export function TextField({
             style={[StyleSheet.absoluteFill, { borderRadius: radii.lg + 6 }]}
           />
         </Animated.View>
-        <Glass radius={radii.lg} shadow={focused} tint={invalid ? "ruby" : "none"}>
+        <Glass radius={radii.lg} shadow tint={invalid ? "ruby" : "none"}>
           {field}
         </Glass>
       </Animated.View>
@@ -274,6 +277,9 @@ export function TextField({
     </View>
   );
 }
+
+/** The shortest limit that gets a live countdown (names, messages; not dates or codes). */
+export const COUNTER_MIN_LENGTH = 20;
 
 /** Removes the browser's focus rectangle (web); native inputs never draw one. */
 export const noOutline = { outlineStyle: "none", outlineWidth: 0 } as unknown as object;
@@ -290,7 +296,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  clear: { width: 36, height: touchTarget, alignItems: "center", justifyContent: "center" },
+  clear: { width: 36, height: touchTarget },
+  clearHit: { flex: 1, alignItems: "center", justifyContent: "center" },
   clearDot: {
     width: 18,
     height: 18,

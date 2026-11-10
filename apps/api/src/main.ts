@@ -4,7 +4,10 @@ import { Kysely, PostgresDialect } from "kysely";
 import pg from "pg";
 import { createApp } from "./app";
 import { createAuth } from "./auth/auth";
-import { createMailer } from "./auth/mailer";
+import { createMailOutbox } from "./mail/outbox";
+import { createSmtpSender } from "./mail/smtp";
+import { renderMail } from "./mail/templates";
+import { createMailWorker, createQueuedMailer, type MailLog } from "./mail/worker";
 import { readConfig } from "./config";
 import type { Database } from "./db/database";
 import { InMemoryObjectStorage, S3ObjectStorage } from "./media/storage/object-storage";
@@ -69,12 +72,29 @@ async function startApi(): Promise<void> {
 
   // Better Auth logs through the API's logger once it exists: a level and a fixed event only.
   let log: (level: "error" | "warn" | "info" | "debug", event: string) => void = () => undefined;
+
+  // Account emails (P-96): written to the outbox when asked for, sent and retried by the worker.
+  // Until the logger exists, mail events go to stderr (an event and a code, never an address).
+  let mailLog: MailLog = (level, event, detail) => {
+    process.stderr.write(`${level} ${event} ${JSON.stringify(detail)}
+`);
+  };
+  const mailSender = createSmtpSender(config.mail.smtpUrl, config.mail.from);
+  const mailOutbox = createMailOutbox(db);
+  const mailWorker = createMailWorker({
+    outbox: mailOutbox,
+    sender: mailSender,
+    render: (job) => renderMail(job, config.auth.baseUrl),
+    log: (level, event, detail) => {
+      mailLog(level, event, detail);
+    },
+  });
   const auth = createAuth({
     database: pool,
     secret: config.auth.secret,
     baseUrl: config.auth.baseUrl,
     policy: config.auth.policy,
-    mailer: createMailer(config.mail.smtpUrl, config.mail.from),
+    mailer: createQueuedMailer(mailOutbox, mailWorker),
     social: config.auth.social,
     log: (level, event) => {
       log(level, event);
@@ -102,12 +122,25 @@ async function startApi(): Promise<void> {
   log = (level, event) => {
     logger[level]({ code: event }, "auth event");
   };
+  mailLog = (level, event, detail) => {
+    logger[level]({ code: event, ...detail }, "mail");
+  };
   await app.listen(config.port, config.host);
+
+  // Sends whatever waited while the API was stopped, then keeps watching. Whether the mail
+  // server accepts our login is checked once now, so a wrong password shows up in the log at
+  // start instead of as a missing email.
+  mailWorker.start();
+  void mailSender.verify().then((error) => {
+    if (error === null) logger.info({ code: "mail_transport_ok" }, "mail");
+    else logger.error({ code: "mail_transport_failed", error: error.code }, "mail");
+  });
 
   let closing = false;
   const close = async () => {
     if (closing) return;
     closing = true;
+    await mailWorker.stop();
     await app.close();
     await db.destroy();
   };

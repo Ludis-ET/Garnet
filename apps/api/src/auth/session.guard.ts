@@ -29,6 +29,13 @@ const PUBLIC = "garnet:public";
 const BEFORE_REGISTRATION = "garnet:before-registration";
 
 const SAFE_METHODS = new Set(["GET", "HEAD"]);
+
+/** Better Auth's own refusals carry a 4xx statusCode; anything else is the server failing. */
+export function sessionRefused(error: unknown): boolean {
+  if (typeof error !== "object" || error === null || !("statusCode" in error)) return false;
+  const status = Number(error.statusCode);
+  return status >= 400 && status < 500;
+}
 /** Marks a route that needs no session (health only, so far). Everything else is private. */
 export const Public = () => SetMetadata(PUBLIC, true);
 /**
@@ -73,7 +80,12 @@ export class SessionGuard implements CanActivate {
       throw new ApiProblem("bad_request");
     const found = await this.auth.api
       .getSession({ headers: authHeaders(request) })
-      .catch(() => null);
+      .catch((error: unknown) => {
+        // A session Better Auth turned down is "no session". The database failing is not: it is
+        // 503, so the app keeps the person signed in and retries (production-fix-plan A5).
+        if (sessionRefused(error)) return null;
+        throw new ApiProblem("unavailable");
+      });
     if (!found?.user.emailVerified) throw new ApiProblem("unauthorized");
     // Better Auth never extends a session past this (auth.ts); checked here too, in depth.
     if (

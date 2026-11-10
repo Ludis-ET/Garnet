@@ -1,6 +1,7 @@
 import { StatusBar } from "expo-status-bar";
 import type { ReactNode } from "react";
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Aurora } from "@/components/brand/Aurora";
 import { SideWash } from "@/components/brand/SideWash";
@@ -13,6 +14,9 @@ import { useTheme } from "@/theme/ThemeProvider";
  * over it (62 pt, P-57), so the last item can always scroll clear of them.
  */
 export const TAB_BAR_SPACE = 150;
+
+/** Space kept between the focused field (its helper or error line too) and the keyboard. */
+const KEYBOARD_GAP = 96;
 
 export interface GlassScreenProps {
   children: ReactNode;
@@ -61,43 +65,44 @@ export function GlassScreen({
       <SideWash side="sapphire" on={flood === "sapphire"} />
       <StatusBar style={scheme === "dark" ? "light" : "dark"} />
       <SafeAreaView style={styles.fill} edges={["top", "bottom"]}>
-        <KeyboardAvoidingView
+        {/* One keyboard-aware scroll on both platforms (production-fix-plan K2). Android draws
+            edge to edge, where the window no longer resizes for the keyboard; this view adds
+            the keyboard's height itself and scrolls the focused field into view, in step with
+            the keyboard's own animation, so nothing jumps while typing. */}
+        <KeyboardAwareScrollView
+          testID="glass-screen-scroll"
           style={styles.fill}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          bottomOffset={KEYBOARD_GAP}
+          contentContainerStyle={[
+            styles.scroll,
+            {
+              paddingHorizontal: spacing.gutter,
+              paddingBottom: tabBar ? TAB_BAR_SPACE : spacing.md,
+            },
+          ]}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "none"}
+          showsVerticalScrollIndicator={false}
         >
-          <ScrollView
-            testID="glass-screen-scroll"
-            contentContainerStyle={[
-              styles.scroll,
-              {
-                paddingHorizontal: spacing.gutter,
-                paddingBottom: tabBar ? TAB_BAR_SPACE : spacing.md,
-              },
-            ]}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "none"}
-            showsVerticalScrollIndicator={false}
+          <View
+            testID="glass-screen-column"
+            style={[styles.column, { gap: spacing.xl, paddingTop: spacing.sm }]}
           >
-            <View
-              testID="glass-screen-column"
-              style={[styles.column, { gap: spacing.xl, paddingTop: spacing.sm }]}
-            >
-              {onBack !== undefined || header !== undefined || headerRight !== undefined ? (
-                <Header
-                  {...(onBack === undefined ? {} : { onBack })}
-                  {...(headerRight === undefined ? {} : { right: headerRight })}
-                >
-                  {header}
-                </Header>
-              ) : null}
-              <OfflineBanner />
-              <View testID="glass-screen-body" style={[styles.body, { gap: spacing.xl }]}>
-                {children}
-              </View>
-              {footer === undefined ? null : <View style={{ gap: spacing.md }}>{footer}</View>}
+            {onBack !== undefined || header !== undefined || headerRight !== undefined ? (
+              <Header
+                {...(onBack === undefined ? {} : { onBack })}
+                {...(headerRight === undefined ? {} : { right: headerRight })}
+              >
+                {header}
+              </Header>
+            ) : null}
+            <OfflineBanner />
+            <View testID="glass-screen-body" style={[styles.body, { gap: spacing.xl }]}>
+              {children}
             </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
+            {footer === undefined ? null : <View style={{ gap: spacing.md }}>{footer}</View>}
+          </View>
+        </KeyboardAwareScrollView>
       </SafeAreaView>
     </View>
   );

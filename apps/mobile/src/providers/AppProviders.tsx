@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
 import { StyleSheet } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ToastProvider } from "@/components/ui/Toast";
 import { RepositoryProvider } from "@/data/RepositoryProvider";
@@ -22,17 +23,20 @@ export function AppProviders({ children }: { children: ReactNode }) {
   );
   return (
     <GestureHandlerRootView style={styles.fill}>
-      <SafeAreaProvider>
-        <QueryClientProvider client={queryClient}>
-          <RepositoryProvider>
-            <ThemeProvider>
-              <ToastProvider>
-                <MediaPlayerProvider>{children}</MediaPlayerProvider>
-              </ToastProvider>
-            </ThemeProvider>
-          </RepositoryProvider>
-        </QueryClientProvider>
-      </SafeAreaProvider>
+      {/* Tracks the keyboard frame by frame for every screen (production-fix-plan K2). */}
+      <KeyboardProvider>
+        <SafeAreaProvider>
+          <QueryClientProvider client={queryClient}>
+            <RepositoryProvider>
+              <ThemeProvider>
+                <ToastProvider>
+                  <MediaPlayerProvider>{children}</MediaPlayerProvider>
+                </ToastProvider>
+              </ThemeProvider>
+            </RepositoryProvider>
+          </QueryClientProvider>
+        </SafeAreaProvider>
+      </KeyboardProvider>
     </GestureHandlerRootView>
   );
 }

@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import { problemSchema, type Problem, type Schema } from "@garnet/contracts";
 
 /**
@@ -28,6 +29,11 @@ export interface ApiClientOptions {
   headers?: () => Promise<Record<string, string>>;
   timeoutMs?: number;
   fetch?: typeof fetch;
+  /**
+   * Called when the API answers 401, with the headers that request carried, so the caller can
+   * tell a session that is really gone from a request that raced a fresh sign-in (A5).
+   */
+  onUnauthorized?: (sent: Readonly<Record<string, string>>) => void;
 }
 
 export interface ApiClient {
@@ -39,6 +45,8 @@ export interface ApiClient {
   /** A PATCH the API answers with a body. */
   patchWith<T>(path: string, schema: Schema<T>, body: unknown): Promise<T>;
   put(path: string, body: unknown): Promise<void>;
+  /** A PUT the API answers with a body. */
+  putWith<T>(path: string, schema: Schema<T>, body: unknown): Promise<T>;
   delete(path: string, body?: unknown): Promise<void>;
   /** A DELETE the API answers with a body. */
   deleteWith<T>(path: string, schema: Schema<T>): Promise<T>;
@@ -72,8 +80,8 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
           ...extra,
         },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-        // The session travels in the header above; the platform's own cookie jar stays out.
-        credentials: "omit",
+        // Web uses include for cross-origin cookie session; native uses omit with auth header.
+        credentials: Platform.OS === "web" ? "include" : "omit",
         signal: controller.signal,
       });
     } catch {
@@ -91,6 +99,9 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       throw new ApiError("invalid", response.status);
     }
     if (!response.ok) {
+      if (response.status === 401) {
+        options.onUnauthorized?.(extra);
+      }
       const problem = problemSchema.safeParse(json);
       throw new ApiError(
         problem.success ? "problem" : "invalid",
@@ -117,6 +128,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       await send("PATCH", path, body);
     },
     patchWith: async (path, schema, body) => parse(schema, await send("PATCH", path, body)),
+    putWith: async (path, schema, body) => parse(schema, await send("PUT", path, body)),
     put: async (path, body) => {
       await send("PUT", path, body);
     },

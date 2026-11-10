@@ -7,7 +7,7 @@ import type { AuthRepository, AuthStatus } from "@/data/repositories/types";
 import { maskEmail, normaliseEmail } from "@/domain/auth";
 import type { GarnetAuthClient } from "./authClient";
 import type { ApiClient } from "./client";
-import { clearLocal, readLocal, writeLocal } from "./localState";
+import { clearAllAuthSessions, clearLocal, readLocal, writeLocal } from "./localState";
 import { continueWithProvider } from "./social";
 
 /** Between resends of the verification email; the API also rate limits (ADR-0006). */
@@ -38,20 +38,22 @@ export function createHttpAuth(
     registered: boolean;
     birthDate: string | null;
   } | null> {
-    try {
-      const { data, error } = await client.getSession();
-      if (error !== null || data === null) return null;
-      // Better Auth's additional fields (P-79), not in its client's types.
-      const user = data.user as typeof data.user & { birthDate?: unknown; termsVersion?: unknown };
-      return {
-        name: data.user.name,
-        verified: data.user.emailVerified,
-        registered: isRegistrationComplete(user.birthDate, user.termsVersion),
-        birthDate: typeof user.birthDate === "string" ? user.birthDate : null,
-      };
-    } catch {
-      return null;
+    // No connection, or the server failing, is not "signed out" (production-fix-plan A3): it
+    // throws, the gate shows "try again", and nothing about the session is forgotten.
+    const { data, error } = await client.getSession();
+    if (error !== null) {
+      if (error.status === 401 || error.status === 403) return null;
+      throw new Error("session-check-failed");
     }
+    if (data === null) return null;
+    // Better Auth's additional fields (P-79), not in its client's types.
+    const user = data.user as typeof data.user & { birthDate?: unknown; termsVersion?: unknown };
+    return {
+      name: data.user.name,
+      verified: data.user.emailVerified,
+      registered: isRegistrationComplete(user.birthDate, user.termsVersion),
+      birthDate: typeof user.birthDate === "string" ? user.birthDate : null,
+    };
   }
 
   return {
@@ -71,7 +73,10 @@ export function createHttpAuth(
           return { kind: "registering", displayName: s.name, birthDate: s.birthDate };
         return { kind: "signedIn", displayName: s.name };
       }
-      return readLocal("hadSession") === "yes" ? { kind: "expired" } : { kind: "signedOut" };
+      // Reading the status changes nothing (A4): "signed out for privacy" stays until the person
+      // leaves that screen, which clears it (SessionExpiredScreen).
+      if (readLocal("hadSession") === "yes") return { kind: "expired" };
+      return { kind: "signedOut" };
     },
 
     createAccount: async ({ displayName, email, password, birthDate, termsVersion }) => {
@@ -94,6 +99,31 @@ export function createHttpAuth(
         return { ok: false, reason: "may-already-exist" };
       }
       if (error !== null) {
+        const anyErr = error as {
+          status?: number;
+          message?: string;
+          body?: { issues?: { path?: string[]; code?: string }[] };
+          issues?: { path?: string[]; code?: string }[];
+        };
+        const issues = anyErr.issues ?? anyErr.body?.issues;
+        if (Array.isArray(issues) && issues.length > 0) {
+          const first = issues[0];
+          if (first?.code === "guessable") {
+            throw new Error("Password is too easy to guess. Choose a stronger password.");
+          }
+          if (first?.code === "too_young") {
+            throw new Error("You must be at least 16 to use Garnet.");
+          }
+          if (first?.code === "invalid_date") {
+            throw new Error("Please enter a valid birthday.");
+          }
+        }
+        if (
+          error.status === 400 &&
+          (error.message?.includes("guessable") || error.message?.includes("password"))
+        ) {
+          throw new Error("Password is too easy to guess. Choose a stronger password.");
+        }
         throw new Error(error.message ?? `Sign up failed (${error.status})`);
       }
       writeLocal("pendingEmail", normal);
@@ -149,8 +179,12 @@ export function createHttpAuth(
     },
 
     cancelVerification: async () => {
-      await clearLocal("pendingEmail", "justVerified");
-      await client.signOut();
+      try {
+        await client.signOut();
+      } catch {
+        // Continue clearing even if server sign out fails
+      }
+      await clearAllAuthSessions();
     },
 
     requestPasswordReset: async (email) => {
@@ -195,7 +229,7 @@ export function createHttpAuth(
     completeRegistration: async (input) => {
       const result = await api.post("/v1/me/registration", completeRegistrationResultSchema, input);
       // Too young: the server removed the new account; this phone forgets it too.
-      if (!result.ok) await clearLocal("hadSession", "pendingEmail", "justVerified");
+      if (!result.ok) await clearAllAuthSessions();
       return result;
     },
 
@@ -203,8 +237,12 @@ export function createHttpAuth(
     unsentCount: () => Promise.resolve(0),
 
     signOut: async () => {
-      await client.signOut();
-      await clearLocal("hadSession", "pendingEmail", "justVerified", "inviteCode", "reviewingCode");
+      try {
+        await client.signOut();
+      } catch {
+        // Continue clearing even if server throws or returns 401
+      }
+      await clearAllAuthSessions();
     },
   };
 }

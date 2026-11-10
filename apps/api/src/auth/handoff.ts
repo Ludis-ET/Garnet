@@ -31,6 +31,32 @@ const identifier = (code: string) => `app-handoff:${sha256(code).toString("base6
 
 const storedSchema = z.object({ token: z.string().min(1), challenge: z.string() });
 
+/**
+ * Where a hand-off may land (production-fix-plan S14). The web build is local development only
+ * (P-79; CORS allows only localhost), so `redirect_to` may name nothing but
+ * http://localhost:<port>/auth-callback or the 127.0.0.1 equivalent; anything else goes to the
+ * app. Without this, a crafted link could turn a browser session into a code delivered to
+ * another site, where the attacker's own verifier would redeem it.
+ */
+export function handoffTarget(redirectTo: string | undefined): string {
+  if (redirectTo === undefined) return APP_CALLBACK;
+  let url: URL;
+  try {
+    url = new URL(redirectTo);
+  } catch {
+    return APP_CALLBACK;
+  }
+  const local =
+    url.protocol === "http:" &&
+    (url.hostname === "localhost" || url.hostname === "127.0.0.1") &&
+    url.username === "" &&
+    url.password === "" &&
+    url.pathname === "/auth-callback" &&
+    url.search === "" &&
+    url.hash === "";
+  return local ? `${url.origin}/auth-callback` : APP_CALLBACK;
+}
+
 export const appHandoff = () =>
   ({
     id: "garnet-app-handoff",
@@ -46,7 +72,7 @@ export const appHandoff = () =>
         },
         async (ctx) => {
           const found = await getSessionFromCtx(ctx);
-          const target = ctx.query.redirect_to ?? APP_CALLBACK;
+          const target = handoffTarget(ctx.query.redirect_to);
           if (found === null) throw ctx.redirect(`${target}?error=failed`);
           const code = randomBytes(32).toString("base64url");
           await ctx.context.internalAdapter.createVerificationValue({
@@ -82,7 +108,7 @@ export const appHandoff = () =>
               : ctx.query.error === "account_already_linked_to_different_user"
                 ? "taken"
                 : "failed";
-          const target = ctx.query.redirect_to ?? APP_CALLBACK;
+          const target = handoffTarget(ctx.query.redirect_to);
           throw ctx.redirect(`${target}?error=${reason}`);
         },
       ),

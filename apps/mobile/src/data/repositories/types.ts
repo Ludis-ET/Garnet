@@ -204,6 +204,10 @@ export interface SetupRepository {
   complete(): Promise<{ ok: true } | { ok: false; missing: SetupStep[] }>;
   /** Sets (or clears) "together since" for both partners, and marks the step done (P-79). */
   setTogetherSince(date: string | null): Promise<void>;
+  /** Makes a picture from the gallery theirs (P-98): a small JPEG the phone already resized. */
+  setPicture(picture: { base64: string }): Promise<AvatarChoice>;
+  /** Back to initials; the stored picture is removed (P-98). */
+  clearPicture(): Promise<void>;
 }
 
 /** One of the viewer's own moments today (HOME-01). The partner's day stays hidden (U-02). */

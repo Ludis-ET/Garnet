@@ -38,6 +38,9 @@ const VERSIONS = [
   "0011",
   "0012",
   "0013",
+  "0014",
+  "0015",
+  "0016",
 ];
 
 const STRANGER = "0192f0a0-0000-7000-8000-00000000c001";
@@ -147,7 +150,13 @@ describe("what each role can reach (ADR-0004, P-77)", () => {
 
   it("keeps the app role away from accounts, sessions, passwords, email links and invitations", async () => {
     await seedDev(pgliteClient(db));
-    for (const table of [...AUTH_TABLES, "invitation", "garnet_meta.schema_migration"]) {
+    for (const table of [
+      ...AUTH_TABLES,
+      "invitation",
+      "garnet_meta.schema_migration",
+      // Recipients and link tokens waiting to be emailed (0014).
+      "mail_outbox",
+    ]) {
       await expect(
         asUser(db, DEV_PEOPLE.selam.id, (tx) => tx.query(`select * from ${table}`)),
       ).rejects.toThrow(/permission denied/);
@@ -161,7 +170,7 @@ describe("what each role can reach (ADR-0004, P-77)", () => {
         await tx.exec("set local role garnet_auth");
         return tx.query(sql);
       });
-    for (const table of AUTH_TABLES)
+    for (const table of [...AUTH_TABLES, "mail_outbox"])
       await expect(asAuth(`select * from ${table}`)).resolves.toBeTruthy();
     for (const table of ["profile", "relationship", "relationship_member", "invitation", "entry"])
       await expect(asAuth(`select * from ${table}`)).rejects.toThrow(/permission denied/);

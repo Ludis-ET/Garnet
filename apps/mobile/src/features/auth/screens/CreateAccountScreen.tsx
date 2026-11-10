@@ -149,6 +149,9 @@ export function CreateAccountScreen() {
   );
   // A quick fade between steps (P-74), not a slide.
   const enter = ENTER;
+  // After the first step the keyboard is already up: the next field takes focus on Android too,
+  // instead of closing the keyboard and waiting for a tap (production-fix-plan K3).
+  const keepTyping = Platform.OS === "ios" || step > 0;
 
   return (
     <GlassScreen
@@ -180,13 +183,13 @@ export function CreateAccountScreen() {
         </>
       }
     >
+      {/* The mark stays put; only the question and its field fade between steps (K3), so the
+          screen doesn't rebuild under the keyboard. */}
+      <View style={styles.gem}>
+        <GarnetMark size={56} progress={facets(form, today)} />
+      </View>
       <Animated.View key={step} entering={enter} style={{ gap: spacing.xl }}>
-        <View style={{ gap: spacing.md }}>
-          <View style={styles.gem}>
-            <GarnetMark size={56} progress={facets(form, today)} />
-          </View>
-          <AppText variant="question">{QUESTIONS[step]}</AppText>
-        </View>
+        <AppText variant="question">{QUESTIONS[step]}</AppText>
 
         {step === 0 ? (
           <TextField
@@ -213,7 +216,7 @@ export function CreateAccountScreen() {
               label="Email"
               placeholder="you@example.com"
               large
-              autoFocus={Platform.OS === "ios"}
+              autoFocus={keepTyping}
               value={form.email}
               onChangeText={set("email")}
               keyboardType="email-address"
@@ -254,6 +257,7 @@ export function CreateAccountScreen() {
               set("birthDate")(iso ?? "");
             }}
             autofill="birthday"
+            autoFocus={keepTyping}
             disabled={busy}
             {...errorFor("birthDate")}
           />
@@ -264,7 +268,7 @@ export function CreateAccountScreen() {
             <TextField
               label="Password"
               secure
-              autoFocus
+              autoFocus={keepTyping}
               value={form.password}
               onChangeText={set("password")}
               autoComplete="new-password"

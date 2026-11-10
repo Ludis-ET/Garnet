@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { StyleSheet, View, type TextInput } from "react-native";
 import { AppText } from "@/components/ui/AppText";
 import { Icon } from "@/components/ui/Icon";
@@ -16,6 +16,8 @@ export interface DateFieldProps {
   /** The phone's autofill knows birthdays: "birthday" offers it. */
   autofill?: "birthday";
   disabled?: boolean;
+  /** Focus the day field when it appears (a step in a flow where the keyboard is already up). */
+  autoFocus?: boolean;
 }
 
 function parts(iso: string | null): { d: string; m: string; y: string } {
@@ -27,12 +29,32 @@ function parts(iso: string | null): { d: string; m: string; y: string } {
 /** Digits only, at most `n`. */
 const digits = (text: string, n: number) => text.replace(/\D/g, "").slice(0, n);
 
+function tryParseFullDate(text: string): { d: string; m: string; y: string } | null {
+  const raw = text.trim();
+  if (raw.includes("-") || raw.includes("/")) {
+    const partsArr = raw.split(/[-/]/);
+    if (partsArr.length === 3) {
+      const [p1 = "", p2 = "", p3 = ""] = partsArr;
+      if (p1.length === 4) {
+        // YYYY-MM-DD
+        return { y: digits(p1, 4), m: digits(p2, 2), d: digits(p3, 2) };
+      }
+      // DD-MM-YYYY
+      return { d: digits(p1, 2), m: digits(p2, 2), y: digits(p3, 4) };
+    }
+  }
+  const nums = digits(raw, 8);
+  if (nums.length === 8) {
+    return { d: nums.slice(0, 2), m: nums.slice(2, 4), y: nums.slice(4, 8) };
+  }
+  return null;
+}
+
 /**
  * A calendar date as three liquid-glass fields, day / month / year (the order used in Ethiopia
- * and the UK), with the number pad and the phone's birthday autofill. Typing moves on by itself
- * once a part is complete. Each part is labelled for screen readers; an error sits under the
- * group with an icon (never colour alone). Whether the date is real, and old enough, is the
- * caller's rule (P-79).
+ * and the UK), with the number pad and the phone's birthday autofill. Typing moves on smoothly
+ * only after 2 digits are typed or via keyboard Next. Each part is labelled for screen readers;
+ * an error sits under the group with an icon (never colour alone).
  */
 export function DateField({
   label,
@@ -42,19 +64,74 @@ export function DateField({
   error,
   autofill,
   disabled = false,
+  autoFocus = false,
 }: DateFieldProps) {
   const { colors, spacing } = useTheme();
+  const draftRef = useRef(parts(value));
   const [draft, setDraft] = useState(() => parts(value));
+  const dayRef = useRef<TextInput>(null);
   const monthRef = useRef<TextInput>(null);
   const yearRef = useRef<TextInput>(null);
 
+  // Sync draft if value changes externally (e.g. form reset or partner loaded)
+  useEffect(() => {
+    const cur = draftRef.current;
+    const curIso =
+      cur.y.length === 4 && cur.m !== "" && cur.d !== ""
+        ? `${cur.y}-${cur.m.padStart(2, "0")}-${cur.d.padStart(2, "0")}`
+        : null;
+    if (value !== curIso) {
+      const next = parts(value);
+      draftRef.current = next;
+      setDraft(next);
+    }
+  }, [value]);
+
+  // Moving to the next part waits for the key event to finish (production-fix-plan K4): focusing
+  // inside onChangeText restarts Android's keyboard mid-keystroke, which made it flicker.
+  const moveTo = (target: { current: TextInput | null }) => {
+    requestAnimationFrame(() => target.current?.focus());
+  };
+
   const update = (next: { d: string; m: string; y: string }) => {
+    draftRef.current = next;
     setDraft(next);
     if (next.y.length !== 4 || next.m === "" || next.d === "") {
       onChange(null);
       return;
     }
     onChange(`${next.y}-${next.m.padStart(2, "0")}-${next.d.padStart(2, "0")}`);
+  };
+
+  const handleDayChange = (t: string) => {
+    const full = tryParseFullDate(t);
+    if (full !== null) {
+      update(full);
+      moveTo(yearRef);
+      return;
+    }
+    const d = digits(t, 2);
+    const prevLen = draftRef.current.d.length;
+    update({ ...draftRef.current, d });
+    // Advance to month ONLY when the user typed the 2nd digit and month is empty
+    if (prevLen < 2 && d.length === 2 && draftRef.current.m === "") {
+      moveTo(monthRef);
+    }
+  };
+
+  const handleMonthChange = (t: string) => {
+    const m = digits(t, 2);
+    const prevLen = draftRef.current.m.length;
+    update({ ...draftRef.current, m });
+    // Advance to year ONLY when the user typed the 2nd digit and year is empty
+    if (prevLen < 2 && m.length === 2 && draftRef.current.y === "") {
+      moveTo(yearRef);
+    }
+  };
+
+  const handleYearChange = (t: string) => {
+    const y = digits(t, 4);
+    update({ ...draftRef.current, y });
   };
 
   return (
@@ -65,21 +142,21 @@ export function DateField({
       <View style={[styles.row, { gap: spacing.sm }]}>
         <View style={styles.short}>
           <TextField
+            ref={dayRef}
             label="Day"
             placeholder="DD"
             value={draft.d}
-            onChangeText={(t) => {
-              const d = digits(t, 2);
-              update({ ...draft, d });
-              if (d.length === 2 || Number(d) > 3) monthRef.current?.focus();
-            }}
+            onChangeText={handleDayChange}
             keyboardType="number-pad"
             maxLength={2}
             clearable={false}
             disabled={disabled}
             accessibilityLabel={`${label}, day`}
+            autoFocus={autoFocus}
             {...(autofill === "birthday" ? { autoComplete: "birthdate-day" as const } : {})}
             returnKeyType="next"
+            onSubmitEditing={() => monthRef.current?.focus()}
+            submitBehavior="submit"
           />
         </View>
         <View style={styles.short}>
@@ -88,11 +165,7 @@ export function DateField({
             label="Month"
             placeholder="MM"
             value={draft.m}
-            onChangeText={(t) => {
-              const m = digits(t, 2);
-              update({ ...draft, m });
-              if (m.length === 2 || Number(m) > 1) yearRef.current?.focus();
-            }}
+            onChangeText={handleMonthChange}
             keyboardType="number-pad"
             maxLength={2}
             clearable={false}
@@ -100,6 +173,8 @@ export function DateField({
             accessibilityLabel={`${label}, month`}
             {...(autofill === "birthday" ? { autoComplete: "birthdate-month" as const } : {})}
             returnKeyType="next"
+            onSubmitEditing={() => yearRef.current?.focus()}
+            submitBehavior="submit"
           />
         </View>
         <View style={styles.long}>
@@ -108,9 +183,7 @@ export function DateField({
             label="Year"
             placeholder="YYYY"
             value={draft.y}
-            onChangeText={(t) => {
-              update({ ...draft, y: digits(t, 4) });
-            }}
+            onChangeText={handleYearChange}
             keyboardType="number-pad"
             maxLength={4}
             clearable={false}

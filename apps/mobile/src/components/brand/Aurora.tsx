@@ -1,6 +1,10 @@
 import { useEffect } from "react";
-import { StyleSheet, useWindowDimensions, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+// The keyboard library's window size ignores the keyboard on Android, so the orbs don't jump
+// when it opens (production-fix-plan K6).
+import { useKeyboardState, useWindowDimensions } from "react-native-keyboard-controller";
 import Animated, {
+  cancelAnimation,
   Easing,
   useAnimatedStyle,
   useSharedValue,
@@ -73,14 +77,25 @@ function Orb({ spec, color, t }: { spec: OrbSpec; color: string; t: SharedValue<
  */
 export function Aurora() {
   const { colors, reduceMotion } = useTheme();
+  // Held still while the keyboard is open, so typing never shares frames with the drift (K6).
+  const keyboardOpen = useKeyboardState((state) => state.isVisible);
   const t = useSharedValue(0);
   useEffect(() => {
     if (reduceMotion) {
+      cancelAnimation(t);
       t.set(0);
       return;
     }
-    t.set(withRepeat(withTiming(1, { duration: 26000, easing: Easing.linear }), -1, false));
-  }, [reduceMotion, t]);
+    if (keyboardOpen) {
+      cancelAnimation(t);
+      return;
+    }
+    // Carry on from where it stopped: whole cycles per unit of t, so from → from + 1 loops
+    // seamlessly.
+    const from = t.get() % 1;
+    t.set(from);
+    t.set(withRepeat(withTiming(from + 1, { duration: 26000, easing: Easing.linear }), -1, false));
+  }, [reduceMotion, keyboardOpen, t]);
   const color = { rose: colors.auroraRose, sky: colors.auroraSky, lilac: colors.auroraLilac };
   return (
     <View

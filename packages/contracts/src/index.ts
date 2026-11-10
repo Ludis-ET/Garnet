@@ -63,7 +63,13 @@ export {
   type SettingsViewDto,
 } from "./settings";
 export {
+  AVATAR_MAX_BASE64,
+  AVATAR_TYPES,
+  avatarInputSchema,
   avatarSchema,
+  uploadAvatarResultSchema,
+  uploadAvatarSchema,
+  type AvatarDto,
   chooseSideResultSchema,
   chooseSideSchema,
   completeSetupResultSchema,

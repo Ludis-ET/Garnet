@@ -8,6 +8,7 @@
  * - Time (ADR-0002): IANA zones and Temporal; offsets come from the zone database, never from
  *   "+N hours" maths, and a zone's daylight saving is detected, not assumed.
  */
+import { ALL_ZONES } from "./zoneList";
 import { Temporal } from "temporal-polyfill";
 
 export type GemSide = "ruby" | "sapphire";
@@ -82,7 +83,7 @@ export interface ZoneOption {
   country: string;
 }
 
-/** A short list for the prototype's picker; a real build uses the full IANA list. */
+/** The best-known cities, listed first in the picker (and each with a place on the map). */
 export const ZONES: readonly ZoneOption[] = [
   { zone: "Africa/Addis_Ababa", city: "Addis Ababa", country: "Ethiopia" },
   { zone: "Europe/London", city: "London", country: "United Kingdom" },
@@ -108,6 +109,138 @@ export const ZONES: readonly ZoneOption[] = [
   { zone: "America/Toronto", city: "Toronto", country: "Canada" },
   { zone: "America/Sao_Paulo", city: "São Paulo", country: "Brazil" },
 ];
+
+/**
+ * More cities people look for that aren't a time zone's own name: Ethiopia's and the UK's in
+ * particular, and the world's biggest. Each points at its zone.
+ */
+export const MORE_CITIES: readonly ZoneOption[] = [
+  { zone: "Africa/Addis_Ababa", city: "Bahir Dar", country: "Ethiopia" },
+  { zone: "Africa/Addis_Ababa", city: "Mekelle", country: "Ethiopia" },
+  { zone: "Africa/Addis_Ababa", city: "Hawassa", country: "Ethiopia" },
+  { zone: "Africa/Addis_Ababa", city: "Gondar", country: "Ethiopia" },
+  { zone: "Africa/Addis_Ababa", city: "Dire Dawa", country: "Ethiopia" },
+  { zone: "Africa/Addis_Ababa", city: "Adama", country: "Ethiopia" },
+  { zone: "Africa/Addis_Ababa", city: "Jimma", country: "Ethiopia" },
+  { zone: "Europe/London", city: "Manchester", country: "United Kingdom" },
+  { zone: "Europe/London", city: "Birmingham", country: "United Kingdom" },
+  { zone: "Europe/London", city: "Leeds", country: "United Kingdom" },
+  { zone: "Europe/London", city: "Liverpool", country: "United Kingdom" },
+  { zone: "Europe/London", city: "Bristol", country: "United Kingdom" },
+  { zone: "Europe/London", city: "Edinburgh", country: "United Kingdom" },
+  { zone: "Europe/London", city: "Glasgow", country: "United Kingdom" },
+  { zone: "Europe/London", city: "Cardiff", country: "United Kingdom" },
+  { zone: "Europe/London", city: "Belfast", country: "United Kingdom" },
+  { zone: "Europe/London", city: "Leicester", country: "United Kingdom" },
+  { zone: "Europe/London", city: "Nottingham", country: "United Kingdom" },
+  { zone: "Europe/London", city: "Sheffield", country: "United Kingdom" },
+  { zone: "Europe/London", city: "Oxford", country: "United Kingdom" },
+  { zone: "Europe/London", city: "Cambridge", country: "United Kingdom" },
+  { zone: "Africa/Asmara", city: "Asmara", country: "Eritrea" },
+  { zone: "Africa/Djibouti", city: "Djibouti", country: "Djibouti" },
+  { zone: "Africa/Mogadishu", city: "Mogadishu", country: "Somalia" },
+  { zone: "Africa/Khartoum", city: "Khartoum", country: "Sudan" },
+  { zone: "Africa/Juba", city: "Juba", country: "South Sudan" },
+  { zone: "Africa/Kampala", city: "Kampala", country: "Uganda" },
+  { zone: "Africa/Kigali", city: "Kigali", country: "Rwanda" },
+  { zone: "Africa/Dar_es_Salaam", city: "Dar es Salaam", country: "Tanzania" },
+  { zone: "Africa/Accra", city: "Accra", country: "Ghana" },
+  { zone: "Africa/Casablanca", city: "Casablanca", country: "Morocco" },
+  { zone: "Africa/Algiers", city: "Algiers", country: "Algeria" },
+  { zone: "Africa/Tunis", city: "Tunis", country: "Tunisia" },
+  { zone: "Africa/Kinshasa", city: "Kinshasa", country: "DR Congo" },
+  { zone: "Africa/Luanda", city: "Luanda", country: "Angola" },
+  { zone: "Africa/Johannesburg", city: "Cape Town", country: "South Africa" },
+  { zone: "Asia/Kolkata", city: "Delhi", country: "India" },
+  { zone: "Asia/Kolkata", city: "Bengaluru", country: "India" },
+  { zone: "Asia/Shanghai", city: "Beijing", country: "China" },
+  { zone: "Asia/Shanghai", city: "Shanghai", country: "China" },
+  { zone: "Asia/Hong_Kong", city: "Hong Kong", country: "China" },
+  { zone: "Asia/Seoul", city: "Seoul", country: "South Korea" },
+  { zone: "Asia/Manila", city: "Manila", country: "Philippines" },
+  { zone: "Asia/Jakarta", city: "Jakarta", country: "Indonesia" },
+  { zone: "Asia/Bangkok", city: "Bangkok", country: "Thailand" },
+  { zone: "Asia/Karachi", city: "Karachi", country: "Pakistan" },
+  { zone: "Asia/Dhaka", city: "Dhaka", country: "Bangladesh" },
+  { zone: "Asia/Tehran", city: "Tehran", country: "Iran" },
+  { zone: "Asia/Jerusalem", city: "Jerusalem", country: "Israel" },
+  { zone: "Asia/Qatar", city: "Doha", country: "Qatar" },
+  { zone: "Asia/Kuwait", city: "Kuwait City", country: "Kuwait" },
+  { zone: "Asia/Riyadh", city: "Jeddah", country: "Saudi Arabia" },
+  { zone: "Asia/Dubai", city: "Abu Dhabi", country: "United Arab Emirates" },
+  { zone: "Europe/Madrid", city: "Madrid", country: "Spain" },
+  { zone: "Europe/Amsterdam", city: "Amsterdam", country: "Netherlands" },
+  { zone: "Europe/Brussels", city: "Brussels", country: "Belgium" },
+  { zone: "Europe/Zurich", city: "Zurich", country: "Switzerland" },
+  { zone: "Europe/Vienna", city: "Vienna", country: "Austria" },
+  { zone: "Europe/Oslo", city: "Oslo", country: "Norway" },
+  { zone: "Europe/Copenhagen", city: "Copenhagen", country: "Denmark" },
+  { zone: "Europe/Helsinki", city: "Helsinki", country: "Finland" },
+  { zone: "Europe/Warsaw", city: "Warsaw", country: "Poland" },
+  { zone: "Europe/Athens", city: "Athens", country: "Greece" },
+  { zone: "Europe/Lisbon", city: "Lisbon", country: "Portugal" },
+  { zone: "Europe/Moscow", city: "Moscow", country: "Russia" },
+  { zone: "Europe/Kyiv", city: "Kyiv", country: "Ukraine" },
+  { zone: "America/New_York", city: "Washington", country: "United States" },
+  { zone: "America/New_York", city: "Boston", country: "United States" },
+  { zone: "America/New_York", city: "Atlanta", country: "United States" },
+  { zone: "America/New_York", city: "Miami", country: "United States" },
+  { zone: "America/Chicago", city: "Houston", country: "United States" },
+  { zone: "America/Chicago", city: "Dallas", country: "United States" },
+  { zone: "America/Denver", city: "Denver", country: "United States" },
+  { zone: "America/Phoenix", city: "Phoenix", country: "United States" },
+  { zone: "America/Los_Angeles", city: "San Francisco", country: "United States" },
+  { zone: "America/Los_Angeles", city: "Seattle", country: "United States" },
+  { zone: "America/Los_Angeles", city: "Las Vegas", country: "United States" },
+  { zone: "America/Vancouver", city: "Vancouver", country: "Canada" },
+  { zone: "America/Toronto", city: "Ottawa", country: "Canada" },
+  { zone: "America/Toronto", city: "Montreal", country: "Canada" },
+  { zone: "America/Edmonton", city: "Calgary", country: "Canada" },
+  { zone: "America/Mexico_City", city: "Mexico City", country: "Mexico" },
+  { zone: "America/Bogota", city: "Bogotá", country: "Colombia" },
+  { zone: "America/Lima", city: "Lima", country: "Peru" },
+  { zone: "America/Santiago", city: "Santiago", country: "Chile" },
+  { zone: "America/Argentina/Buenos_Aires", city: "Buenos Aires", country: "Argentina" },
+  { zone: "America/Sao_Paulo", city: "Rio de Janeiro", country: "Brazil" },
+  { zone: "Australia/Melbourne", city: "Melbourne", country: "Australia" },
+  { zone: "Australia/Brisbane", city: "Brisbane", country: "Australia" },
+  { zone: "Australia/Perth", city: "Perth", country: "Australia" },
+  { zone: "Pacific/Auckland", city: "Auckland", country: "New Zealand" },
+];
+
+/** Where a zone is, for zones with no listed city: its region from the zone's name. */
+const REGIONS: Readonly<Record<string, string>> = {
+  Africa: "Africa",
+  America: "Americas",
+  Antarctica: "Antarctica",
+  Arctic: "Arctic",
+  Asia: "Asia",
+  Atlantic: "Atlantic Ocean",
+  Australia: "Australia",
+  Europe: "Europe",
+  Indian: "Indian Ocean",
+  Pacific: "Pacific Ocean",
+};
+
+/**
+ * Every place the picker offers: the best-known cities, more cities, then every other IANA zone
+ * by its own city (ADR-0002), so anywhere in the world can be chosen.
+ */
+export const ALL_PLACES: readonly ZoneOption[] = (() => {
+  const named = [...ZONES, ...MORE_CITIES];
+  const covered = new Set(named.map((z) => z.zone));
+  const rest = ALL_ZONES.filter((z) => !covered.has(z)).map((zone) => {
+    const parts = zone.split("/");
+    const region = parts[0] ?? "";
+    return {
+      zone,
+      city: (parts[parts.length - 1] ?? zone).replace(/_/g, " "),
+      country: REGIONS[region] ?? region,
+    };
+  });
+  rest.sort((a, b) => a.city.localeCompare(b.city));
+  return [...named, ...rest];
+})();
 
 /** The city for a zone: from the list, else the zone's last segment ("America/Port_of_Spain"). */
 export function cityForZone(zone: string): string {
@@ -144,14 +277,30 @@ export function hasDaylightSaving(zone: string, year: number): boolean {
 
 /** Case-insensitive search by city, country or zone id; empty query lists everything. */
 export function searchZones(query: string): ZoneOption[] {
-  const q = query.trim().toLowerCase();
-  if (q.length === 0) return [...ZONES];
-  return ZONES.filter(
-    (z) =>
-      z.city.toLowerCase().includes(q) ||
-      z.country.toLowerCase().includes(q) ||
-      z.zone.toLowerCase().replace(/_/g, " ").includes(q),
-  );
+  const q = fold(query.trim());
+  if (q.length === 0) return [...ALL_PLACES];
+  // Cities whose name starts with the search come first, then any other match.
+  const starts: ZoneOption[] = [];
+  const others: ZoneOption[] = [];
+  for (const z of ALL_PLACES) {
+    const city = fold(z.city);
+    if (city.startsWith(q)) starts.push(z);
+    else if (
+      city.includes(q) ||
+      fold(z.country).includes(q) ||
+      fold(z.zone.replace(/_/g, " ")).includes(q)
+    )
+      others.push(z);
+  }
+  return [...starts, ...others];
+}
+
+/** Lower case without accents, so "sao paulo" finds São Paulo and "bogota" Bogotá. */
+function fold(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
 }
 
 /** A zone the runtime knows; anything else falls back to UTC rather than guessing. */

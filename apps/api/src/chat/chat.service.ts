@@ -20,7 +20,7 @@ import {
 import { sql, type Kysely, type SqlBool, type Transaction } from "kysely";
 import { asViewer, KYSELY, type Database, type Viewer } from "../db/database";
 import { ApiProblem } from "../errors/problem";
-import { ChatEventsService } from "./chat-events.service";
+import { ChatEventsService, type ChatEvent } from "./chat-events.service";
 import { NotificationsService } from "../notifications/notifications.service";
 
 const EDIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes (A13)
@@ -774,5 +774,15 @@ export class ChatService {
       const relationshipId = await this.requireRelationshipId(trx, viewer.userId);
       return this.loadMessagesWithDetails(trx, relationshipId, viewer.userId, { query });
     });
+  }
+
+  async getRelationshipId(viewer: Viewer): Promise<string> {
+    return asViewer(this.db, viewer, async (trx) => {
+      return this.requireRelationshipId(trx, viewer.userId);
+    });
+  }
+
+  subscribeEvents(relationshipId: string, listener: (event: ChatEvent) => void): () => void {
+    return this.events.subscribe(relationshipId, listener);
   }
 }

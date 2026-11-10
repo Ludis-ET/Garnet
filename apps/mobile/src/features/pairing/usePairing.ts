@@ -11,9 +11,14 @@ export const pairingKeys = {
   status: ["pairing", "status"] as const,
 };
 
-export function usePairingStatus() {
+export function usePairingStatus(enabled = true, refetchInterval?: number) {
   const { pairing } = useRepositories();
-  return useQuery({ queryKey: pairingKeys.status, queryFn: () => pairing.status() });
+  return useQuery({
+    queryKey: pairingKeys.status,
+    queryFn: () => pairing.status(),
+    enabled,
+    ...(refetchInterval !== undefined ? { refetchInterval } : {}),
+  });
 }
 
 /** A pairing action that refreshes the pairing state afterwards. */

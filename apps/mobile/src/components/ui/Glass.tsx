@@ -62,10 +62,13 @@ export function Glass({
       ]}
     >
       {/* No rim (owner direction P-67): depth comes from blur, veil, sheen and the soft shadow. */}
-      <View style={{ borderRadius: radius }}>
+      {/* The layers grow with the pane: a pane given flex (a full-height sheet) passes its height
+          on to its content, so a list inside it is never squeezed to nothing. */}
+      <View style={[styles.grow, { borderRadius: radius }]}>
         <View
           style={[
             styles.clip,
+            styles.grow,
             {
               borderRadius: inner,
               backgroundColor: reduceTransparency ? colors.surface : "transparent",
@@ -109,7 +112,7 @@ export function Glass({
               style={[styles.sheen, { borderTopLeftRadius: inner, borderTopRightRadius: inner }]}
             />
           )}
-          <View style={contentStyle}>{children}</View>
+          <View style={[styles.grow, contentStyle]}>{children}</View>
         </View>
       </View>
     </View>
@@ -120,6 +123,7 @@ export function Glass({
 const RIM = 0;
 
 const styles = StyleSheet.create({
+  grow: { flexGrow: 1 },
   clip: { overflow: "hidden" },
   sheen: { position: "absolute", top: 0, left: 0, right: 0, height: "48%" },
 });

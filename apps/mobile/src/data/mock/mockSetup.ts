@@ -73,6 +73,27 @@ export function createMockSetup(store: MockStore): SetupRepository {
         store.update((s) => ({ ...s, profiles: { ...s.profiles, togetherSince: date } }));
       }),
 
+    // On mock data the picture stays on the phone, as a data address (P-98).
+    setPicture: ({ base64 }) =>
+      store.simulate(() => {
+        const who = me();
+        const current = profileOf(who.userId, who.name);
+        const avatar = { kind: "image" as const, uri: `data:image/jpeg;base64,${base64}` };
+        write(who.userId, {
+          ...current,
+          avatar,
+          done: [...new Set([...current.done, "photo" as const])],
+        });
+        return avatar;
+      }),
+
+    clearPicture: () =>
+      store.simulate(() => {
+        const who = me();
+        const current = profileOf(who.userId, who.name);
+        write(who.userId, { ...current, avatar: { kind: "initials", swatch: 0 } });
+      }),
+
     complete: () =>
       store.simulate(() => {
         const who = me();

@@ -56,6 +56,48 @@ describe("pairing two new people (PAIR-01 to PAIR-07)", () => {
     expect((await api.call("POST", "/v1/invitations", { cookie: a.cookie })).statusCode).toBe(400);
   });
 
+  it("gives the inviter their own code back after signing in again, and nobody else (P-97)", async () => {
+    const a = await api.newAccount("Elias");
+    const b = await api.newAccount("Feven");
+    const code = await invite(a.cookie);
+    expect((await status(a.cookie)).invite?.code).toBe(code);
+    // A new session for the same person (signed out and in, or another phone).
+    const again = await api.signIn(a.email);
+    expect((await status(again)).invite?.code).toBe(code);
+    // The partner-to-be sees no code of anyone's.
+    expect((await status(b.cookie)).invite).toBeNull();
+    // A replaced code is gone; the new one is given instead.
+    const next = await invite(a.cookie);
+    expect((await status(a.cookie)).invite?.code).toBe(next);
+    // In the database it is sealed, never the code itself.
+    const stored = await api.db.query<{ sealed_code: string | null }>(
+      "select sealed_code from invitation where sealed_code is not null",
+    );
+    for (const row of stored.rows) {
+      expect(row.sealed_code).not.toContain(next);
+      expect(row.sealed_code).not.toContain(code);
+    }
+    // Used: the sealed copy is erased.
+    expect((await accept(b.cookie, next)).json()).toEqual({ ok: true, partnerName: "Elias" });
+    const left = await api.db.query<{ n: number }>(
+      "select count(*)::int as n from invitation i join app_user u on u.id = i.created_by where u.email = $1 and sealed_code is not null",
+      [a.email],
+    );
+    expect(left.rows[0]?.n).toBe(0);
+  });
+
+  it("erases the sealed code when an invitation is withdrawn", async () => {
+    const a = await api.newAccount("Genet");
+    await invite(a.cookie);
+    await api.call("DELETE", "/v1/invitations", { cookie: a.cookie });
+    expect((await status(a.cookie)).invite).toBeNull();
+    const left = await api.db.query<{ n: number }>(
+      "select count(*)::int as n from invitation i join app_user u on u.id = i.created_by where u.email = $1 and sealed_code is not null",
+      [a.email],
+    );
+    expect(left.rows[0]?.n).toBe(0);
+  });
+
   it("answers every unusable code the same: unknown, one's own, withdrawn, replaced, expired", async () => {
     const owner = await api.newAccount("Dawit");
     const other = await api.newAccount("Elif");

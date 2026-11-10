@@ -7,20 +7,22 @@ import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { useAuthStatus } from "@/features/auth/useAuth";
 import { FRAME_ASPECT } from "@/features/figures/art/figure";
+import { fusionPlayedThisLaunch } from "@/features/pairing/fusionOnLaunch";
 import { usePairingStatus } from "@/features/pairing/usePairing";
 import { useSetupState } from "@/features/setup/useSetup";
 import { useTheme } from "@/theme/ThemeProvider";
 
 /**
  * Entry gate: sends each account, pairing and setup state to its screen (AUTH-01 to AUTH-09,
- * PAIR-01 to PAIR-04, SETUP-01). Set-up people go to the Home placeholder until HOME-01 is
- * designed (P-49, B-04).
+ * PAIR-01 to PAIR-04, SETUP-01). Home opens only once both partners have finished setup, and
+ * each launch then opens on the fusion (P-99).
  */
 export default function EntryGate() {
   const router = useRouter();
   const auth = useAuthStatus();
-  const pairing = usePairingStatus();
-  const setup = useSetupState(auth.data?.kind === "signedIn" && pairing.data?.kind === "paired");
+  const signedIn = auth.data?.kind === "signedIn";
+  const pairing = usePairingStatus(signedIn);
+  const setup = useSetupState(signedIn && pairing.data?.kind === "paired");
   const { colors, spacing } = useTheme();
   const [timedOut, setTimedOut] = useState(false);
 
@@ -33,7 +35,10 @@ export default function EntryGate() {
     };
   }, []);
 
-  const isError = auth.isError || pairing.isError || setup.isError;
+  const isError =
+    auth.isError ||
+    (signedIn && pairing.isError) ||
+    (signedIn && pairing.data?.kind === "paired" && setup.isError);
   const isStalled = timedOut && auth.data === undefined;
 
   if (isError || isStalled) {
@@ -60,7 +65,7 @@ export default function EntryGate() {
             onPress={() => {
               setTimedOut(false);
               void auth.refetch();
-              void pairing.refetch();
+              if (signedIn) void pairing.refetch();
             }}
           />
           <Button
@@ -104,7 +109,12 @@ export default function EntryGate() {
       return <Redirect href="/pair/review" />;
     case "paired":
       if (setup.data === undefined) return loading;
-      return <Redirect href={setup.data.profile.complete ? "/home" : "/setup"} />;
+      if (!setup.data.profile.complete) return <Redirect href="/setup" />;
+      // The space opens for both together (P-99): home waits for the partner's setup too,
+      // and every launch after that opens on the fusion.
+      if (!setup.data.partner.ready) return <Redirect href="/waiting" />;
+      if (!fusionPlayedThisLaunch()) return <Redirect href="/fusion" />;
+      return <Redirect href="/home" />;
   }
 }
 

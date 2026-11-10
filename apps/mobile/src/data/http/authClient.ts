@@ -37,15 +37,37 @@ const webStorage = {
 };
 
 export function createGarnetAuthClient(baseURL: string) {
-  const storage = Platform.OS === "web" ? webStorage : SecureStore;
+  const isWeb = Platform.OS === "web";
+  const storage = isWeb ? webStorage : SecureStore;
   return createAuthClient({
     baseURL,
     basePath: "/v1/auth",
     fetchOptions: {
-      headers: { [CLIENT_HEADER.name]: CLIENT_HEADER.value, "user-agent": deviceAgent() },
+      credentials: isWeb ? "include" : "omit",
+      headers: {
+        [CLIENT_HEADER.name]: CLIENT_HEADER.value,
+        ...(isWeb ? {} : { "user-agent": deviceAgent() }),
+      },
     },
     plugins: [expoClient({ scheme: "garnet", storagePrefix: "garnet", storage })],
   });
 }
 
 export type GarnetAuthClient = ReturnType<typeof createGarnetAuthClient>;
+
+const shared = new Map<string, GarnetAuthClient>();
+
+/**
+ * The one auth client per API address (production-fix-plan A1). Several clients each kept their
+ * own copy of the session in memory, so one could hold a fresh sign-in while another still said
+ * "signed out"; every caller in the app goes through this instead.
+ */
+export function getGarnetAuthClient(baseURL: string): GarnetAuthClient {
+  const key = baseURL.replace(/\/+$/, "");
+  let client = shared.get(key);
+  if (client === undefined) {
+    client = createGarnetAuthClient(key);
+    shared.set(key, client);
+  }
+  return client;
+}

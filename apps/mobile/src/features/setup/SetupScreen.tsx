@@ -203,7 +203,8 @@ function SetupFlow({ initial }: { initial: SetupState }) {
             if (result.ok) {
               if (Platform.OS !== "web")
                 void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              router.replace("/home");
+              // The gate decides: home, waiting for the partner, or the fusion (P-99).
+              router.replace("/");
               return;
             }
             const first = result.missing[0];

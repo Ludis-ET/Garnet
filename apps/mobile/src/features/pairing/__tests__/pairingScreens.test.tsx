@@ -154,9 +154,9 @@ describe("PAIR-02 and PAIR-06 Your invitation", () => {
     await renderWith(<InviteScreen />, fresh());
     await press("Share invitation");
     expect(await screen.findByRole("header", { name: "Share preview" }, WAIT)).toBeTruthy();
-    expect(
-      screen.getByText(/Your code: ABCD-2345\. It works once and expires in 24 hours\./),
-    ).toBeTruthy();
+    // The matcher collapses the message's line breaks into spaces.
+    expect(screen.getByText(/Your invitation code: ABCD-2345 /)).toBeTruthy();
+    expect(screen.getByText(/It works once and expires in 24 hours\./)).toBeTruthy();
     expect(screen.getByText("Simulated — nothing is sent")).toBeTruthy();
   });
 
@@ -169,6 +169,22 @@ describe("PAIR-02 and PAIR-06 Your invitation", () => {
     expect(await screen.findByText("This invitation has expired.", {}, WAIT)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Create a new one" })).toBeTruthy();
     expect(screen.queryByText("Waiting for your person to join…")).toBeNull();
+  });
+
+  it("walks the person receiving the code through joining", async () => {
+    await renderWith(<InviteScreen />, fresh());
+    expect(await screen.findByRole("header", { name: "How your person joins" }, WAIT)).toBeTruthy();
+    expect(screen.getByText("Enter the code to open your space together")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Copy message" })).toBeTruthy();
+  });
+
+  it("offers a fresh code instead of empty tiles when this phone has no code (P-97)", async () => {
+    await renderWith(
+      <InviteScreen />,
+      signedInStore({ invite: { code: "", createdAt: Temporal.Now.instant().toString() } }),
+    );
+    expect(await screen.findByRole("button", { name: "Make a fresh code" }, WAIT)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Share invitation" })).toBeNull();
   });
 
   it("revokes after confirming", async () => {

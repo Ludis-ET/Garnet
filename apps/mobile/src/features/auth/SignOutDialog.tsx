@@ -6,8 +6,6 @@
 import { useRouter } from "expo-router";
 import { SideCharacter } from "@/components/character/SideCharacter";
 import { ActionSheet } from "@/components/ui/ActionSheet";
-import { useToast } from "@/components/ui/Toast";
-import { serviceErrorMessage } from "./authUi";
 import { useSignOut, useUnsentCount } from "./useAuth";
 
 export function signOutBody(unsent: number): string {
@@ -18,7 +16,6 @@ export function signOutBody(unsent: number): string {
 
 export function SignOutDialog({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const router = useRouter();
-  const toast = useToast();
   const unsent = useUnsentCount(visible);
   const signOut = useSignOut();
   return (
@@ -34,12 +31,9 @@ export function SignOutDialog({ visible, onClose }: { visible: boolean; onClose:
       onCancel={onClose}
       onConfirm={() => {
         signOut.mutate(undefined, {
-          onSuccess: () => {
+          onSettled: () => {
             onClose();
             router.replace("/welcome");
-          },
-          onError: (e) => {
-            toast.show(serviceErrorMessage(e), "error");
           },
         });
       }}

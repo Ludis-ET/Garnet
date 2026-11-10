@@ -69,6 +69,7 @@ import { gemOf, PeekBubble, PeekCharacter, TypingDots } from "./components/Prese
 import {
   useCancelUpload,
   useChatMessages,
+  useChatStream,
   useMarkChatRead,
   useMarkSaved,
   useChatPresence,
@@ -159,6 +160,7 @@ function buildItems(
 }
 
 function Conversation() {
+  useChatStream();
   const toast = useToast();
   const { colors, radii, spacing, reduceMotion } = useTheme();
   const now = useNow();

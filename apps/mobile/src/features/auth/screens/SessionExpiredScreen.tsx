@@ -3,21 +3,34 @@
  * canvas on purpose: no private content is visible or blurred behind it (spec A9 privacy).
  */
 import { useRouter } from "expo-router";
+import { View } from "react-native";
 import { Button } from "@/components/ui/Button";
 import { GlassScreen } from "@/components/ui/GlassScreen";
 import { StatusHero } from "@/components/ui/StatusHero";
+import { clearAllAuthSessions } from "@/data/http/localState";
 
 export function SessionExpiredScreen() {
   const router = useRouter();
   return (
     <GlassScreen
       footer={
-        <Button
-          label="Sign in"
-          onPress={() => {
-            router.replace("/sign-in");
-          }}
-        />
+        <View style={{ gap: 8, width: "100%" }}>
+          <Button
+            label="Sign in"
+            onPress={() => {
+              void clearAllAuthSessions();
+              router.replace("/sign-in");
+            }}
+          />
+          <Button
+            label="Start fresh"
+            variant="text"
+            onPress={() => {
+              void clearAllAuthSessions();
+              router.replace("/welcome");
+            }}
+          />
+        </View>
       }
     >
       <StatusHero
