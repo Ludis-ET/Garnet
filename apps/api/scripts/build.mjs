@@ -23,7 +23,8 @@ await build({
   banner: {
     js: "import { createRequire as __createRequire } from 'node:module'; const require = __createRequire(import.meta.url);",
   },
-  external: ["@nestjs/*", "fastify", "pg", "rxjs", "reflect-metadata"],
+  // ws has optional native add-ons that must not be bundled; it and its plugin ship as packages.
+  external: ["@nestjs/*", "fastify", "pg", "rxjs", "reflect-metadata", "@fastify/websocket", "ws"],
 });
 
 // 2. Bundle database migration CLI
@@ -74,10 +75,12 @@ const prodPkg = {
     "@nestjs/common": "12.2.0",
     "@nestjs/core": "12.2.0",
     "@nestjs/platform-fastify": "12.2.0",
+    "@fastify/websocket": "11.3.6",
     fastify: "5.12.7",
     pg: "8.23.1",
     "reflect-metadata": "0.2.2",
     rxjs: "7.8.2",
+    ws: "8.22.0",
   },
 };
 writeFileSync(resolve(distDir, "package.json"), JSON.stringify(prodPkg, null, 2) + "\n");

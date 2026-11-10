@@ -1,6 +1,9 @@
 import "reflect-metadata";
 import { randomUUID } from "node:crypto";
 import cors from "@fastify/cors";
+import websocket from "@fastify/websocket";
+import { RealtimeHub } from "./realtime/hub";
+import { registerRealtime } from "./realtime/gateway";
 import { Module, type DynamicModule } from "@nestjs/common";
 import { APP_FILTER, APP_GUARD, NestFactory } from "@nestjs/core";
 import { FastifyAdapter, type NestFastifyApplication } from "@nestjs/platform-fastify";
@@ -114,6 +117,7 @@ class AppModule {
         { provide: KYSELY, useValue: options.db },
         { provide: AUTH, useValue: options.auth },
         { provide: POLICY, useValue: options.policy },
+        { provide: RealtimeHub, useValue: options.realtimeHub },
         { provide: CODE_SEALER, useValue: createCodeSealer(options.auth.options.secret) },
         { provide: SOCIAL, useValue: options.social ?? {} },
         { provide: PUSH_SENDER, useValue: options.pushSender ?? new InMemoryPushSender() },
@@ -132,6 +136,8 @@ export interface AppOptions {
   policy: AuthPolicy;
   /** Google and Apple, when configured (P-79); the same object Better Auth was given. */
   social?: SocialConfig;
+  /** Realtime for the couple (P-100); main.ts joins it to the other processes. */
+  realtimeHub?: RealtimeHub;
   /** Optional push sender provider (defaults to InMemoryPushSender). */
   pushSender?: PushSender;
   /** Optional object storage provider (defaults to InMemoryObjectStorage). */
@@ -199,11 +205,18 @@ export async function createApp(options: AppOptions): Promise<NestFastifyApplica
   });
   options.beforeRoutes?.(fastify);
   fastify.addHook("onRequest", (request, _reply, done) => {
-    const sock = request.raw.socket as unknown as {
-      setKeepAlive?: () => void;
-      setNoDelay?: () => void;
-      setTimeout?: () => void;
-    };
+    const sock = request.raw.socket as unknown as
+      | {
+          setKeepAlive?: () => void;
+          setNoDelay?: () => void;
+          setTimeout?: () => void;
+        }
+      | undefined;
+    // Some requests (in-process WebSocket upgrades) have no socket to patch.
+    if (sock === undefined) {
+      done();
+      return;
+    }
     if (typeof sock.setKeepAlive !== "function") sock.setKeepAlive = () => undefined;
     if (typeof sock.setNoDelay !== "function") sock.setNoDelay = () => undefined;
     if (typeof sock.setTimeout !== "function") sock.setTimeout = () => undefined;
@@ -230,9 +243,31 @@ export async function createApp(options: AppOptions): Promise<NestFastifyApplica
 
   registerAuthRoutes(fastify, options.auth);
 
-  const app = await NestFactory.create<NestFastifyApplication>(AppModule.with(options), adapter, {
-    logger: false,
+  // Realtime (P-100): one hub per process, the WebSocket route next to the SSE stream.
+  const hub = options.realtimeHub ?? new RealtimeHub();
+  let chat: ChatService | null = null;
+  await fastify.register(websocket, {
+    options: { maxPayload: 4096 },
+    // A broken connection is closed; the log names the error's kind only (§6).
+    errorHandler: (error, socket) => {
+      fastify.log.warn({ code: "realtime_error", error: error.name }, "realtime");
+      socket.terminate();
+    },
   });
+  registerRealtime(fastify, {
+    auth: options.auth,
+    db: options.db,
+    policy: options.policy,
+    hub,
+    chat: () => chat,
+  });
+
+  const app = await NestFactory.create<NestFastifyApplication>(
+    AppModule.with({ ...options, realtimeHub: hub }),
+    adapter,
+    { logger: false },
+  );
+  chat = app.get(ChatService);
   app.enableShutdownHooks();
   // Nest routes unknown routes and Fastify's own errors (body parsing, size limits) through
   // ProblemFilter, so every error leaves as a problem.

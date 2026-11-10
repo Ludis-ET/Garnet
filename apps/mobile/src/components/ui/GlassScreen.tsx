@@ -1,8 +1,20 @@
 import { StatusBar } from "expo-status-bar";
 import type { ReactNode } from "react";
 import { Platform, StyleSheet, View } from "react-native";
-import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  useReanimatedFocusedInput,
+  useReanimatedKeyboardAnimation,
+  useWindowDimensions,
+} from "react-native-keyboard-controller";
+import Animated, {
+  scrollTo,
+  useAnimatedReaction,
+  useAnimatedRef,
+  useAnimatedStyle,
+  useAnimatedScrollHandler,
+  useSharedValue,
+} from "react-native-reanimated";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Aurora } from "@/components/brand/Aurora";
 import { SideWash } from "@/components/brand/SideWash";
 import { Header } from "@/components/ui/Header";
@@ -53,6 +65,38 @@ export function GlassScreen({
   tabBar = false,
 }: GlassScreenProps) {
   const { spacing, scheme, side, intensity } = useTheme();
+  const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  // Keyboard handling (production-fix-plan K2), with nothing clipped: a real spacer as tall as
+  // the keyboard ends the content, so everything can scroll above it, and the focused field is
+  // brought into view once, in step with the keyboard. With the keyboard closed the spacer is
+  // zero. (The library's KeyboardAwareScrollView clipped part of the page on Android.)
+  const scrollRef = useAnimatedRef<Animated.ScrollView>();
+  // Where the page is scrolled to, kept from its own scroll events.
+  const offset = useSharedValue(0);
+  const onScroll = useAnimatedScrollHandler((event) => {
+    offset.value = event.contentOffset.y;
+  });
+  const keyboard = useReanimatedKeyboardAnimation();
+  const { input } = useReanimatedFocusedInput();
+  const startOffset = useSharedValue(0);
+  const bottomInset = insets.bottom;
+  const spacerStyle = useAnimatedStyle(() => ({
+    height: Math.max(0, Math.abs(keyboard.height.value) - bottomInset),
+  }));
+  useAnimatedReaction(
+    () => Math.abs(keyboard.height.value),
+    (now, before) => {
+      if (before === null || now <= before) return;
+      if (before === 0) startOffset.value = offset.value;
+      const layout = input.value?.layout;
+      if (layout === undefined) return;
+      const fieldBottom = layout.absoluteY + layout.height + KEYBOARD_GAP;
+      const visibleBottom = windowHeight - now;
+      if (fieldBottom > visibleBottom)
+        scrollTo(scrollRef, 0, startOffset.value + (fieldBottom - visibleBottom), false);
+    },
+  );
   // A "rich" look (SETUP-06) washes personal pages in the person's own colour.
   const flood =
     wash === "none"
@@ -65,14 +109,12 @@ export function GlassScreen({
       <SideWash side="sapphire" on={flood === "sapphire"} />
       <StatusBar style={scheme === "dark" ? "light" : "dark"} />
       <SafeAreaView style={styles.fill} edges={["top", "bottom"]}>
-        {/* One keyboard-aware scroll on both platforms (production-fix-plan K2). Android draws
-            edge to edge, where the window no longer resizes for the keyboard; this view adds
-            the keyboard's height itself and scrolls the focused field into view, in step with
-            the keyboard's own animation, so nothing jumps while typing. */}
-        <KeyboardAwareScrollView
+        <Animated.ScrollView
+          ref={scrollRef}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
           testID="glass-screen-scroll"
           style={styles.fill}
-          bottomOffset={KEYBOARD_GAP}
           contentContainerStyle={[
             styles.scroll,
             {
@@ -102,7 +144,8 @@ export function GlassScreen({
             </View>
             {footer === undefined ? null : <View style={{ gap: spacing.md }}>{footer}</View>}
           </View>
-        </KeyboardAwareScrollView>
+          <Animated.View style={spacerStyle} />
+        </Animated.ScrollView>
       </SafeAreaView>
     </View>
   );

@@ -1,4 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
+import { NotificationsService } from "../notifications/notifications.service";
 import { randomUUID } from "node:crypto";
 import {
   surpriseCancelledViewSchema,
@@ -16,7 +17,10 @@ import { ApiProblem } from "../errors/problem";
 
 @Injectable()
 export class SurprisesService {
-  constructor(@Inject(KYSELY) private readonly db: Kysely<Database>) {}
+  constructor(
+    @Inject(KYSELY) private readonly db: Kysely<Database>,
+    @Inject(NotificationsService) private readonly notifications: NotificationsService,
+  ) {}
 
   private async requireRelationshipAndPartner(
     trx: Transaction<Database>,
@@ -201,6 +205,27 @@ export class SurprisesService {
   }
 
   async create(input: CreateSurpriseRequest, viewer: Viewer): Promise<{ id: string }> {
+    const made = await this.#create(input, viewer);
+    // P-102: a surprise that opens now is announced now; a dated one when its day comes.
+    if (input.reveal.kind === "now")
+      await this.notifications
+        .sendNotification({
+          relationshipId: made.relationshipId,
+          recipientUserId: made.recipientId,
+          senderUserId: viewer.userId,
+          category: "surprise",
+          group: "letters",
+          href: `/moments/surprises/${made.id}`,
+          context: { senderName: viewer.name },
+        })
+        .catch(() => undefined);
+    return { id: made.id };
+  }
+
+  async #create(
+    input: CreateSurpriseRequest,
+    viewer: Viewer,
+  ): Promise<{ id: string; relationshipId: string; recipientId: string }> {
     return asViewer(this.db, viewer, async (trx) => {
       const { relationshipId, partnerId } = await this.requireRelationshipAndPartner(
         trx,
@@ -235,7 +260,7 @@ export class SurprisesService {
         })
         .execute();
 
-      return { id: surpriseId };
+      return { id: surpriseId, relationshipId, recipientId: partnerId };
     });
   }
 

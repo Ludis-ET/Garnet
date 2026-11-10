@@ -445,6 +445,30 @@ const suites = [
     runs: 1,
     mutants: [
       {
+        id: "NOTIFY-1",
+        file: "src/moments/open-when.service.ts",
+        find: '        category: "open-when",',
+        replace: '        category: "open-when-x",',
+        expect: "killed",
+        note: "the recipient hears a letter is waiting (P-102)",
+      },
+      {
+        id: "SCHED-1",
+        file: "src/notifications/scheduler.ts",
+        find: "    return r.rows[0]?.ok === true;",
+        replace: "    return true;",
+        expect: "killed",
+        note: "a day's notice is sent once, even by two processes (P-102)",
+      },
+      {
+        id: "SCHED-2",
+        file: "src/notifications/scheduler.ts",
+        find: "export const MORNING_HOUR = 9;",
+        replace: "export const MORNING_HOUR = 0;",
+        expect: "killed",
+        note: "day notices wait for 9:00 in each person's own zone, never the night (P-102)",
+      },
+      {
         id: "MAIL-1",
         file: "src/mail/worker.ts",
         find: "          await o.outbox.retry(mail.id, retryAt, code);",

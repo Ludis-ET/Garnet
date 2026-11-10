@@ -18,7 +18,8 @@ export interface QueuedMail {
 }
 
 export interface MailOutbox {
-  enqueue(to: string, job: MailJob, expiresAt: Date): Promise<void>;
+  /** Due at `now`: the same clock the worker claims by, never the database's own. */
+  enqueue(to: string, job: MailJob, expiresAt: Date, now: Date): Promise<void>;
   /** Up to `limit` emails due now, claimed for `claimMs`. */
   claim(now: Date, limit: number, claimMs: number): Promise<QueuedMail[]>;
   /** Sent: the row, with the address and token in it, goes at once. */
@@ -60,11 +61,12 @@ export function createMailOutbox(db: Kysely<Database>): MailOutbox {
     await sql`delete from mail_outbox where id = ${id}::uuid`.execute(db);
   };
   return {
-    async enqueue(to, job, expiresAt) {
+    async enqueue(to, job, expiresAt, now) {
       const { kind, ...payload } = job;
       await sql`
-        insert into mail_outbox (kind, recipient, payload, expires_at)
-        values (${kind}, ${to}, ${JSON.stringify(payload)}::jsonb, ${expiresAt.toISOString()}::timestamptz)
+        insert into mail_outbox (kind, recipient, payload, expires_at, next_attempt_at)
+        values (${kind}, ${to}, ${JSON.stringify(payload)}::jsonb,
+                ${expiresAt.toISOString()}::timestamptz, ${now.toISOString()}::timestamptz)
       `.execute(db);
     },
 

@@ -4,6 +4,7 @@ import type { FastifyReply } from "fastify";
 import { sql, type Kysely } from "kysely";
 import { Public } from "../auth/session.guard";
 import { KYSELY, type Database } from "../db/database";
+import { mailStatus } from "../mail/status";
 
 /** How long health waits for the database before calling it unavailable. */
 const DB_TIMEOUT_MS = 2000;
@@ -29,6 +30,12 @@ export class HealthController {
       clearTimeout(timer);
     });
     if (!ok) void reply.status(503);
-    return ok ? { status: "ok", database: "ok" } : { status: "degraded", database: "unavailable" };
+    const mail = mailStatus();
+    return {
+      ...(ok
+        ? { status: "ok" as const, database: "ok" as const }
+        : { status: "degraded" as const, database: "unavailable" as const }),
+      ...(mail === null ? {} : { mail }),
+    };
   }
 }

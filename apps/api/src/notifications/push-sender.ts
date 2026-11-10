@@ -7,6 +7,8 @@ export const PUSH_SENDER = Symbol("PUSH_SENDER");
 
 export interface PushPayload {
   readonly to: string; // Device token
+  /** Where the token came from: FCM sends Android only; iPhones need APNs (P-101). */
+  readonly platform: string;
   readonly title: string;
   readonly body: string;
   readonly data: {

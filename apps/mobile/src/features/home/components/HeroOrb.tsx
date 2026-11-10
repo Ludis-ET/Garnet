@@ -234,8 +234,11 @@ export function HeroOrb({
   width,
   pulse,
   look,
+  character = "garnet",
   shortcuts = [],
 }: {
+  /** Garnet while both are online; the viewer's own gem when alone (P-100). */
+  character?: "garnet" | "ruby" | "sapphire";
   size: number;
   /** The full width available; the ring may reach past the orb. */
   width: number;
@@ -345,7 +348,7 @@ export function HeroOrb({
             ]}
           >
             <CharacterSlot
-              character="garnet"
+              character={character}
               look={look}
               size={figureH}
               aspectRatio={FRAME_ASPECT}

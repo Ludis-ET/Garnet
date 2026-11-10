@@ -55,6 +55,7 @@ export function ZoneSheet({
         >
           <Glass
             radius={radii.xl}
+            fill
             style={styles.flex}
             contentStyle={[
               styles.flex,

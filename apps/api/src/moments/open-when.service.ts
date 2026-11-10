@@ -1,4 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
+import { NotificationsService } from "../notifications/notifications.service";
 import { randomUUID } from "node:crypto";
 import {
   openWhenDraftViewSchema,
@@ -18,7 +19,10 @@ import { ApiProblem } from "../errors/problem";
 
 @Injectable()
 export class OpenWhenService {
-  constructor(@Inject(KYSELY) private readonly db: Kysely<Database>) {}
+  constructor(
+    @Inject(KYSELY) private readonly db: Kysely<Database>,
+    @Inject(NotificationsService) private readonly notifications: NotificationsService,
+  ) {}
 
   private async requireRelationshipAndPartner(
     trx: Transaction<Database>,
@@ -293,6 +297,27 @@ export class OpenWhenService {
   }
 
   async seal(id: string, unlockRule: UnlockRuleDto, viewer: Viewer): Promise<OpenWhenViewDto> {
+    const view = await this.#seal(id, unlockRule, viewer);
+    // P-102: the recipient learns a letter is waiting; nothing of what it says.
+    await this.notifications
+      .sendNotification({
+        relationshipId: view.relationshipId,
+        recipientUserId: view.recipientId,
+        senderUserId: viewer.userId,
+        category: "open-when",
+        group: "letters",
+        href: `/moments/open-when/${id}`,
+        context: { senderName: viewer.name },
+      })
+      .catch(() => undefined);
+    return view.dto;
+  }
+
+  async #seal(
+    id: string,
+    unlockRule: UnlockRuleDto,
+    viewer: Viewer,
+  ): Promise<{ dto: OpenWhenViewDto; relationshipId: string; recipientId: string }> {
     return asViewer(this.db, viewer, async (trx) => {
       const row = await trx
         .selectFrom("open_when_letter")
@@ -315,7 +340,7 @@ export class OpenWhenService {
         .where("id", "=", id)
         .execute();
 
-      return openWhenSealedViewSchema.parse({
+      const dto = openWhenSealedViewSchema.parse({
         id: row.id,
         status: "sealed",
         authorId: row.author_id,
@@ -325,6 +350,7 @@ export class OpenWhenService {
         unlockRule,
         createdAt: row.created_at.toISOString(),
       });
+      return { dto, relationshipId: row.relationship_id, recipientId: row.recipient_id };
     });
   }
 

@@ -57,6 +57,9 @@ export interface SentMail {
 
 export interface TestApi {
   db: PGlite;
+  /** The Nest application, to reach its services (the notification scheduler's tests). */
+  nest: NestFastifyApplication;
+  kysely: Kysely<Database>;
   auth: Auth;
   /** Session cookies: the two partners, someone in another relationship, and dead ones. */
   cookies: { selam: string; noah: string; stranger: string; revoked: string; expired: string };
@@ -71,6 +74,8 @@ export interface TestApi {
   /** Every log line the API wrote, parsed. */
   logs: Record<string, unknown>[];
   inject(options: InjectOptions): Promise<LightMyRequestResponse>;
+  /** Opens the realtime WebSocket (P-100) in process, as the app would (its header, a cookie). */
+  realtime(cookie?: string, headers?: Record<string, string>): Promise<RealtimeSocket>;
   /** A request as the app sends it: the app header, its origin, JSON, and a session cookie. */
   call(
     method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE",
@@ -88,6 +93,18 @@ export interface TestApi {
   /** Signs up and verifies a new person through the API; their email and session cookie. */
   newAccount(name: string): Promise<{ email: string; cookie: string; id: string }>;
   close(): Promise<void>;
+}
+
+/** A test end of the realtime socket: what arrived, and a way to wait for the next match. */
+export interface RealtimeSocket {
+  received: { type: string; senderId?: string; payload?: unknown }[];
+  send(message: unknown): void;
+  next(
+    type: string,
+    timeoutMs?: number,
+  ): Promise<{ type: string; senderId?: string; payload?: unknown }>;
+  closed: Promise<number>;
+  close(): void;
 }
 
 /** A pool whose every connection fails, as when the database is down. */
@@ -203,6 +220,60 @@ export async function startTestApi(
   const fastify = app.getHttpAdapter().getInstance();
   const inject = (o: InjectOptions) => fastify.inject(o);
 
+  const realtime: TestApi["realtime"] = async (cookie, headers = {}) => {
+    const ws = await fastify.injectWS("/v1/realtime", {
+      headers: {
+        [CLIENT_HEADER.name]: CLIENT_HEADER.value,
+        ...(cookie === undefined ? {} : { cookie }),
+        ...headers,
+      },
+    });
+    const received: RealtimeSocket["received"] = [];
+    const waiters: { type: string; resolve: (m: RealtimeSocket["received"][number]) => void }[] =
+      [];
+    ws.on("message", (data: Buffer) => {
+      const m = JSON.parse(data.toString("utf8")) as RealtimeSocket["received"][number];
+      received.push(m);
+      const i = waiters.findIndex((w) => w.type === m.type);
+      if (i !== -1) waiters.splice(i, 1)[0]?.resolve(m);
+    });
+    const closed = new Promise<number>((resolve) => {
+      ws.on("close", (code: number) => {
+        resolve(code);
+      });
+    });
+    return {
+      received,
+      closed,
+      send: (message) => {
+        ws.send(JSON.stringify(message));
+      },
+      close: () => {
+        ws.terminate();
+      },
+      next: (type, timeoutMs = 3000) => {
+        const seen = received.find((m) => m.type === type);
+        if (seen !== undefined) {
+          received.splice(received.indexOf(seen), 1);
+          return Promise.resolve(seen);
+        }
+        return new Promise((resolve, reject) => {
+          const timer = setTimeout(() => {
+            reject(new Error(`no ${type} within ${String(timeoutMs)} ms`));
+          }, timeoutMs);
+          waiters.push({
+            type,
+            resolve: (m) => {
+              clearTimeout(timer);
+              received.splice(received.indexOf(m), 1);
+              resolve(m);
+            },
+          });
+        });
+      },
+    };
+  };
+
   const call: TestApi["call"] = (method, url, o = {}) =>
     inject({
       method,
@@ -252,6 +323,9 @@ export async function startTestApi(
   ]);
 
   return {
+    nest: app,
+    kysely,
+    realtime,
     db,
     auth,
     cookies: { selam, noah, stranger, revoked, expired },

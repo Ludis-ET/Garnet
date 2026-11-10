@@ -12,11 +12,17 @@ module.exports = ({ config }) => {
   const foreground = local("adaptive-foreground.png");
   const background = local("adaptive-background.png");
   const favicon = local("favicon.png");
+  // Android push (P-101): the Firebase app file the owner downloads (docs/guides/firebase-push.md).
+  // Git-ignored; without it the app builds and simply has no push.
+  const firebase = fs.existsSync(path.join(__dirname, "google-services.json"))
+    ? "./google-services.json"
+    : null;
   return {
     ...config,
     ...(icon === null ? {} : { icon }),
     android: {
       ...config.android,
+      ...(firebase === null ? {} : { googleServicesFile: firebase }),
       adaptiveIcon: {
         ...config.android?.adaptiveIcon,
         ...(foreground === null || background === null

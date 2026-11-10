@@ -7,10 +7,16 @@ import { createAuth } from "./auth/auth";
 import { createMailOutbox } from "./mail/outbox";
 import { createSmtpSender } from "./mail/smtp";
 import { renderMail } from "./mail/templates";
+import { setMailStatus } from "./mail/status";
 import { createMailWorker, createQueuedMailer, type MailLog } from "./mail/worker";
 import { readConfig } from "./config";
+import { RealtimeHub } from "./realtime/hub";
+import { createPgBus } from "./realtime/pg-bus";
 import type { Database } from "./db/database";
 import { InMemoryObjectStorage, S3ObjectStorage } from "./media/storage/object-storage";
+import { FcmPushSender, readServiceAccount } from "./notifications/fcm-sender";
+import { NotificationsService } from "./notifications/notifications.service";
+import { NotificationScheduler } from "./notifications/scheduler";
 
 function loadEnv(): void {
   const envPath = new URL("./.env", import.meta.url);
@@ -86,6 +92,10 @@ async function startApi(): Promise<void> {
     sender: mailSender,
     render: (job) => renderMail(job, config.auth.baseUrl),
     log: (level, event, detail) => {
+      // The health page shows how the last try went (P-96).
+      if (event === "mail_sent") setMailStatus({ state: "ok", error: null });
+      else if (event === "mail_retry" || event === "mail_expired")
+        setMailStatus({ state: "failing", error: detail.error ?? "unknown" });
       mailLog(level, event, detail);
     },
   });
@@ -110,7 +120,19 @@ async function startApi(): Promise<void> {
       })
     : new InMemoryObjectStorage();
 
+  // Realtime (P-100): this process's hub, joined to the others through PostgreSQL.
+  let busLog: (event: string) => void = () => undefined;
+  const realtimeHub = new RealtimeHub();
+  const bus = createPgBus(config.databaseUrl, pool, (event) => {
+    busLog(event);
+  });
+  realtimeHub.attachBus(bus);
+
+  // Android push through FCM (P-101) when its service account is set; none otherwise.
+  const fcmAccount = readServiceAccount(process.env);
   const app = await createApp({
+    ...(fcmAccount === null ? {} : { pushSender: new FcmPushSender(fcmAccount) }),
+    realtimeHub,
     db,
     auth,
     objectStorage,
@@ -122,6 +144,10 @@ async function startApi(): Promise<void> {
   log = (level, event) => {
     logger[level]({ code: event }, "auth event");
   };
+  busLog = (event) => {
+    if (event === "realtime_bus_up") logger.info({ code: event }, "realtime");
+    else logger.warn({ code: event }, "realtime");
+  };
   mailLog = (level, event, detail) => {
     logger[level]({ code: event, ...detail }, "mail");
   };
@@ -131,9 +157,19 @@ async function startApi(): Promise<void> {
   // server accepts our login is checked once now, so a wrong password shows up in the log at
   // start instead of as a missing email.
   mailWorker.start();
+  // Surprises on their day, events and birthdays on theirs (P-102).
+  const scheduler = new NotificationScheduler(db, app.get(NotificationsService), () => {
+    logger.warn({ code: "scheduler_failed" }, "notifications");
+  });
+  scheduler.start();
   void mailSender.verify().then((error) => {
-    if (error === null) logger.info({ code: "mail_transport_ok" }, "mail");
-    else logger.error({ code: "mail_transport_failed", error: error.code }, "mail");
+    if (error === null) {
+      logger.info({ code: "mail_transport_ok" }, "mail");
+      setMailStatus({ state: "ok", error: null });
+    } else {
+      logger.error({ code: "mail_transport_failed", error: error.code }, "mail");
+      setMailStatus({ state: "failing", error: error.code });
+    }
   });
 
   let closing = false;
@@ -141,6 +177,9 @@ async function startApi(): Promise<void> {
     if (closing) return;
     closing = true;
     await mailWorker.stop();
+    scheduler.stop();
+    realtimeHub.stop();
+    await bus.close();
     await app.close();
     await db.destroy();
   };

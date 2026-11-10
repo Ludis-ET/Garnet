@@ -56,6 +56,30 @@ function setup(): Promise<void> {
   return setUp;
 }
 
+/**
+ * This phone's Firebase token for push (P-101), once notifications are allowed; null when the
+ * build has no Firebase file (google-services.json) or the token can't be had.
+ */
+export async function pushToken(): Promise<string | null> {
+  await setup();
+  try {
+    const token = await Notifications.getDevicePushTokenAsync();
+    return typeof token.data === "string" && token.data !== "" ? token.data : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Calls back whenever Firebase gives this phone a new token. */
+export function onPushToken(listener: (token: string) => void): () => void {
+  const sub = Notifications.addPushTokenListener((token) => {
+    if (typeof token.data === "string" && token.data !== "") listener(token.data);
+  });
+  return () => {
+    sub.remove();
+  };
+}
+
 export async function permission(ask: boolean): Promise<Permission> {
   await setup();
   const now = await Notifications.getPermissionsAsync();

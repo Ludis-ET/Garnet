@@ -329,7 +329,15 @@ function HomeContent() {
           size={orb}
           width={heroWidth}
           pulse={pulse}
-          look={looks.garnet}
+          // P-100: Garnet when both have the app open; alone, the viewer's own gem.
+          character={looks.partnerActive || looks.mySide === null ? "garnet" : looks.mySide}
+          look={
+            looks.partnerActive || looks.mySide === null
+              ? looks.garnet
+              : looks.mySide === "ruby"
+                ? looks.ruby
+                : looks.sapphire
+          }
           shortcuts={prefs?.ring === false ? [] : shortcuts}
         />
         {incoming === null ? null : (

@@ -14,6 +14,7 @@ if (Platform.OS === "web") {
 import { API_AREAS_ON } from "@/data/http/config";
 import { useTestingTools } from "@/features/prototype/devTools";
 import { NotificationSync } from "@/notifications/NotificationSync";
+import { PushRegistration } from "@/notifications/PushRegistration";
 import { PrototypePanel } from "@/features/prototype/PrototypePanel";
 import { ProfileThemeSync } from "@/features/setup/ProfileThemeSync";
 import { AppProviders } from "@/providers/AppProviders";
@@ -57,6 +58,7 @@ export default function RootLayout() {
       <ProfileThemeSync />
       <Stack screenOptions={{ headerShown: false, ...PAGE }} />
       <NotificationSync />
+      <PushRegistration />
       <TestingPanel />
     </AppProviders>
   );

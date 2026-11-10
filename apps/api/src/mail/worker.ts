@@ -138,7 +138,8 @@ export function createQueuedMailer(
   now: () => Date = () => new Date(),
 ): Mailer {
   const queue = async (to: string, job: MailJob) => {
-    await outbox.enqueue(to, job, new Date(now().getTime() + mailLifetimeMs(job)));
+    const at = now();
+    await outbox.enqueue(to, job, new Date(at.getTime() + mailLifetimeMs(job)), at);
     worker.kick();
   };
   return {

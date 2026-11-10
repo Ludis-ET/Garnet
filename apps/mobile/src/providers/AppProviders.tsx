@@ -6,6 +6,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ToastProvider } from "@/components/ui/Toast";
 import { RepositoryProvider } from "@/data/RepositoryProvider";
+import { RealtimeProvider } from "@/features/realtime/RealtimeProvider";
 import { MediaPlayerProvider } from "@/features/media/MediaPlayerContext";
 import { ThemeProvider } from "@/theme/ThemeProvider";
 
@@ -28,11 +29,13 @@ export function AppProviders({ children }: { children: ReactNode }) {
         <SafeAreaProvider>
           <QueryClientProvider client={queryClient}>
             <RepositoryProvider>
-              <ThemeProvider>
-                <ToastProvider>
-                  <MediaPlayerProvider>{children}</MediaPlayerProvider>
-                </ToastProvider>
-              </ThemeProvider>
+              <RealtimeProvider>
+                <ThemeProvider>
+                  <ToastProvider>
+                    <MediaPlayerProvider>{children}</MediaPlayerProvider>
+                  </ToastProvider>
+                </ThemeProvider>
+              </RealtimeProvider>
             </RepositoryProvider>
           </QueryClientProvider>
         </SafeAreaProvider>

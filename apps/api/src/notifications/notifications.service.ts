@@ -120,6 +120,27 @@ export class NotificationsService {
         inAppTitle = "Your day is ready to revisit";
         inAppBody = "Your shared day is ready.";
         break;
+      // P-102: never the letter's words or the surprise's contents, only that it is there.
+      case "open-when":
+        inAppTitle = `A letter from ${senderName}`;
+        inAppBody = "Sealed for you, for when the moment is right.";
+        break;
+      case "surprise":
+        inAppTitle = `A surprise from ${senderName}`;
+        inAppBody = "It's ready to open.";
+        break;
+      case "event-reminder":
+        inAppTitle = "Something to look forward to";
+        inAppBody = "One of your days is today.";
+        break;
+      case "birthday":
+        inAppTitle = "A special day";
+        inAppBody = "Today is one of your special days.";
+        break;
+      case "partner-joined":
+        inAppTitle = `${senderName} is here`;
+        inAppBody = "Your space is ready for both of you.";
+        break;
       default:
         break;
     }
@@ -211,7 +232,7 @@ export class NotificationsService {
     // 6. Query recipient's active push tokens
     const devices = await this.db
       .selectFrom("push_device")
-      .select(["id", "token"])
+      .select(["id", "token", "platform"])
       .where("user_id", "=", input.recipientUserId)
       .execute();
 
@@ -220,6 +241,7 @@ export class NotificationsService {
       try {
         const result = await this.pushSender.send({
           to: dev.token,
+          platform: dev.platform,
           title: pushTitle,
           body: pushBody,
           data: {

@@ -72,6 +72,8 @@ const TIMELINE: readonly [ConnectPhase, number][] = [
 
 /** The fusion video duration before settling on Garnet (ms). */
 const FUSION_DURATION_MS = 2550;
+/** How long the fusion fades into the settled Garnet (ms). */
+const SETTLE_FADE_MS = 220;
 /** The moment when the sparkle explosion bursts and Garnet appears (ms). */
 const FUSION_BURST_PEAK_MS = 1800;
 
@@ -244,6 +246,30 @@ export function ConnectedScene({
     };
   });
 
+  // The looping fusion fades out as Garnet fades in, then is removed for good. This lives in
+  // its own effect: it used to be a timer in the timeline effect, which the switch to "settled"
+  // tore down before it fired, so the loop played on behind Garnet.
+  const settledOpacity = useSharedValue(reduceMotion ? 1 : 0);
+  const animOpacity = useSharedValue(1);
+  useEffect(() => {
+    if (phase !== 4) {
+      settledOpacity.set(reduceMotion ? 1 : 0);
+      animOpacity.set(1);
+      return;
+    }
+    const fade = reduceMotion ? 0 : SETTLE_FADE_MS;
+    settledOpacity.set(withTiming(1, { duration: fade }));
+    animOpacity.set(withTiming(0, { duration: fade }));
+    const gone = setTimeout(() => {
+      setHideUnderlyingAnim(true);
+    }, fade + 40);
+    return () => {
+      clearTimeout(gone);
+    };
+  }, [phase, reduceMotion, settledOpacity, animOpacity]);
+  const settledStyle = useAnimatedStyle(() => ({ opacity: settledOpacity.get() }));
+  const animStyle = useAnimatedStyle(() => ({ opacity: animOpacity.get() }));
+
   const settle = () => {
     if (settled.current) return;
     settled.current = true;
@@ -318,12 +344,7 @@ export function ConnectedScene({
       settleFromEffect();
     }, FUSION_DURATION_MS);
 
-    // Clean up underlying animation shortly after settled overlay mounts to prevent looping
-    const cleanupTimer = setTimeout(() => {
-      setHideUnderlyingAnim(true);
-    }, FUSION_DURATION_MS + 150);
-
-    timers.current = [leapTimer, hapticTimer, settleTimer, cleanupTimer];
+    timers.current = [leapTimer, hapticTimer, settleTimer];
 
     return () => {
       timers.current.forEach(clearTimeout);
@@ -373,27 +394,31 @@ export function ConnectedScene({
         style={styles.fusionStage}
       >
         <Animated.View style={[styles.fusionWrap, floatStyle]}>
-          {!hideUnderlyingAnim ? (
-            <Image
-              key={`fusion-anim-${replayKey}`}
-              source={animating ? webpSource : startSource}
-              style={{ width: animWidth, height: animHeight }}
-              contentFit="contain"
-              priority="high"
-              accessible={false}
-            />
-          ) : null}
-          {isSettled ? (
-            <View pointerEvents="none" style={styles.settledOverlay}>
+          {hideUnderlyingAnim ? (
+            // Holds the stage's size once the animation is gone.
+            <View style={{ width: animWidth, height: animHeight }} />
+          ) : (
+            <Animated.View style={animStyle}>
               <Image
-                source={settledSourceToUse}
+                key={`fusion-anim-${replayKey}`}
+                source={animating ? webpSource : startSource}
                 style={{ width: animWidth, height: animHeight }}
                 contentFit="contain"
                 priority="high"
                 accessible={false}
               />
-            </View>
-          ) : null}
+            </Animated.View>
+          )}
+          {/* Mounted from the start so it is decoded and ready: the fade is never a pop. */}
+          <Animated.View pointerEvents="none" style={[styles.settledOverlay, settledStyle]}>
+            <Image
+              source={settledSourceToUse}
+              style={{ width: animWidth, height: animHeight }}
+              contentFit="contain"
+              priority="high"
+              accessible={false}
+            />
+          </Animated.View>
           <View pointerEvents="none" style={styles.sparkleOverlay}>
             <SparkleBurst play={isSettled} />
           </View>

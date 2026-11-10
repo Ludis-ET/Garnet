@@ -1,4 +1,5 @@
 import { Body, Controller, Get, HttpCode, Inject, Patch, Post } from "@nestjs/common";
+import { NotificationsService } from "../notifications/notifications.service";
 import {
   ageOn,
   chooseSideSchema,
@@ -34,6 +35,7 @@ export class SetupController {
   constructor(
     @Inject(KYSELY) private readonly db: Kysely<Database>,
     @Inject(OBJECT_STORAGE) private readonly storage: ObjectStorage,
+    @Inject(NotificationsService) private readonly notifications: NotificationsService,
   ) {}
 
   @Get()
@@ -193,6 +195,29 @@ export class SetupController {
   async complete(
     @CurrentViewer() viewer: Viewer,
   ): Promise<{ ok: true } | { ok: false; missing: Missing[] }> {
+    const result = await this.#complete(viewer);
+    // P-99, P-102: the partner who was waiting hears that their space is open.
+    if (result.ok && result.waiting !== null)
+      await this.notifications
+        .sendNotification({
+          relationshipId: result.waiting.rel,
+          recipientUserId: result.waiting.partner,
+          senderUserId: viewer.userId,
+          category: "partner-joined",
+          group: "account",
+          href: "/",
+          context: { senderName: viewer.name },
+        })
+        .catch(() => undefined);
+    return result.ok ? { ok: true } : { ok: false, missing: result.missing };
+  }
+
+  async #complete(
+    viewer: Viewer,
+  ): Promise<
+    | { ok: true; waiting: { rel: string; partner: string } | null }
+    | { ok: false; missing: Missing[] }
+  > {
     return asViewer(this.db, viewer, async (trx) => {
       await ensureProfile(trx, viewer);
       const profile = toProfileDto(await readProfile(trx, viewer));
@@ -206,7 +231,19 @@ export class SetupController {
         .set({ complete: true, updated_at: sql<Date>`now()` })
         .where("user_id", "=", viewer.userId)
         .execute();
-      return { ok: true as const };
+      const partner = (
+        await sql<{ rel: string | null; partner: string | null; ready: boolean | null }>`
+          select my_relationship() as rel, my_partner() as partner,
+                 (select ready from partner_profile()) as ready`.execute(trx)
+      ).rows[0];
+      const waiting =
+        !profile.complete &&
+        partner?.rel != null &&
+        partner.partner != null &&
+        partner.ready === true
+          ? { rel: partner.rel, partner: partner.partner }
+          : null;
+      return { ok: true as const, waiting };
     });
   }
 }

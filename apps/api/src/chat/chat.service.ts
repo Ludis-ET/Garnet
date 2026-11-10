@@ -434,12 +434,12 @@ export class ChatService {
   }
 
   async toggleReaction(viewer: Viewer, messageId: string, emoji: string): Promise<ChatMessageDto> {
-    const { relationshipId, message } = await asViewer(this.db, viewer, async (trx) => {
+    const { relationshipId, message, notify } = await asViewer(this.db, viewer, async (trx) => {
       const relationshipId = await this.requireRelationshipId(trx, viewer.userId);
 
       const msg = await trx
         .selectFrom("chat_message")
-        .select("id")
+        .select(["id", "sender_id"])
         .where("id", "=", messageId)
         .where("relationship_id", "=", relationshipId)
         .executeTakeFirst();
@@ -473,7 +473,9 @@ export class ChatService {
       });
       const message = msgs[0];
       if (!message) throw new ApiProblem("internal");
-      return { relationshipId, message };
+      const notify =
+        existing === undefined && msg.sender_id !== viewer.userId ? msg.sender_id : null;
+      return { relationshipId, message, notify };
     });
 
     this.events.emit({
@@ -482,6 +484,18 @@ export class ChatService {
       type: "reaction_updated",
       payload: message,
     });
+    if (notify !== null)
+      await this.notifications
+        .sendNotification({
+          relationshipId,
+          recipientUserId: notify,
+          senderUserId: viewer.userId,
+          category: "reply-reaction",
+          group: "messages",
+          href: "/us/chat",
+          context: { senderName: viewer.name },
+        })
+        .catch(() => undefined);
 
     return message;
   }
@@ -634,7 +648,7 @@ export class ChatService {
   }
 
   async sendTyping(viewer: Viewer, typing: boolean): Promise<void> {
-    const { relationshipId } = await asViewer(this.db, viewer, async (trx) => {
+    const { relationshipId, shown } = await asViewer(this.db, viewer, async (trx) => {
       const relationshipId = await this.requireRelationshipId(trx, viewer.userId);
       const now = new Date();
       const typingUntil = typing ? new Date(now.getTime() + 5000) : null;
@@ -646,8 +660,16 @@ export class ChatService {
         do update set typing_until = ${typingUntil}, updated_at = ${now}
       `.execute(trx);
 
-      return { relationshipId };
+      // Someone who turned typing indicators off is never shown typing (P-58).
+      const own = await trx
+        .selectFrom("chat_participant_state")
+        .select("typing_indicators")
+        .where("relationship_id", "=", relationshipId)
+        .where("user_id", "=", viewer.userId)
+        .executeTakeFirst();
+      return { relationshipId, shown: own?.typing_indicators !== false };
     });
+    if (!shown) return;
 
     this.events.emit({
       relationshipId,
@@ -658,7 +680,7 @@ export class ChatService {
   }
 
   async setWatching(viewer: Viewer, watching: boolean): Promise<void> {
-    const { relationshipId } = await asViewer(this.db, viewer, async (trx) => {
+    const { relationshipId, mutual } = await asViewer(this.db, viewer, async (trx) => {
       const relationshipId = await this.requireRelationshipId(trx, viewer.userId);
       const now = new Date();
       const inChatUntil = watching ? new Date(now.getTime() + 10000) : null;
@@ -670,8 +692,16 @@ export class ChatService {
         do update set in_chat_until = ${inChatUntil}, updated_at = ${now}
       `.execute(trx);
 
-      return { relationshipId };
+      // "Here now" only when both have turned it on (P-58, P-61, U-35 stays open).
+      const states = await trx
+        .selectFrom("chat_participant_state")
+        .select("read_receipts")
+        .where("relationship_id", "=", relationshipId)
+        .execute();
+      const mutual = states.length === 2 && states.every((r) => r.read_receipts === true);
+      return { relationshipId, mutual };
     });
+    if (!mutual) return;
 
     this.events.emit({
       relationshipId,

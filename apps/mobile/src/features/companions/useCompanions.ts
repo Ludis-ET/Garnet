@@ -13,6 +13,7 @@ import {
 } from "@/domain/companion";
 import type { GemSide } from "@/domain/identity";
 import { useHomeToday } from "@/features/home/useHome";
+import { usePartnerPresence } from "@/features/realtime/RealtimeProvider";
 import { useNow } from "@/features/setup/useNow";
 
 export interface CompanionLooks {
@@ -21,12 +22,16 @@ export interface CompanionLooks {
   garnet: CompanionLook;
   /** Which gem is the viewer (null before choosing). */
   mySide: GemSide | null;
-  /** Both are using the app; until then only the viewer's own gem is shown (P-63). */
+  /**
+   * Both have Garnet open right now (P-100, realtime); on mock data, the sample's "both using the
+   * app" (P-63). Until then only the viewer's own gem is shown.
+   */
   partnerActive: boolean;
 }
 
 export function useCompanions(): CompanionLooks {
   const now = useNow();
+  const presence = usePartnerPresence();
   const today = useHomeToday().data;
   const c = today?.companions;
   const myZone = c?.me.zone ?? Temporal.Now.timeZoneId();
@@ -45,7 +50,7 @@ export function useCompanions(): CompanionLooks {
   const partnerLook = companionLook(theirs);
   return {
     mySide,
-    partnerActive: today?.partnerActive ?? false,
+    partnerActive: presence === null ? (today?.partnerActive ?? false) : presence.online,
     ruby: mySide === "sapphire" ? partnerLook : meLook,
     sapphire: mySide === "sapphire" ? meLook : mySide === "ruby" ? partnerLook : meLook,
     garnet: garnetLook(mine, { feeling: theirs.feeling, signal: theirs.signal }),

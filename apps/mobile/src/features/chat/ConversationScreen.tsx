@@ -4,7 +4,9 @@
  * partner's character pops up with typing dots while they type (only if they share typing),
  * yours hops when you send, and under your latest message the partner's tiny face says "Seen"
  * — only when BOTH of you said yes to it (U-35 open; asked once, nothing preselected).
- * Nothing claims delivery, presence or "online". Media never becomes a memory on its own.
+ * Live (P-100): typing and "here now" arrive the moment they happen over the realtime
+ * connection; this screen tells the partner it is open and when you type. Nothing claims
+ * delivery. Media never becomes a memory on its own.
  */
 import * as Clipboard from "expo-clipboard";
 import { LinearGradient } from "expo-linear-gradient";
@@ -63,13 +65,13 @@ import { AttachTray } from "./components/AttachTray";
 import { Bubble } from "./components/Bubble";
 import { ExpressionPanel, QUICK_EMOJI } from "./components/ExpressionPanel";
 import { MessageMenu, type MenuAction, type MessageAnchor } from "./components/MessageMenu";
+import { useRealtime } from "@/features/realtime/RealtimeProvider";
 import { MediaComposer } from "./components/MediaComposer";
 import { StatusRow } from "./components/StatusRow";
 import { gemOf, PeekBubble, PeekCharacter, TypingDots } from "./components/Presence";
 import {
   useCancelUpload,
   useChatMessages,
-  useChatStream,
   useMarkChatRead,
   useMarkSaved,
   useChatPresence,
@@ -160,7 +162,6 @@ function buildItems(
 }
 
 function Conversation() {
-  useChatStream();
   const toast = useToast();
   const { colors, radii, spacing, reduceMotion } = useTheme();
   const now = useNow();
@@ -186,6 +187,51 @@ function Conversation() {
   const keyboardUp = useKeyboardVisible();
 
   const [text, setText] = useState("");
+  const realtime = useRealtime();
+  // Stable access for effects: the context value changes with every presence update.
+  const realtimeRef = useRef(realtime);
+  useEffect(() => {
+    realtimeRef.current = realtime;
+  });
+  const typingSentAt = useRef(0);
+  const typingStop = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // This chat is open: said when the connection is up, unsaid on leaving (P-100).
+  const connected = realtime.status === "open" || realtime.status === "fallback";
+  useEffect(() => {
+    if (!connected) return;
+    realtimeRef.current.setInChat(true);
+    return () => {
+      realtimeRef.current.setInChat(false);
+    };
+  }, [connected]);
+
+  /** Typing, said at most every 3 s while it goes on, and "stopped" after 4 s of quiet. */
+  const onTyped = (next: string) => {
+    setText(next);
+    const now = Date.now();
+    if (typingStop.current !== null) clearTimeout(typingStop.current);
+    if (next.trim() === "") {
+      if (typingSentAt.current !== 0) realtimeRef.current.setTyping(false);
+      typingSentAt.current = 0;
+      return;
+    }
+    if (now - typingSentAt.current > 3000) {
+      realtimeRef.current.setTyping(true);
+      typingSentAt.current = now;
+    }
+    typingStop.current = setTimeout(() => {
+      realtimeRef.current.setTyping(false);
+      typingSentAt.current = 0;
+    }, 4000);
+  };
+  useEffect(
+    () => () => {
+      if (typingStop.current !== null) clearTimeout(typingStop.current);
+      if (typingSentAt.current !== 0) realtimeRef.current.setTyping(false);
+    },
+    [],
+  );
   const [focused, setFocused] = useState(false);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [editing, setEditing] = useState<ChatMessage | null>(null);
@@ -280,8 +326,10 @@ function Conversation() {
   const theirGem = gemOf(partner.side);
   const theirLook =
     theirGem === "sapphire" ? looks.sapphire : theirGem === "ruby" ? looks.ruby : looks.garnet;
-  const typing = presence.data?.partnerTyping === true;
-  const here = presence.data?.partnerHere === true;
+  // Live when connected (P-100); the presence query on mock data.
+  const live = realtime.partner;
+  const typing = live === null ? presence.data?.partnerTyping === true : live.typing;
+  const here = live === null ? presence.data?.partnerHere === true : live.inChat;
 
   const jumpTo = (id: string) => {
     const index = items.findIndex((i) => i.key === id);
@@ -871,7 +919,7 @@ function Conversation() {
             <TextInput
               ref={input}
               value={text}
-              onChangeText={setText}
+              onChangeText={onTyped}
               onFocus={() => {
                 setFocused(true);
                 setPanel(false);

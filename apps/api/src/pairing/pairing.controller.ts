@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, HttpCode, Inject, Post } from "@nestjs/common";
+import { NotificationsService } from "../notifications/notifications.service";
 import { hashToken } from "@garnet/db";
 import {
   INVITE_ALPHABET,
@@ -47,6 +48,7 @@ export class PairingController {
     @Inject(KYSELY) private readonly db: Kysely<Database>,
     @Inject(POLICY) private readonly policy: AuthPolicy,
     @Inject(CODE_SEALER) private readonly sealer: CodeSealer,
+    @Inject(NotificationsService) private readonly notifications: NotificationsService,
   ) {}
 
   @Get("v1/pairing")
@@ -139,14 +141,29 @@ export class PairingController {
     const { code } = parseBody(inviteCodeBodySchema, body);
     if (!this.#attempts.take(viewer.userId)) throw new ApiProblem("rate_limited");
     try {
-      const partnerName = await asViewer(this.db, viewer, async (trx) => {
+      const joined = await asViewer(this.db, viewer, async (trx) => {
         await ensureProfile(trx, viewer);
         const r = await sql<{
           name: string | null;
         }>`select join_with_invitation(${hashToken(code)}) as name`.execute(trx);
-        return r.rows[0]?.name ?? "";
+        const couple = await sql<{ rel: string | null; partner: string | null }>`
+          select my_relationship() as rel, my_partner() as partner`.execute(trx);
+        return { name: r.rows[0]?.name ?? "", couple: couple.rows[0] };
       });
-      return { ok: true, partnerName };
+      // P-102: the inviter hears their person joined (PAIR-06).
+      if (joined.couple?.rel != null && joined.couple.partner != null)
+        await this.notifications
+          .sendNotification({
+            relationshipId: joined.couple.rel,
+            recipientUserId: joined.couple.partner,
+            senderUserId: viewer.userId,
+            category: "partner-joined",
+            group: "account",
+            href: "/",
+            context: { senderName: viewer.name },
+          })
+          .catch(() => undefined);
+      return { ok: true, partnerName: joined.name };
     } catch (error) {
       if (isInvalidInvitation(error)) return { ok: false };
       throw error;

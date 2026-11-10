@@ -2,13 +2,15 @@ import { useEffect } from "react";
 import { useAuthStatus } from "@/features/auth/useAuth";
 import { useThemeSettings } from "@/theme/ThemeProvider";
 import { setHapticsEnabled } from "@/components/ui/haptics";
+import { usePartnerPresence } from "@/features/realtime/RealtimeProvider";
 import { useSettings } from "@/features/settings/useSettings";
 import { useSetupState } from "./useSetup";
 
 /**
  * Applies the signed-in person's side colour, appearance and accent intensity to the whole app
- * (SETUP-03, SETUP-06). Personal pages use the viewer's own side (master style); signed-out screens and
- * people who haven't chosen a side stay Garnet violet. Renders nothing.
+ * (SETUP-03, SETUP-06). Alone in the app it is the viewer's own side (master style); while the
+ * partner has Garnet open too it becomes Garnet violet (P-100). Signed-out screens and people
+ * who haven't chosen a side stay Garnet violet. Renders nothing.
  */
 export function ProfileThemeSync() {
   const auth = useAuthStatus();
@@ -18,7 +20,10 @@ export function ProfileThemeSync() {
   const prefs = useSettings(signedIn).data?.settings;
   const motion = prefs?.motion;
   const haptics = prefs?.haptics ?? true;
-  const side = signedIn ? (setup.data?.profile.side ?? null) : null;
+  const mySide = signedIn ? (setup.data?.profile.side ?? null) : null;
+  // P-100: alone in the app, it wears the person's own colour; with both online, Garnet's.
+  const together = usePartnerPresence()?.online === true;
+  const side = together ? "garnet" : mySide;
   const appearance = signedIn ? setup.data?.profile.appearance : undefined;
   const accent = signedIn ? (setup.data?.profile.accent ?? "subtle") : "subtle";
 

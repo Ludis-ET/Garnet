@@ -29,6 +29,7 @@ import {
 import { CurrentViewer } from "../auth/session.guard";
 import type { Viewer } from "../db/database";
 import { parseBody } from "../http/body";
+import { RealtimeHub } from "../realtime/hub";
 import { ChatService } from "./chat.service";
 
 /**
@@ -53,7 +54,10 @@ import { ChatService } from "./chat.service";
  */
 @Controller("v1/chat")
 export class ChatController {
-  constructor(@Inject(ChatService) private readonly chatService: ChatService) {}
+  constructor(
+    @Inject(ChatService) private readonly chatService: ChatService,
+    @Inject(RealtimeHub) private readonly hub: RealtimeHub,
+  ) {}
 
   @Get("summary")
   async getSummary(@CurrentViewer() viewer: Viewer): Promise<ConversationSummaryResponse> {
@@ -207,6 +211,9 @@ export class ChatController {
         return;
       }
 
+      // The SSE fallback counts as having Garnet open, like the WebSocket (P-100).
+      const presence = this.hub.connected(relId, viewer.userId);
+
       // Subscribe to relationship chat events
       unsubscribe = this.chatService.subscribeEvents(relId, (event) => {
         if (active) {
@@ -225,6 +232,7 @@ export class ChatController {
         active = false;
         clearInterval(pingInterval);
         unsubscribe();
+        presence.close();
       };
     });
   }

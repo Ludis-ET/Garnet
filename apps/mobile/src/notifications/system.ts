@@ -23,3 +23,8 @@ export const setBadge: (count: number) => Promise<void> = () => Promise.resolve(
 
 /** Calls back with the notification's in-app link when one is tapped; returns an unsubscribe. */
 export const onOpen: (open: (href: string) => void) => () => void = () => () => undefined;
+
+/** Push tokens exist only on Android for now (P-101; iPhones wait for APNs). */
+export const pushToken: () => Promise<string | null> = () => Promise.resolve(null);
+
+export const onPushToken: (listener: (token: string) => void) => () => void = () => () => undefined;

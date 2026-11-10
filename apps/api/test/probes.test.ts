@@ -53,6 +53,8 @@ const PUBLIC_ROUTES = new Set([
   "GET /v1/sign-in-methods",
   // The email-link opener (production-fix-plan A7): hands a token to garnet://, reads nothing.
   "GET /v1/open/:page",
+  // The realtime WebSocket checks the session at the upgrade (realtime.test.ts covers it).
+  "GET /v1/realtime",
   "GET /v1/auth/*",
   "POST /v1/auth/*",
   "GET /v1/me/export/download/:token",

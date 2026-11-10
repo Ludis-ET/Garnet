@@ -1,5 +1,5 @@
-import { Injectable } from "@nestjs/common";
-import { EventEmitter } from "node:events";
+import { Inject, Injectable } from "@nestjs/common";
+import { RealtimeHub } from "../realtime/hub";
 
 export interface ChatEvent {
   relationshipId: string;
@@ -15,19 +15,21 @@ export interface ChatEvent {
   payload: unknown;
 }
 
+/**
+ * Chat's events, sent through the realtime hub (P-100) so they reach the partner whichever API
+ * process holds their connection, by WebSocket or by the SSE stream.
+ */
 @Injectable()
 export class ChatEventsService {
-  private readonly emitter = new EventEmitter();
+  constructor(@Inject(RealtimeHub) private readonly hub: RealtimeHub) {}
 
   emit(event: ChatEvent): void {
-    this.emitter.emit(`rel:${event.relationshipId}`, event);
+    this.hub.publish(event);
   }
 
   subscribe(relationshipId: string, listener: (event: ChatEvent) => void): () => void {
-    const channel = `rel:${relationshipId}`;
-    this.emitter.on(channel, listener);
-    return () => {
-      this.emitter.off(channel, listener);
-    };
+    return this.hub.subscribe(relationshipId, (event) => {
+      listener(event as ChatEvent);
+    });
   }
 }

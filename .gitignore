@@ -37,3 +37,8 @@ Thumbs.db
 # Built app packages (production-fix-plan S12): never committed.
 *.apk
 *.aab
+
+# Firebase (P-101): the app file and the server key stay out of git.
+google-services.json
+GoogleService-Info.plist
+*firebase-adminsdk*.json
